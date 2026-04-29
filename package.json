@@ -1,0 +1,35 @@
+{
+  "name": "eclesia-presenter",
+  "version": "0.1.0",
+  "description": "Software de presentación para iglesias — letras, Biblia, OBS overlay, control móvil",
+  "main": "src/main/main.js",
+  "homepage": "https://github.com/tu-usuario/eclesia-presenter",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "vite build && electron-builder",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.18.3",
+    "socket.io": "^4.7.4",
+    "socket.io-client": "^4.7.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^29.1.4",
+    "electron-builder": "^24.13.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.4.1",
+    "autoprefixer": "^10.4.18",
+    "postcss": "^8.4.35",
+    "vite": "^5.1.6",
+    "wait-on": "^7.2.0"
+  }
+}
