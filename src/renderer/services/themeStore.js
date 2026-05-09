@@ -4,8 +4,45 @@
 
 import { useEffect, useState } from 'react'
 
-// Default unificado entre renderer y main.
-// Si cambias esto, actualiza también `defaultTheme()` en src/main/projection.js.
+// Default del overlay (lower-third) — independiente del fondo de pantalla completa.
+// Editable desde ProjectionPanel y se aplica solo a la ventana overlay capturable por OBS.
+export const DEFAULT_OVERLAY = {
+  // Estilo del fondo de la banda
+  bgEnabled: true,
+  bgType: 'gradient',                 // 'solid' | 'gradient' | 'transparent'
+  bgColor: 'rgba(20, 16, 13, 0.88)',
+  bgGradient: ['rgba(20, 16, 13, 0)', 'rgba(20, 16, 13, 0.95)'],
+  bgBlur: 2,                          // backdrop-filter blur (px)
+
+  // Posición
+  position: 'bottom',                 // 'top' | 'bottom'
+  offsetY: 90,                        // distancia al borde (px)
+  offsetX: 80,                        // margen lateral (px)
+  padding: '32px 48px',
+
+  // Borde acento
+  borderEnabled: true,
+  borderColor: '#c8794a',             // copper-300
+  borderWidth: 6,
+  borderSide: 'left',                 // 'left' | 'top' | 'all' | 'none'
+  borderRadius: 8,
+
+  // Texto principal
+  fontFamily: '"Cormorant Garamond", serif',
+  fontSize: 54,
+  fontColor: '#ffffff',
+  fontWeight: 500,
+  textShadow: true,
+
+  // Referencia
+  refEnabled: true,
+  refFontSize: 18,
+  refFontColor: '#db9f75',            // copper-200
+  refUppercase: true,
+}
+
+// Default unificado entre renderer y main. Si lo cambias, sincroniza también
+// `defaultTheme()` en src/main/projection.js.
 const DEFAULT_THEME = {
   bgType: 'gradient',
   bgColor: '#0a1620',
@@ -22,9 +59,11 @@ const DEFAULT_THEME = {
   transitionType: 'fade',
   transitionDuration: 500,
   transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+  // Configuración del overlay (lower-third) — anidada para mantener un único theme
+  overlay: { ...DEFAULT_OVERLAY },
 }
 
-let currentTheme = { ...DEFAULT_THEME }
+let currentTheme = { ...DEFAULT_THEME, overlay: { ...DEFAULT_OVERLAY } }
 const listeners = new Set()
 
 function emit() {
@@ -34,10 +73,17 @@ function emit() {
 export function getTheme() { return currentTheme }
 
 export function setTheme(patch) {
-  currentTheme = { ...currentTheme, ...patch }
+  // Permite patch parcial. Para overlay se hace merge profundo.
+  const next = { ...currentTheme, ...patch }
+  if (patch.overlay) next.overlay = { ...currentTheme.overlay, ...patch.overlay }
+  currentTheme = next
   emit()
-  // Sincronizar al main si hay Electron
   if (window.electron?.projection) window.electron.projection.theme(patch)
+}
+
+/** Patch específico del overlay (atajo). */
+export function setOverlay(overlayPatch) {
+  setTheme({ overlay: overlayPatch })
 }
 
 export function subscribeTheme(fn) {
@@ -46,29 +92,103 @@ export function subscribeTheme(fn) {
   return () => listeners.delete(fn)
 }
 
-/**
- * Al arrancar: lee el theme persistido en main + ASEGURA que main tiene
- * el theme actual (push). Esto resuelve el caso en que el main inicia con
- * sus defaults y nunca recibe el theme del renderer hasta que el usuario
- * toque algo.
- */
 export async function syncFromMain() {
   if (!window.electron?.projection) return
   const state = await window.electron.projection.state()
   if (state?.theme) {
-    currentTheme = { ...DEFAULT_THEME, ...state.theme }
+    currentTheme = {
+      ...DEFAULT_THEME,
+      ...state.theme,
+      overlay: { ...DEFAULT_OVERLAY, ...(state.theme.overlay || {}) },
+    }
     emit()
   }
-  // Push completo del estado actual al main para garantizar sincronía
-  // (el main usa esto para inicializar las ventanas de proyección que se abran después).
+  // Push para garantizar que el main tiene exactamente este theme
   window.electron.projection.theme(currentTheme)
 }
 
-/** Hook para componentes — re-renderizan cuando el tema cambia */
 export function useTheme() {
   const [theme, setLocal] = useState(currentTheme)
   useEffect(() => subscribeTheme(setLocal), [])
   return theme
 }
+
+// 6 presets visuales para el overlay (la "baraja" del lower-third)
+export const OVERLAY_PRESETS = [
+  {
+    id: 'broadcast',
+    label: 'Broadcast',
+    description: 'Cobre clásico (default)',
+    preview: { bg: 'linear-gradient(180deg, transparent, rgba(20,16,13,0.95))', border: '#c8794a' },
+    overlay: {
+      bgEnabled: true, bgType: 'gradient',
+      bgGradient: ['rgba(20, 16, 13, 0)', 'rgba(20, 16, 13, 0.95)'],
+      borderEnabled: true, borderColor: '#c8794a', borderSide: 'left', borderWidth: 6,
+      fontColor: '#ffffff', refFontColor: '#db9f75',
+    },
+  },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    description: 'Sin fondo · solo texto',
+    preview: { bg: 'transparent', border: 'transparent' },
+    overlay: {
+      bgEnabled: false, bgType: 'transparent',
+      borderEnabled: false,
+      textShadow: true,
+      fontColor: '#ffffff', refFontColor: '#f5dec8',
+    },
+  },
+  {
+    id: 'banner',
+    label: 'Banner negro',
+    description: 'Caja negra opaca',
+    preview: { bg: 'rgba(0,0,0,0.85)', border: 'transparent' },
+    overlay: {
+      bgEnabled: true, bgType: 'solid',
+      bgColor: 'rgba(0, 0, 0, 0.88)',
+      borderEnabled: false,
+      fontColor: '#ffffff', refFontColor: '#ffffff',
+    },
+  },
+  {
+    id: 'cinema',
+    label: 'Cinema',
+    description: 'Banda superior elegante',
+    preview: { bg: 'linear-gradient(0deg, transparent, rgba(0,0,0,0.85))', border: '#f5dec8' },
+    overlay: {
+      bgEnabled: true, bgType: 'gradient',
+      bgGradient: ['rgba(0, 0, 0, 0.92)', 'rgba(0, 0, 0, 0)'],
+      borderEnabled: true, borderColor: '#f5dec8', borderSide: 'top', borderWidth: 2,
+      position: 'top',
+      fontColor: '#ffffff', refFontColor: '#f5dec8',
+    },
+  },
+  {
+    id: 'card',
+    label: 'Card flotante',
+    description: 'Tarjeta con sombra',
+    preview: { bg: 'rgba(34,26,20,0.95)', border: 'transparent' },
+    overlay: {
+      bgEnabled: true, bgType: 'solid',
+      bgColor: 'rgba(34, 26, 20, 0.92)',
+      borderEnabled: false,
+      borderRadius: 16,
+      fontColor: '#f4e6d7', refFontColor: '#db9f75',
+    },
+  },
+  {
+    id: 'ticker',
+    label: 'Ticker rojo',
+    description: 'Aviso · estilo urgente',
+    preview: { bg: 'rgba(214,42,42,0.92)', border: '#ff5252' },
+    overlay: {
+      bgEnabled: true, bgType: 'solid',
+      bgColor: 'rgba(214, 42, 42, 0.92)',
+      borderEnabled: true, borderColor: '#ff5252', borderSide: 'left', borderWidth: 8,
+      fontColor: '#ffffff', refFontColor: '#fff5d6',
+    },
+  },
+]
 
 export { DEFAULT_THEME }

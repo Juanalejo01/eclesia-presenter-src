@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import MediaPicker from './MediaPicker.jsx'
 import SlideRenderer from './SlideRenderer.jsx'
-import { useTheme, setTheme as setStoredTheme } from '../services/themeStore.js'
+import LowerThirdRenderer from './LowerThirdRenderer.jsx'
 import {
-  IconExternal, IconMonitor, IconLayers, IconRefresh, IconChevDown,
+  useTheme, setTheme as setStoredTheme, setOverlay, OVERLAY_PRESETS,
+} from '../services/themeStore.js'
+import {
+  IconExternal, IconMonitor, IconLayers, IconRefresh,
 } from './Icons.jsx'
 
 const TRANSITION_TYPES = [
@@ -30,13 +33,14 @@ const BG_TYPES = [
   { value: 'video', label: 'Video' },
   { value: 'transparent', label: 'Transparente' },
 ]
+
 const ALIGN = [
   { value: 'top', label: 'Arriba' },
   { value: 'center', label: 'Centro' },
   { value: 'bottom', label: 'Abajo' },
 ]
 
-const PRESETS = [
+const FULLSCREEN_PRESETS = [
   { id: 'azul',      label: 'Clásico azul', bg: 'linear-gradient(135deg, #0a1620 0%, #1e3a5f 60%, #0a1620 100%)',
     theme: { bgType: 'gradient', bgGradient: ['#0a1620', '#1e3a5f'], fontColor: '#ffffff', fontSize: 64, textAlign: 'center' } },
   { id: 'atardecer', label: 'Atardecer', bg: 'linear-gradient(135deg, #3e2411 0%, #804012 50%, #1a0e08 100%)',
@@ -49,8 +53,6 @@ const PRESETS = [
     theme: { bgType: 'gradient', bgGradient: ['#db9f75', '#1a0e08'], fontColor: '#ffffff', fontSize: 64, textAlign: 'center' } },
   { id: 'vitral',    label: 'Vitral', bg: 'conic-gradient(from 200deg at 50% 50%, #122324, #804012, #db9f75, #2f3a32, #122324)',
     theme: { bgType: 'gradient', bgGradient: ['#122324', '#804012'], fontColor: '#ffffff', fontSize: 64, textAlign: 'center' } },
-  { id: 'overlay',   label: 'Overlay OBS', bg: 'repeating-conic-gradient(#1a1410 0 25%, #2a1f17 0 50%) 50% / 14px 14px',
-    theme: { bgType: 'transparent', fontColor: '#ffffff', fontSize: 56, textAlign: 'bottom', textShadow: true } },
 ]
 
 export default function ProjectionPanel({ slide }) {
@@ -60,6 +62,8 @@ export default function ProjectionPanel({ slide }) {
   const theme   = useTheme()
   const [preview, setPreview] = useState(slide || DEMO_SLIDES[0])
   const [activePreset, setActivePreset] = useState(null)
+  const [activeOverlayPreset, setActiveOverlayPreset] = useState(null)
+  const [editorTab, setEditorTab] = useState('fullscreen')  // 'fullscreen' | 'overlay'
 
   useEffect(() => { if (slide) setPreview(slide) }, [slide])
 
@@ -76,7 +80,8 @@ export default function ProjectionPanel({ slide }) {
     setOpenModes(s.open); setDisplays(s.displays)
   }
 
-  const updateTheme = (patch) => setStoredTheme(patch)
+  const updateTheme   = (patch) => setStoredTheme(patch)
+  const updateOverlay = (patch) => setOverlay(patch)
 
   const open = async (mode, displayId) => {
     if (!hasElectron) {
@@ -146,142 +151,424 @@ export default function ProjectionPanel({ slide }) {
             />
           </div>
 
-          {/* Big preview */}
-          <div>
-            <div className="section-h">
-              <h3>Vista previa del estilo</h3>
-              <span className="sub">{activePreset || theme.bgType}</span>
-            </div>
-            <div className="projection-preview" style={{ background: 'transparent', padding: 0 }}>
-              <SlideRenderer slide={preview} theme={theme} />
-            </div>
-          </div>
-
-          {/* Style presets */}
-          <div>
-            <div className="section-h">
-              <h3>Estilos predefinidos</h3>
-              <span className="sub">{PRESETS.length} plantillas · personalizables</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PRESETS.length}, 1fr)`, gap: 10 }}>
-              {PRESETS.map(p => (
-                <div key={p.id}
-                  className={'style-card' + (activePreset === p.id ? ' active' : '')}
-                  onClick={() => { updateTheme(p.theme); setActivePreset(p.id) }}
-                  style={{ background: p.bg }}>
-                  <span className="label-aa">Aa</span>
-                  <span className="label-name">{p.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Customization */}
-          <div className="card" style={{ padding: 18 }}>
-            <div className="section-h" style={{ marginBottom: 14 }}>
-              <h3 style={{ fontSize: 16 }}>Personalización avanzada</h3>
-              <span className="sub">en tiempo real</span>
+          {/* Tabs editor */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{
+              display: 'flex', borderBottom: '1px solid var(--line-1)',
+              background: 'var(--bg-1)',
+            }}>
+              <TabButton
+                active={editorTab === 'fullscreen'}
+                onClick={() => setEditorTab('fullscreen')}
+                icon={<IconMonitor size={14} />}
+                label="Pantalla completa"
+              />
+              <TabButton
+                active={editorTab === 'overlay'}
+                onClick={() => setEditorTab('overlay')}
+                icon={<IconLayers size={14} />}
+                label="Overlay (Lower-Third)"
+              />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-              <div className="field">
-                <span className="label">Fondo</span>
-                <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 'var(--r-md)' }}>
-                  {BG_TYPES.map(b => (
-                    <button key={b.value}
-                      className={'modal-tab ' + (theme.bgType === b.value ? 'active' : '')}
-                      style={{ flex: 1 }}
-                      onClick={() => updateTheme({ bgType: b.value })}>{b.label}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="field">
-                <span className="label">Tamaño · {theme.fontSize}px</span>
-                <input type="range" min="32" max="120" value={theme.fontSize}
-                  onChange={e => updateTheme({ fontSize: +e.target.value })}
-                  className="slider"
-                  style={{ '--val': ((theme.fontSize - 32) / 88 * 100) + '%' }} />
-              </div>
-
-              {theme.bgType === 'solid' && (
-                <ColorRow label="Color del fondo" value={theme.bgColor} onChange={v => updateTheme({ bgColor: v })} />
+            <div style={{ padding: 18 }}>
+              {editorTab === 'fullscreen' && (
+                <FullscreenEditor
+                  theme={theme} preview={preview}
+                  activePreset={activePreset} setActivePreset={setActivePreset}
+                  updateTheme={updateTheme}
+                />
               )}
-
-              {theme.bgType === 'gradient' && (
-                <>
-                  <ColorRow label="Gradiente · desde" value={theme.bgGradient[0]}
-                    onChange={v => updateTheme({ bgGradient: [v, theme.bgGradient[1]] })} />
-                  <ColorRow label="Gradiente · hasta" value={theme.bgGradient[1]}
-                    onChange={v => updateTheme({ bgGradient: [theme.bgGradient[0], v] })} />
-                </>
+              {editorTab === 'overlay' && (
+                <OverlayEditor
+                  theme={theme} preview={preview}
+                  activePreset={activeOverlayPreset} setActivePreset={setActiveOverlayPreset}
+                  updateOverlay={updateOverlay}
+                />
               )}
-
-              {theme.bgType === 'image' && (
-                <div className="field" style={{ gridColumn: 'span 2' }}>
-                  <span className="label">Imagen de fondo</span>
-                  <MediaPicker kind="image" label="Biblioteca de imágenes"
-                    value={theme.bgImage} onChange={(url) => updateTheme({ bgImage: url })} />
-                </div>
-              )}
-
-              {theme.bgType === 'video' && (
-                <div className="field" style={{ gridColumn: 'span 2' }}>
-                  <span className="label">Video de fondo</span>
-                  <MediaPicker kind="video" label="Biblioteca de videos"
-                    value={theme.bgVideo} onChange={(url) => updateTheme({ bgVideo: url })} />
-                </div>
-              )}
-
-              <ColorRow label="Color del texto" value={theme.fontColor}
-                onChange={v => updateTheme({ fontColor: v })} />
-
-              <div className="field">
-                <span className="label">Posición vertical</span>
-                <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 'var(--r-md)' }}>
-                  {ALIGN.map(a => (
-                    <button key={a.value}
-                      className={'modal-tab ' + (theme.textAlign === a.value ? 'active' : '')}
-                      style={{ flex: 1 }}
-                      onClick={() => updateTheme({ textAlign: a.value })}>{a.label}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="field" style={{ gridColumn: 'span 2' }}>
-                <span className="label">Transición · {theme.transitionDuration ?? 500}ms</span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, padding: 3, background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 'var(--r-md)', marginBottom: 8 }}>
-                  {TRANSITION_TYPES.map(t => (
-                    <button key={t.value}
-                      className={'modal-tab ' + (theme.transitionType === t.value ? 'active' : '')}
-                      onClick={() => updateTheme({ transitionType: t.value })}
-                      style={{ fontSize: 11, padding: '4px 6px' }}>{t.label}</button>
-                  ))}
-                </div>
-                <input type="range" min="0" max="2000" step="50"
-                  value={theme.transitionDuration ?? 500}
-                  onChange={e => updateTheme({ transitionDuration: +e.target.value })}
-                  className="slider"
-                  style={{ '--val': ((theme.transitionDuration ?? 500) / 2000 * 100) + '%' }} />
-              </div>
-
-              <div className="field" style={{ gridColumn: 'span 2', flexDirection: 'row', gap: 18 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!theme.textShadow}
-                    onChange={e => updateTheme({ textShadow: e.target.checked })} />
-                  Sombra de texto
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!theme.referenceVisible}
-                    onChange={e => updateTheme({ referenceVisible: e.target.checked })} />
-                  Mostrar referencia bíblica
-                </label>
-              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+// ---------- Editor: Pantalla completa ----------
+function FullscreenEditor({ theme, preview, activePreset, setActivePreset, updateTheme }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* Big preview */}
+      <div>
+        <div className="section-h">
+          <h3>Vista previa</h3>
+          <span className="sub">{activePreset || theme.bgType}</span>
+        </div>
+        <div className="projection-preview" style={{ background: 'transparent', padding: 0 }}>
+          <SlideRenderer slide={preview} theme={theme} />
+        </div>
+      </div>
+
+      {/* Presets de fondo */}
+      <div>
+        <div className="section-h">
+          <h3>Estilos predefinidos</h3>
+          <span className="sub">{FULLSCREEN_PRESETS.length} plantillas · personalizables</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${FULLSCREEN_PRESETS.length}, 1fr)`, gap: 10 }}>
+          {FULLSCREEN_PRESETS.map(p => (
+            <div key={p.id}
+              className={'style-card' + (activePreset === p.id ? ' active' : '')}
+              onClick={() => { updateTheme(p.theme); setActivePreset(p.id) }}
+              style={{ background: p.bg }}>
+              <span className="label-aa">Aa</span>
+              <span className="label-name">{p.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Customization */}
+      <CustomizationGrid theme={theme} updateTheme={updateTheme} />
+    </div>
+  )
+}
+
+function CustomizationGrid({ theme, updateTheme }) {
+  return (
+    <div>
+      <div className="section-h"><h3>Personalización avanzada</h3><span className="sub">en tiempo real</span></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+        <div className="field">
+          <span className="label">Fondo</span>
+          <SegmentedControl
+            options={BG_TYPES} value={theme.bgType}
+            onChange={v => updateTheme({ bgType: v })} />
+        </div>
+
+        <div className="field">
+          <span className="label">Tamaño · {theme.fontSize}px</span>
+          <input type="range" min="32" max="120" value={theme.fontSize}
+            onChange={e => updateTheme({ fontSize: +e.target.value })}
+            className="slider"
+            style={{ '--val': ((theme.fontSize - 32) / 88 * 100) + '%' }} />
+        </div>
+
+        {theme.bgType === 'solid' && (
+          <ColorRow label="Color del fondo" value={theme.bgColor} onChange={v => updateTheme({ bgColor: v })} />
+        )}
+
+        {theme.bgType === 'gradient' && (
+          <>
+            <ColorRow label="Gradiente · desde" value={theme.bgGradient[0]}
+              onChange={v => updateTheme({ bgGradient: [v, theme.bgGradient[1]] })} />
+            <ColorRow label="Gradiente · hasta" value={theme.bgGradient[1]}
+              onChange={v => updateTheme({ bgGradient: [theme.bgGradient[0], v] })} />
+          </>
+        )}
+
+        {theme.bgType === 'image' && (
+          <div className="field" style={{ gridColumn: 'span 2' }}>
+            <span className="label">Imagen de fondo</span>
+            <MediaPicker kind="image" label="Biblioteca de imágenes"
+              value={theme.bgImage} onChange={(url) => updateTheme({ bgImage: url })} />
+          </div>
+        )}
+
+        {theme.bgType === 'video' && (
+          <div className="field" style={{ gridColumn: 'span 2' }}>
+            <span className="label">Video de fondo</span>
+            <MediaPicker kind="video" label="Biblioteca de videos"
+              value={theme.bgVideo} onChange={(url) => updateTheme({ bgVideo: url })} />
+          </div>
+        )}
+
+        <ColorRow label="Color del texto" value={theme.fontColor} onChange={v => updateTheme({ fontColor: v })} />
+
+        <div className="field">
+          <span className="label">Posición vertical</span>
+          <SegmentedControl
+            options={ALIGN} value={theme.textAlign}
+            onChange={v => updateTheme({ textAlign: v })} />
+        </div>
+
+        <div className="field" style={{ gridColumn: 'span 2' }}>
+          <span className="label">Transición · {theme.transitionDuration ?? 500}ms</span>
+          <SegmentedControl
+            options={TRANSITION_TYPES} value={theme.transitionType}
+            onChange={v => updateTheme({ transitionType: v })}
+            cols={8} small />
+          <input type="range" min="0" max="2000" step="50"
+            value={theme.transitionDuration ?? 500}
+            onChange={e => updateTheme({ transitionDuration: +e.target.value })}
+            className="slider"
+            style={{ '--val': ((theme.transitionDuration ?? 500) / 2000 * 100) + '%', marginTop: 8 }} />
+        </div>
+
+        <div className="field" style={{ gridColumn: 'span 2', flexDirection: 'row', gap: 18 }}>
+          <CheckboxLabel checked={!!theme.textShadow} onChange={v => updateTheme({ textShadow: v })}>
+            Sombra de texto
+          </CheckboxLabel>
+          <CheckboxLabel checked={!!theme.referenceVisible} onChange={v => updateTheme({ referenceVisible: v })}>
+            Mostrar referencia bíblica
+          </CheckboxLabel>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------- Editor: Overlay (Lower-Third) ----------
+function OverlayEditor({ theme, preview, activePreset, setActivePreset, updateOverlay }) {
+  const o = theme.overlay || {}
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* Preview del lower-third sobre fondo neutro de cámara */}
+      <div>
+        <div className="section-h">
+          <h3>Vista previa del lower-third</h3>
+          <span className="sub">simula captura OBS · sobre cámara</span>
+        </div>
+        <div style={{
+          aspectRatio: '16 / 9',
+          borderRadius: 'var(--r-lg)',
+          overflow: 'hidden', position: 'relative',
+          // Simulación de fondo "cámara" — degradado oscuro genérico
+          background: 'linear-gradient(135deg, #2a3440 0%, #4a5260 50%, #2a3440 100%)',
+          border: '1px solid var(--line-1)',
+          boxShadow: 'var(--shadow-1)',
+        }}>
+          {/* Patrón de "ruido" para que se note la transparencia */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'radial-gradient(ellipse at 30% 30%, rgba(255,255,255,0.08), transparent 70%)',
+            mixBlendMode: 'overlay',
+          }} />
+          <div style={{ position: 'absolute', inset: 0 }}>
+            <LowerThirdRenderer slide={preview} theme={theme} />
+          </div>
+        </div>
+      </div>
+
+      {/* Presets — la "baraja" */}
+      <div>
+        <div className="section-h">
+          <h3>Estilos predefinidos</h3>
+          <span className="sub">{OVERLAY_PRESETS.length} plantillas · click para aplicar</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {OVERLAY_PRESETS.map(p => (
+            <button key={p.id}
+              className={'template-card' + (activePreset === p.id ? ' active' : '')}
+              onClick={() => { updateOverlay(p.overlay); setActivePreset(p.id) }}
+              style={{ position: 'relative', overflow: 'hidden', minHeight: 78 }}>
+              <span style={{
+                position: 'absolute', top: 0, right: 0, bottom: 0, width: 60,
+                background: p.preview.bg,
+                borderLeft: p.preview.border !== 'transparent' ? `3px solid ${p.preview.border}` : 'none',
+              }} />
+              <span className="template-card-title" style={{ position: 'relative', zIndex: 1 }}>{p.label}</span>
+              <span className="template-card-meta" style={{ position: 'relative', zIndex: 1 }}>{p.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Personalización fina del overlay */}
+      <div>
+        <div className="section-h">
+          <h3>Personalización fina</h3>
+          <span className="sub">en tiempo real</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          {/* Toggle fondo */}
+          <div className="field" style={{ gridColumn: 'span 2', flexDirection: 'row', gap: 18 }}>
+            <CheckboxLabel checked={o.bgEnabled} onChange={v => updateOverlay({ bgEnabled: v })}>
+              Fondo de banda
+            </CheckboxLabel>
+            <CheckboxLabel checked={o.borderEnabled} onChange={v => updateOverlay({ borderEnabled: v })}>
+              Borde de acento
+            </CheckboxLabel>
+            <CheckboxLabel checked={o.refEnabled} onChange={v => updateOverlay({ refEnabled: v })}>
+              Mostrar referencia
+            </CheckboxLabel>
+            <CheckboxLabel checked={o.textShadow} onChange={v => updateOverlay({ textShadow: v })}>
+              Sombra texto
+            </CheckboxLabel>
+          </div>
+
+          {o.bgEnabled && (
+            <>
+              <div className="field">
+                <span className="label">Tipo de fondo</span>
+                <SegmentedControl
+                  options={[
+                    { value: 'solid', label: 'Sólido' },
+                    { value: 'gradient', label: 'Gradiente' },
+                    { value: 'transparent', label: 'Sin fondo' },
+                  ]}
+                  value={o.bgType} onChange={v => updateOverlay({ bgType: v })} />
+              </div>
+
+              <div className="field">
+                <span className="label">Blur · {o.bgBlur}px</span>
+                <input type="range" min="0" max="20" value={o.bgBlur}
+                  onChange={e => updateOverlay({ bgBlur: +e.target.value })}
+                  className="slider"
+                  style={{ '--val': (o.bgBlur / 20 * 100) + '%' }} />
+              </div>
+
+              {o.bgType === 'solid' && (
+                <div className="field" style={{ gridColumn: 'span 2' }}>
+                  <ColorRow label="Color de fondo (rgba/hex)" value={o.bgColor}
+                    onChange={v => updateOverlay({ bgColor: v })} />
+                </div>
+              )}
+
+              {o.bgType === 'gradient' && (
+                <>
+                  <ColorRow label="Gradiente · arriba" value={o.bgGradient[0]}
+                    onChange={v => updateOverlay({ bgGradient: [v, o.bgGradient[1]] })} />
+                  <ColorRow label="Gradiente · abajo" value={o.bgGradient[1]}
+                    onChange={v => updateOverlay({ bgGradient: [o.bgGradient[0], v] })} />
+                </>
+              )}
+            </>
+          )}
+
+          {o.borderEnabled && (
+            <>
+              <ColorRow label="Color del borde" value={o.borderColor}
+                onChange={v => updateOverlay({ borderColor: v })} />
+              <div className="field">
+                <span className="label">Lado del borde</span>
+                <SegmentedControl
+                  options={[
+                    { value: 'left', label: 'Izquierda' },
+                    { value: 'right', label: 'Derecha' },
+                    { value: 'top', label: 'Arriba' },
+                    { value: 'bottom', label: 'Abajo' },
+                    { value: 'all', label: 'Todos' },
+                  ]}
+                  value={o.borderSide} onChange={v => updateOverlay({ borderSide: v })} />
+              </div>
+              <div className="field">
+                <span className="label">Grosor · {o.borderWidth}px</span>
+                <input type="range" min="0" max="20" value={o.borderWidth}
+                  onChange={e => updateOverlay({ borderWidth: +e.target.value })}
+                  className="slider"
+                  style={{ '--val': (o.borderWidth / 20 * 100) + '%' }} />
+              </div>
+              <div className="field">
+                <span className="label">Radio · {o.borderRadius}px</span>
+                <input type="range" min="0" max="32" value={typeof o.borderRadius === 'number' ? o.borderRadius : 8}
+                  onChange={e => updateOverlay({ borderRadius: +e.target.value })}
+                  className="slider"
+                  style={{ '--val': ((typeof o.borderRadius === 'number' ? o.borderRadius : 8) / 32 * 100) + '%' }} />
+              </div>
+            </>
+          )}
+
+          <div className="field">
+            <span className="label">Posición</span>
+            <SegmentedControl
+              options={[{ value: 'bottom', label: 'Abajo' }, { value: 'top', label: 'Arriba' }]}
+              value={o.position} onChange={v => updateOverlay({ position: v })} />
+          </div>
+
+          <div className="field">
+            <span className="label">Margen vertical · {o.offsetY}px</span>
+            <input type="range" min="0" max="300" value={o.offsetY}
+              onChange={e => updateOverlay({ offsetY: +e.target.value })}
+              className="slider"
+              style={{ '--val': (o.offsetY / 300 * 100) + '%' }} />
+          </div>
+
+          <div className="field">
+            <span className="label">Margen lateral · {o.offsetX}px</span>
+            <input type="range" min="0" max="200" value={o.offsetX}
+              onChange={e => updateOverlay({ offsetX: +e.target.value })}
+              className="slider"
+              style={{ '--val': (o.offsetX / 200 * 100) + '%' }} />
+          </div>
+
+          <div className="field">
+            <span className="label">Tamaño texto · {o.fontSize}px</span>
+            <input type="range" min="24" max="96" value={o.fontSize}
+              onChange={e => updateOverlay({ fontSize: +e.target.value })}
+              className="slider"
+              style={{ '--val': ((o.fontSize - 24) / 72 * 100) + '%' }} />
+          </div>
+
+          <ColorRow label="Color del texto" value={o.fontColor}
+            onChange={v => updateOverlay({ fontColor: v })} />
+
+          {o.refEnabled && (
+            <>
+              <ColorRow label="Color referencia" value={o.refFontColor}
+                onChange={v => updateOverlay({ refFontColor: v })} />
+              <div className="field">
+                <span className="label">Tamaño referencia · {o.refFontSize}px</span>
+                <input type="range" min="10" max="36" value={o.refFontSize}
+                  onChange={e => updateOverlay({ refFontSize: +e.target.value })}
+                  className="slider"
+                  style={{ '--val': ((o.refFontSize - 10) / 26 * 100) + '%' }} />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------- Helpers de UI ----------
+function TabButton({ active, onClick, icon, label }) {
+  return (
+    <button onClick={onClick}
+      style={{
+        flex: 1, padding: '14px 18px',
+        background: active ? 'var(--bg-2)' : 'transparent',
+        color: active ? 'var(--copper-100)' : 'var(--text-3)',
+        borderBottom: active ? '2px solid var(--copper-300)' : '2px solid transparent',
+        borderRadius: 0, border: 0, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        fontSize: 13, fontWeight: 500,
+        transition: 'all 0.15s ease',
+      }}>
+      {icon} {label}
+    </button>
+  )
+}
+
+function SegmentedControl({ options, value, onChange, cols, small }) {
+  return (
+    <div style={{
+      display: cols ? 'grid' : 'flex',
+      gridTemplateColumns: cols ? `repeat(${cols}, 1fr)` : undefined,
+      gap: 4, padding: 3,
+      background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 'var(--r-md)',
+    }}>
+      {options.map(o => (
+        <button key={o.value}
+          className={'modal-tab ' + (value === o.value ? 'active' : '')}
+          onClick={() => onChange(o.value)}
+          style={{ flex: 1, fontSize: small ? 11 : 12, padding: small ? '4px 6px' : '6px 14px' }}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function CheckboxLabel({ checked, onChange, children }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+      <input type="checkbox" checked={!!checked} onChange={e => onChange(e.target.checked)} />
+      {children}
+    </label>
   )
 }
 
@@ -319,10 +606,10 @@ function OutputCard({ title, subtitle, Icon, accent, isOpen, displays, onOpen, o
           Cerrar ventana
         </button>
       ) : (
-        <button className={isOpen ? 'btn' : 'btn btn-primary'}
+        <button className="btn btn-primary"
           style={{ width: '100%', justifyContent: 'center' }}
           onClick={() => onOpen(displayId ? +displayId : undefined)}>
-          <IconExternal size={14} /> {isOpen ? 'Reabrir' : 'Abrir'}
+          <IconExternal size={14} /> Abrir
         </button>
       )}
     </div>
@@ -330,68 +617,29 @@ function OutputCard({ title, subtitle, Icon, accent, isOpen, displays, onOpen, o
 }
 
 function ColorRow({ label, value, onChange }) {
+  // Convierte rgba(...) a hex para el color picker (best-effort)
+  const hexValue = toHex(value)
+
   return (
     <div className="field">
       <span className="label">{label}</span>
       <div className="input-wrap" style={{ height: 40 }}>
         <span style={{ width: 22, height: 22, borderRadius: 4, background: value, border: '1px solid var(--line-2)', flexShrink: 0 }} />
         <input value={value} onChange={e => onChange(e.target.value)}
-          style={{ fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }} />
-        <input type="color" value={value} onChange={e => onChange(e.target.value)}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }} />
+        <input type="color" value={hexValue} onChange={e => onChange(e.target.value)}
           style={{ width: 32, height: 24, border: 0, background: 'transparent', cursor: 'pointer' }} />
       </div>
     </div>
   )
 }
 
-function getBgStyle(theme) {
-  if (theme.bgType === 'gradient') return `linear-gradient(135deg, ${theme.bgGradient[0]}, ${theme.bgGradient[1]})`
-  if (theme.bgType === 'transparent') return 'repeating-conic-gradient(#1a1410 0 25%, #2a1f17 0 50%) 50% / 14px 14px'
-  if (theme.bgType === 'image' && theme.bgImage) return `url("${theme.bgImage}") center/cover`
-  if (theme.bgType === 'video') return '#000'
-  return theme.bgColor
-}
-
-function ThemePreviewInner({ slide, theme }) {
-  const showVideo = theme.bgType === 'video' && theme.bgVideo
-  const align = theme.textAlign === 'top' ? 'flex-start'
-              : theme.textAlign === 'bottom' ? 'flex-end' : 'center'
-
-  const renderSlideContent = (s) => (
-    <div style={{
-      width: '100%', height: '100%',
-      display: 'flex', alignItems: align, justifyContent: 'center',
-      padding: '40px',
-    }}>
-      <div style={{ textAlign: 'center', maxWidth: '100%' }}>
-        <p style={{
-          color: theme.fontColor,
-          fontSize: `${theme.fontSize / 1.3}px`,
-          fontFamily: theme.fontFamily || 'var(--font-display)',
-          fontWeight: theme.fontWeight ?? 500,
-          textShadow: theme.textShadow ? '0 4px 20px rgba(0,0,0,0.6)' : 'none',
-          lineHeight: 1.25, margin: 0,
-        }}>{s.text}</p>
-        {s.reference && theme.referenceVisible && (
-          <p style={{
-            marginTop: 16, fontFamily: 'var(--font-mono)',
-            fontSize: 13, color: 'rgba(255,255,255,0.7)',
-            letterSpacing: '0.18em', textTransform: 'uppercase',
-          }}>{s.reference}</p>
-        )}
-      </div>
-    </div>
-  )
-
-  return (
-    <>
-      {showVideo && (
-        <video src={theme.bgVideo} autoPlay loop muted playsInline
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-      )}
-      <div style={{ position: 'absolute', inset: 0 }}>
-        <SlideTransition slide={slide} theme={theme} render={renderSlideContent} />
-      </div>
-    </>
-  )
+// rgba(20, 16, 13, 0.85) → #14100d (descarta alpha para el picker)
+function toHex(color) {
+  if (!color) return '#000000'
+  if (color.startsWith('#')) return color.slice(0, 7)
+  const m = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i)
+  if (!m) return '#000000'
+  const [r, g, b] = [m[1], m[2], m[3]].map(n => Number(n).toString(16).padStart(2, '0'))
+  return `#${r}${g}${b}`
 }

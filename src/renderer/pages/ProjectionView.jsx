@@ -18,17 +18,41 @@ export default function ProjectionView() {
   const [slide, setSlide] = useState(window.__demoSlide || null)
   const [theme, setTheme] = useState(window.__demoTheme || DEFAULT_THEME)
 
+  // CRÍTICO para overlay: el body de eclesia-design.css tiene `background: var(--bg-0)`
+  // que es opaco. Lo forzamos a transparent SOLO en modo overlay para que la captura
+  // de OBS muestre realmente solo el lower-third con el resto transparente.
+  useEffect(() => {
+    if (!isOverlay) return
+    const html = document.documentElement
+    const body = document.body
+    const root = document.getElementById('root')
+
+    const prev = {
+      htmlBg: html.style.background,
+      bodyBg: body.style.background,
+      rootBg: root?.style.background,
+    }
+
+    html.style.background = 'transparent'
+    body.style.background = 'transparent'
+    if (root) root.style.background = 'transparent'
+
+    return () => {
+      html.style.background = prev.htmlBg
+      body.style.background = prev.bodyBg
+      if (root) root.style.background = prev.rootBg
+    }
+  }, [isOverlay])
+
   useEffect(() => {
     const proj = window.electron?.projection
     if (!proj) return
 
-    // PULL: pide el estado actual al montar (más confiable que esperar projection:init)
     proj.state().then(state => {
       if (state?.slide) setSlide(state.slide)
       if (state?.theme) setTheme(prev => ({ ...prev, ...state.theme }))
     }).catch(() => {})
 
-    // PUSH: y suscríbete a updates futuros
     const offInit = proj.onInit(({ slide, theme }) => {
       if (slide) setSlide(slide)
       if (theme) setTheme(prev => ({ ...prev, ...theme }))
@@ -40,11 +64,9 @@ export default function ProjectionView() {
   }, [])
 
   if (isOverlay) {
-    // Lower-third broadcast: fondo TRANSPARENTE + texto solo en la banda inferior
     return <LowerThirdRenderer slide={slide} theme={theme} />
   }
 
-  // Pantalla completa: fondo del tema + texto centrado (proyector físico)
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', userSelect: 'none' }}>
       <SlideRenderer slide={slide} theme={theme} />
