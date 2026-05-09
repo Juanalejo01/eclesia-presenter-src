@@ -57,7 +57,14 @@ export default function ProjectionView() {
   }, [])
 
   if (isOverlay) {
-    return <LowerThirdRenderer slide={slide} theme={theme} />
+    // Wrapper fixed que cubre la ventana completa. LowerThirdRenderer es
+    // ahora `position: absolute` con `containerType: size` para que sus cqw
+    // escalen correctamente tanto aquí (1920x1080) como en el preview del editor.
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'transparent', overflow: 'hidden', userSelect: 'none' }}>
+        <LowerThirdRenderer slide={slide} theme={theme} />
+      </div>
+    )
   }
 
   return (
