@@ -5,6 +5,7 @@ import LowerThirdRenderer from './LowerThirdRenderer.jsx'
 import {
   useTheme, setTheme as setStoredTheme, setOverlay, applyOverlayPreset, OVERLAY_PRESETS,
 } from '../services/themeStore.js'
+import { listSystemFonts } from '../services/systemFontsService.js'
 import {
   IconExternal, IconMonitor, IconLayers, IconRefresh,
 } from './Icons.jsx'
@@ -235,6 +236,9 @@ function FullscreenEditor({ theme, preview, activePreset, setActivePreset, updat
 }
 
 function CustomizationGrid({ theme, updateTheme }) {
+  const [fonts, setFonts] = useState([])
+  useEffect(() => { listSystemFonts().then(setFonts) }, [])
+
   return (
     <div>
       <div className="section-h"><h3>Personalización avanzada</h3><span className="sub">en tiempo real</span></div>
@@ -252,6 +256,30 @@ function CustomizationGrid({ theme, updateTheme }) {
             onChange={e => updateTheme({ fontSize: +e.target.value })}
             className="slider"
             style={{ '--val': ((theme.fontSize - 32) / 88 * 100) + '%' }} />
+        </div>
+
+        <div className="field" style={{ gridColumn: 'span 2' }}>
+          <span className="label">
+            Fuente · {fonts.length > 0 ? `${fonts.length} fuentes detectadas` : 'cargando…'}
+          </span>
+          <select className="select" style={{ width: '100%', height: 40, fontFamily: theme.fontFamily }}
+            value={theme.fontFamily || ''}
+            onChange={e => updateTheme({ fontFamily: e.target.value })}>
+            <option value='"Cormorant Garamond", serif'>Cormorant Garamond (default)</option>
+            {fonts.length === 0 && <option disabled>Cargando fuentes del sistema...</option>}
+            {fonts.length > 0 && <optgroup label="── Sistema ──">
+              {fonts.filter(f => !f.generic).map(f => (
+                <option key={f.family} value={f.family} style={{ fontFamily: f.family }}>
+                  {f.family}
+                </option>
+              ))}
+            </optgroup>}
+            {fonts.length > 0 && <optgroup label="── Genéricas ──">
+              {fonts.filter(f => f.generic).map(f => (
+                <option key={f.family} value={f.family}>{f.family}</option>
+              ))}
+            </optgroup>}
+          </select>
         </div>
 
         {theme.bgType === 'solid' && (

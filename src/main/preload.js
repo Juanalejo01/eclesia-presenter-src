@@ -32,5 +32,21 @@ contextBridge.exposeInMainWorld('electron', {
     update:   (id, data)   => ipcRenderer.invoke('songs:update', id, data),
     delete:   (id)         => ipcRenderer.invoke('songs:delete', id),
     favorite: (id)         => ipcRenderer.invoke('songs:favorite', id),
+    export:   ()           => ipcRenderer.invoke('songs:export'),
+    import:   (opts)       => ipcRenderer.invoke('songs:import', opts),
+  },
+
+  // Utilidades de la app (settings)
+  app: {
+    pickDirectory: (title) => ipcRenderer.invoke('app:pickDirectory', title),
+    info:          ()      => ipcRenderer.invoke('app:info'),
+  },
+
+  // Importación de biblias
+  bibles: {
+    import:         ()    => ipcRenderer.invoke('bibles:import'),
+    listImported:   ()    => ipcRenderer.invoke('bibles:listImported'),
+    readImported:   (id)  => ipcRenderer.invoke('bibles:readImported', id),
+    deleteImported: (id)  => ipcRenderer.invoke('bibles:deleteImported', id),
   },
 })

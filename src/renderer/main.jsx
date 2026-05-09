@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import Router from './Router.jsx'
 import './styles/index.css'
 import './styles/eclesia-design.css'
+// Importar el service de settings aplica el tema persistido al <html> antes del render
+import './services/appSettingsService.js'
 
 // CRÍTICO para la captura OBS del overlay:
 // Detectamos modo overlay ANTES de renderizar React y forzamos clase en <html>.

@@ -64,12 +64,40 @@
   --font-mono: "Geist Mono", "SF Mono", "JetBrains Mono", monospace;
 }
 
+/* === NATIVE (default) - copper warm dark, ya definido arriba === */
+:root[data-theme="native"] {
+  /* hereda los tokens default (warm copper) */
+}
+
+/* === DARK puro === */
+:root[data-theme="dark"] {
+  --bg-0: #0b0b0d;
+  --bg-1: #131318;
+  --bg-2: #1a1a21;
+  --bg-3: #22222b;
+  --bg-4: #2c2c37;
+  --line-1: rgba(255, 255, 255, 0.06);
+  --line-2: rgba(255, 255, 255, 0.12);
+  --line-3: rgba(255, 255, 255, 0.20);
+  --text-1: #f0f1f3;
+  --text-2: #b9bbc4;
+  --text-3: #80828d;
+  --text-4: #4f5160;
+  --copper-50:  #d8d8e6;
+  --copper-100: #b6b8d8;
+  --copper-200: #8c8fb8;
+  --copper-300: #6b6f9a;
+  --copper-400: #5a5f8a;
+  --copper-500: #43476a;
+}
+
+/* === LIGHT === */
 :root[data-theme="light"] {
-  --bg-0: #f5ebe0;
-  --bg-1: #faf3ea;
-  --bg-2: #f1e6d6;
-  --bg-3: #e9dcc8;
-  --bg-4: #ddcdb6;
+  --bg-0: #f7f4ee;
+  --bg-1: #fbf8f2;
+  --bg-2: #f1ebe0;
+  --bg-3: #e8e0d0;
+  --bg-4: #ddd1bb;
   --line-1: rgba(62, 36, 17, 0.08);
   --line-2: rgba(62, 36, 17, 0.16);
   --line-3: rgba(62, 36, 17, 0.28);
@@ -77,6 +105,50 @@
   --text-2: #5c4434;
   --text-3: #8a7866;
   --text-4: #b8a690;
+}
+
+/* === OCEAN — azul claro, fresco === */
+:root[data-theme="ocean"] {
+  --bg-0: #eef3f8;
+  --bg-1: #f5f8fc;
+  --bg-2: #e2ecf5;
+  --bg-3: #d2dfee;
+  --bg-4: #b8cce0;
+  --line-1: rgba(15, 39, 65, 0.08);
+  --line-2: rgba(15, 39, 65, 0.16);
+  --line-3: rgba(15, 39, 65, 0.28);
+  --text-1: #0d2238;
+  --text-2: #2c4565;
+  --text-3: #4f6c8b;
+  --text-4: #8aa2bb;
+  --copper-50:  #cfe1f5;
+  --copper-100: #95bce0;
+  --copper-200: #5b91c4;
+  --copper-300: #316fa8;
+  --copper-400: #1f5489;
+  --copper-500: #133a64;
+}
+
+/* === ROSE — rosado claro, cálido === */
+:root[data-theme="rose"] {
+  --bg-0: #fbf2f3;
+  --bg-1: #fef7f8;
+  --bg-2: #f6e6e9;
+  --bg-3: #efd6db;
+  --bg-4: #e2bcc4;
+  --line-1: rgba(82, 28, 42, 0.08);
+  --line-2: rgba(82, 28, 42, 0.16);
+  --line-3: rgba(82, 28, 42, 0.28);
+  --text-1: #3a1620;
+  --text-2: #6e3146;
+  --text-3: #94586a;
+  --text-4: #c79ba8;
+  --copper-50:  #f2cdd5;
+  --copper-100: #e398a8;
+  --copper-200: #cc6c81;
+  --copper-300: #b04860;
+  --copper-400: #8b2e44;
+  --copper-500: #621c2e;
 }
 
 html, body, #root { height: 100%; }
