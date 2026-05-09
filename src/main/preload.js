@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electron', {
     close: (mode)  => ipcRenderer.invoke('projection:close', mode),
     theme: (patch) => ipcRenderer.invoke('projection:theme', patch),
     state: ()      => ipcRenderer.invoke('projection:state'),
+    toggleOverlayVisible: (visible) => ipcRenderer.invoke('projection:toggleOverlayVisible', visible),
     onInit:  (cb)  => { ipcRenderer.on('projection:init',  (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:init') },
     onSlide: (cb)  => { ipcRenderer.on('projection:slide', (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:slide') },
     onTheme: (cb)  => { ipcRenderer.on('projection:theme', (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:theme') },

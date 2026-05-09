@@ -193,6 +193,17 @@ function StatCard({ label, value, sub, Icon, mono, accent }) {
 }
 
 function OutputCard({ title, subtitle, Icon, accent, isOpen, onOpen, onClose }) {
+  // El overlay solo se identifica por "Lower-Third" en el subtitle.
+  const isOverlay = (title || '').includes('Lower-Third') || (title || '').includes('Overlay')
+  const [overlayVisible, setOverlayVisible] = useState(false)
+
+  const toggleOverlayView = async () => {
+    const next = !overlayVisible
+    setOverlayVisible(next)
+    try { await window.electron?.projection?.toggleOverlayVisible(next) }
+    catch (e) { console.warn('toggleOverlayVisible failed:', e) }
+  }
+
   return (
     <div className="card" style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -208,9 +219,17 @@ function OutputCard({ title, subtitle, Icon, accent, isOpen, onOpen, onClose }) 
           : <span className="tally off">Cerrada</span>}
       </div>
       {isOpen ? (
-        <button className="btn btn-danger" style={{ width: '100%', justifyContent: 'center' }} onClick={onClose}>
-          Cerrar ventana
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {isOverlay && (
+            <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={toggleOverlayView}
+              title={overlayVisible ? 'Volver a minimizar (no estorbar)' : 'Mostrar para verificar lo que captura OBS'}>
+              {overlayVisible ? 'Ocultar' : 'Ver overlay'}
+            </button>
+          )}
+          <button className="btn btn-danger" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
       ) : (
         <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={onOpen}>
           <IconExternal size={14} /> Abrir

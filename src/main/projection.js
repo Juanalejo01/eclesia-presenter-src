@@ -71,16 +71,22 @@ function openProjection(opts = {}) {
 
   const isOverlay = mode === 'overlay'
 
-  // OVERLAY: ventana invisible para el usuario pero capturable por OBS.
-  //   - Tamaño full HD 1920x1080 (resolución nativa de captura)
-  //   - Posicionada off-screen (x: -3000) para no estorbar al usuario
-  //   - SIN alwaysOnTop (antes ponía la ventana sobre todo el escritorio)
-  //   - Taskbar visible para que el usuario pueda inspeccionarla si quiere
-  // OBS la captura igual con Window Capture aunque esté fuera de pantalla.
-  const overlayBounds = {
-    x: -3000, y: 0,
-    width: 1920, height: 1080,
-  }
+  // OVERLAY: estrategia para que OBS capture sin estorbar al usuario.
+  //
+  // Problema: si la ventana está en x=-3000 (totalmente off-screen), Windows
+  // DWM deja de actualizar su frame buffer y OBS captura un fondo opaco/negro
+  // (frame stale). La ventana TIENE que estar en una posición visible para
+  // que DWM mantenga su composición activa.
+  //
+  // Solución según número de monitores:
+  //   - 2+ monitores: overlay fullscreen en pantalla secundaria (ideal, no estorba)
+  //   - 1 monitor: overlay en (0,0) y se MINIMIZA. OBS Window Capture con método
+  //     "Windows 10 (1903+)" puede capturar ventanas minimizadas vía DWM thumbnail.
+  const secondary = displays.find(d => d.id !== primary.id)
+  const overlayBounds = secondary
+    ? { x: secondary.bounds.x, y: secondary.bounds.y,
+        width: secondary.bounds.width, height: secondary.bounds.height }
+    : { x: 0, y: 0, width: 1920, height: 1080 }
 
   const win = new BrowserWindow({
     x: isOverlay ? overlayBounds.x      : target.bounds.x,
@@ -92,12 +98,12 @@ function openProjection(opts = {}) {
     transparent: isOverlay,
     backgroundColor: isOverlay ? '#00000000' : '#000000',
     hasShadow: false,
-    skipTaskbar: false,                  // visible en taskbar para inspeccionar
-    alwaysOnTop: false,                  // NUNCA encima del escritorio
+    skipTaskbar: false,
+    alwaysOnTop: false,
     resizable: !isOverlay,
     focusable: !isOverlay,
-    show: !isOverlay,                    // overlay arranca oculto, se muestra off-screen
-    title: isOverlay ? 'EclesiaPresenter — Overlay (OBS)' : 'EclesiaPresenter — Proyección',
+    show: !isOverlay,
+    title: isOverlay ? 'EclesiaPresenter — Lower-Third (OBS)' : 'EclesiaPresenter — Pantalla completa',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -108,10 +114,15 @@ function openProjection(opts = {}) {
 
   if (isOverlay) {
     win.setIgnoreMouseEvents(true, { forward: true })
-    // Al cargar, mostrarla off-screen para que OBS pueda capturarla
     win.once('ready-to-show', () => {
-      win.showInactive()              // muestra sin robar foco
-      win.setBounds(overlayBounds)    // re-asegura posición off-screen
+      win.showInactive()
+      // Si solo hay 1 monitor, minimizar para que no estorbe la vista del usuario
+      // pero mantener composición activa para que OBS la capture.
+      if (!secondary) {
+        setTimeout(() => {
+          if (!win.isDestroyed()) win.minimize()
+        }, 250)
+      }
     })
   }
 
@@ -132,6 +143,23 @@ function closeProjection(mode) {
   const entry = projections.get(mode)
   if (!entry) return false
   if (!entry.window.isDestroyed()) entry.window.close()
+  return true
+}
+
+/**
+ * Muestra/oculta la ventana del overlay para inspección manual.
+ * Útil para verificar visualmente qué está capturando OBS sin abrir OBS.
+ */
+function toggleOverlayVisible(visible) {
+  const entry = projections.get('overlay')
+  if (!entry || entry.window.isDestroyed()) return false
+  const win = entry.window
+  if (visible) {
+    if (win.isMinimized()) win.restore()
+    win.showInactive()
+  } else {
+    win.minimize()
+  }
   return true
 }
 
@@ -167,4 +195,5 @@ function getState() {
 module.exports = {
   openProjection, closeProjection, closeAll,
   setSlide, setTheme, getState,
+  toggleOverlayVisible,
 }

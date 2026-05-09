@@ -49,6 +49,7 @@ ipcMain.handle('projection:open',  (_e, opts)   => projection.openProjection(opt
 ipcMain.handle('projection:close', (_e, mode)   => projection.closeProjection(mode))
 ipcMain.handle('projection:theme', (_e, patch)  => { projection.setTheme(patch); return projection.getState().theme })
 ipcMain.handle('projection:state', ()           => projection.getState())
+ipcMain.handle('projection:toggleOverlayVisible', (_e, visible) => projection.toggleOverlayVisible(visible))
 
 // --------- Media library ---------
 
