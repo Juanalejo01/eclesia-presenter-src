@@ -166,12 +166,24 @@ body {
 }
 
 /* Modo overlay: la ventana es transparente para OBS.
-   Aplicada por main.jsx ANTES del primer paint para evitar que el body opaco
-   sea capturado por OBS antes de que useEffect lo cambie. */
+   Reglas blindadas — sobrescriben cualquier theme (data-theme="dark|ocean|rose"...) */
 html.eclesia-overlay-mode,
 html.eclesia-overlay-mode body,
-html.eclesia-overlay-mode #root {
+html.eclesia-overlay-mode #root,
+html.eclesia-overlay-mode #root > div,
+html[data-theme] html.eclesia-overlay-mode body,
+html.eclesia-overlay-mode[data-theme] body {
   background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+/* Cualquier elemento descendiente del root con background opaco hereda transparencia */
+html.eclesia-overlay-mode body::before,
+html.eclesia-overlay-mode body::after,
+html.eclesia-overlay-mode #root::before,
+html.eclesia-overlay-mode #root::after {
+  background: transparent !important;
+  display: none !important;
 }
 
 button { font-family: inherit; color: inherit; }

@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   storagePath: null,         // carpeta principal
   imagesPath:  null,
   videosPath:  null,
+  backgroundsPath: null,     // carpeta para fondos de proyección
   audioOutput: 'default',    // deviceId del audio output
   videoQuality: 'high',      // 'low' | 'medium' | 'high'
   videoFps: 60,              // 30 | 60

@@ -19,6 +19,9 @@ function defaultTheme() {
     bgGradient: ['#0a1620', '#1e3a5f'],
     bgImage: null,
     bgVideo: null,
+    imageFit: 'cover',
+    videoFit: 'cover',
+    bgImageBlur: 0,
     fontFamily: '"Cormorant Garamond", serif',
     fontSize: 64,
     fontColor: '#ffffff',
@@ -71,22 +74,16 @@ function openProjection(opts = {}) {
 
   const isOverlay = mode === 'overlay'
 
-  // OVERLAY: estrategia para que OBS capture sin estorbar al usuario.
+  // OVERLAY: estrategia robusta para OBS sin estorbar al usuario ni tapar
+  // la ventana de Pantalla completa.
   //
-  // Problema: si la ventana está en x=-3000 (totalmente off-screen), Windows
-  // DWM deja de actualizar su frame buffer y OBS captura un fondo opaco/negro
-  // (frame stale). La ventana TIENE que estar en una posición visible para
-  // que DWM mantenga su composición activa.
-  //
-  // Solución según número de monitores:
-  //   - 2+ monitores: overlay fullscreen en pantalla secundaria (ideal, no estorba)
-  //   - 1 monitor: overlay en (0,0) y se MINIMIZA. OBS Window Capture con método
-  //     "Windows 10 (1903+)" puede capturar ventanas minimizadas vía DWM thumbnail.
-  const secondary = displays.find(d => d.id !== primary.id)
-  const overlayBounds = secondary
-    ? { x: secondary.bounds.x, y: secondary.bounds.y,
-        width: secondary.bounds.width, height: secondary.bounds.height }
-    : { x: 0, y: 0, width: 1920, height: 1080 }
+  // Decisiones:
+  //   - SIEMPRE se posiciona en el monitor primario (en 0,0)
+  //   - SIEMPRE se minimiza tras cargar (independientemente del número de monitores)
+  //     OBS captura ventanas minimizadas con método "Windows 10 (1903+)" vía DWM.
+  //   - Esto garantiza que NUNCA se superponga a la ventana de Pantalla completa
+  //     que vive en el monitor secundario y mantiene control de z-order.
+  const overlayBounds = { x: 0, y: 0, width: 1920, height: 1080 }
 
   const win = new BrowserWindow({
     x: isOverlay ? overlayBounds.x      : target.bounds.x,
@@ -116,12 +113,18 @@ function openProjection(opts = {}) {
     win.setIgnoreMouseEvents(true, { forward: true })
     win.once('ready-to-show', () => {
       win.showInactive()
-      // Si solo hay 1 monitor, minimizar para que no estorbe la vista del usuario
-      // pero mantener composición activa para que OBS la capture.
-      if (!secondary) {
-        setTimeout(() => {
-          if (!win.isDestroyed()) win.minimize()
-        }, 250)
+      // Minimizar siempre después de cargar:
+      // 1. El usuario nunca la ve estorbando
+      // 2. NO se superpone a la ventana de Pantalla completa (que está en otro monitor)
+      // 3. OBS la captura igual via DWM thumbnail
+      setTimeout(() => {
+        if (!win.isDestroyed()) win.minimize()
+      }, 300)
+
+      // Bonus: si la ventana de Pantalla completa ya estaba abierta, devolverle el foco.
+      const bg = projections.get('background')
+      if (bg && !bg.window.isDestroyed()) {
+        setTimeout(() => bg.window.focus(), 400)
       }
     })
   }

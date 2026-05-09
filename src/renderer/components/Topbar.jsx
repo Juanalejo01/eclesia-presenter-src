@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import Settings from './Settings.jsx'
-import { LogoMonogram, IconSearch, IconSettings } from './Icons.jsx'
+import { LogoMonogram, IconSettings } from './Icons.jsx'
 
 export default function Topbar({ onSettingsChange }) {
   const [showSettings, setShowSettings] = useState(false)
@@ -48,11 +48,6 @@ export default function Topbar({ onSettingsChange }) {
         </div>
 
         <div className="header-actions">
-          <button className="btn btn-ghost">
-            <IconSearch size={14} />
-            <span style={{ color: 'var(--text-3)' }}>Buscar</span>
-            <span className="kbd">⌘K</span>
-          </button>
           <button className="btn" onClick={() => setShowSettings(true)} title="Ajustes">
             <IconSettings size={14} /> Ajustes
           </button>

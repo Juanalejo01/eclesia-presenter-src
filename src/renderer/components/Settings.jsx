@@ -277,6 +277,11 @@ function SectionAlmacenamiento() {
           value={settings.videosPath || info?.videos}
           onChange={v => setSettings({ videosPath: v })}
         />
+        <PathRow
+          label="Carpeta para fondos (backgrounds de proyección)"
+          value={settings.backgroundsPath || info?.pictures}
+          onChange={v => setSettings({ backgroundsPath: v })}
+        />
       </div>
 
       <div className="card" style={{ padding: 14, marginTop: 24, fontSize: 12, color: 'var(--text-3)' }}>

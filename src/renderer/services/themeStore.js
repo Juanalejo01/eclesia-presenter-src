@@ -49,6 +49,13 @@ const DEFAULT_THEME = {
   bgGradient: ['#0a1620', '#1e3a5f'],
   bgImage: null,
   bgVideo: null,
+  // Cómo encajar imágenes/videos cuando son de orientación distinta a 16:9:
+  //   'cover'   → llena el frame recortando partes (default, mejor para horizontales)
+  //   'contain' → muestra el medio entero con barras laterales (mejor para verticales)
+  //   'fill'    → estira hasta llenar (puede deformar)
+  imageFit: 'cover',
+  videoFit: 'cover',
+  bgImageBlur: 0,                 // si es contain, fondo borroso para llenar las barras
   fontFamily: '"Cormorant Garamond", serif',
   fontSize: 64,
   fontColor: '#ffffff',

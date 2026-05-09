@@ -1,5 +1,5 @@
 import {
-  IconBible, IconMusic, IconList, IconProjector, IconLayers,
+  IconBible, IconMusic, IconList, IconProjector,
   IconImage, IconVideo, IconType, IconBroadcast,
 } from './Icons.jsx'
 
@@ -31,12 +31,6 @@ export default function Sidebar({ active, onChange }) {
           <span>{label}</span>
         </button>
       ))}
-      <div className="sidebar-divider" />
-      <div className="sidebar-bottom">
-        <button className="nav-item" title="Capas">
-          <span className="nav-icon-wrap"><IconLayers size={18} /></span>
-        </button>
-      </div>
     </aside>
   )
 }

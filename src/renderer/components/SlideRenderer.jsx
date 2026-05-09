@@ -24,14 +24,19 @@ export default function SlideRenderer({ slide, theme, isBlackout = false, transp
   const eff = mergeThemeWithSlide(theme, slide)
 
   const showVideo = eff.bgType === 'video' && eff.bgVideo
+  const showImage = eff.bgType === 'image' && eff.bgImage
+  // Para image/video usaremos un <img>/<video> con object-fit (más control que background-size).
+  // El "fondo" del contenedor es solo el color de relleno detrás cuando object-fit:contain deja barras.
   const bg =
       isBlackout ? '#000000'
     : eff.bgType === 'transparent' && transparentBg ? 'transparent'
     : eff.bgType === 'gradient' ? `linear-gradient(135deg, ${eff.bgGradient[0]}, ${eff.bgGradient[1]})`
     : eff.bgType === 'transparent' ? 'repeating-conic-gradient(#1a1410 0 25%, #2a1f17 0 50%) 50% / 14px 14px'
-    : eff.bgType === 'image' && eff.bgImage ? `url("${eff.bgImage}") center/cover`
-    : eff.bgType === 'video' ? '#000'
+    : showImage || eff.bgType === 'video' ? '#000'
     : eff.bgColor
+
+  const imageFit = eff.imageFit || 'cover'
+  const videoFit = eff.videoFit || 'cover'
 
   const align = eff.textAlign === 'top' ? 'flex-start'
               : eff.textAlign === 'bottom' ? 'flex-end' : 'center'
@@ -81,13 +86,35 @@ export default function SlideRenderer({ slide, theme, isBlackout = false, transp
       overflow: 'hidden',
       containerType: 'size',
     }}>
+      {/* Fondo borroso (cuando contain/fill quiere disimular barras). Solo activo si bgImageBlur > 0 e imagen presente */}
+      {showImage && eff.bgImageBlur > 0 && imageFit !== 'fill' && (
+        <img src={eff.bgImage} alt="" aria-hidden="true"
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover',
+            filter: `blur(${eff.bgImageBlur}px) brightness(0.6)`,
+            transform: 'scale(1.1)',  // evitar bordes del blur
+          }} />
+      )}
+      {showImage && !isBlackout && (
+        <img src={eff.bgImage} alt=""
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: imageFit,            // 'cover' | 'contain' | 'fill'
+            objectPosition: 'center center',
+          }} />
+      )}
       {showVideo && !isBlackout && (
         <video src={eff.bgVideo}
           autoPlay
           loop={slide?.videoLoop !== false}
           muted={slide?.videoMuted !== false}
           playsInline
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: videoFit,
+            objectPosition: 'center center',
+          }} />
       )}
       {!isBlank && <SlideTransition slide={slide} theme={eff} render={renderContent} />}
       {isBlackout && (
@@ -110,6 +137,7 @@ function mergeThemeWithSlide(theme, slide) {
   if (!slide) return theme
   const out = { ...theme }
   const keys = ['bgType', 'bgColor', 'bgGradient', 'bgImage', 'bgVideo',
+                'imageFit', 'videoFit', 'bgImageBlur',
                 'fontColor', 'fontFamily', 'fontSize', 'fontWeight',
                 'textAlign', 'textShadow', 'referenceVisible']
   for (const k of keys) {

@@ -296,19 +296,54 @@ function CustomizationGrid({ theme, updateTheme }) {
         )}
 
         {theme.bgType === 'image' && (
-          <div className="field" style={{ gridColumn: 'span 2' }}>
-            <span className="label">Imagen de fondo</span>
-            <MediaPicker kind="image" label="Biblioteca de imágenes"
-              value={theme.bgImage} onChange={(url) => updateTheme({ bgImage: url })} />
-          </div>
+          <>
+            <div className="field" style={{ gridColumn: 'span 2' }}>
+              <span className="label">Imagen de fondo</span>
+              <MediaPicker kind="image" label="Biblioteca de imágenes"
+                value={theme.bgImage} onChange={(url) => updateTheme({ bgImage: url })} />
+            </div>
+            <div className="field">
+              <span className="label">Ajuste de imagen</span>
+              <SegmentedControl
+                options={[
+                  { value: 'cover',   label: 'Cubrir' },
+                  { value: 'contain', label: 'Contener' },
+                  { value: 'fill',    label: 'Estirar' },
+                ]}
+                value={theme.imageFit || 'cover'}
+                onChange={v => updateTheme({ imageFit: v })} />
+            </div>
+            {theme.imageFit === 'contain' && (
+              <div className="field">
+                <span className="label">Blur de relleno · {theme.bgImageBlur ?? 0}px</span>
+                <input type="range" min="0" max="50" value={theme.bgImageBlur ?? 0}
+                  onChange={e => updateTheme({ bgImageBlur: +e.target.value })}
+                  className="slider"
+                  style={{ '--val': ((theme.bgImageBlur ?? 0) / 50 * 100) + '%' }} />
+              </div>
+            )}
+          </>
         )}
 
         {theme.bgType === 'video' && (
-          <div className="field" style={{ gridColumn: 'span 2' }}>
-            <span className="label">Video de fondo</span>
-            <MediaPicker kind="video" label="Biblioteca de videos"
-              value={theme.bgVideo} onChange={(url) => updateTheme({ bgVideo: url })} />
-          </div>
+          <>
+            <div className="field" style={{ gridColumn: 'span 2' }}>
+              <span className="label">Video de fondo</span>
+              <MediaPicker kind="video" label="Biblioteca de videos"
+                value={theme.bgVideo} onChange={(url) => updateTheme({ bgVideo: url })} />
+            </div>
+            <div className="field" style={{ gridColumn: 'span 2' }}>
+              <span className="label">Ajuste de video</span>
+              <SegmentedControl
+                options={[
+                  { value: 'cover',   label: 'Cubrir (recorta)' },
+                  { value: 'contain', label: 'Contener (con barras)' },
+                  { value: 'fill',    label: 'Estirar (deforma)' },
+                ]}
+                value={theme.videoFit || 'cover'}
+                onChange={v => updateTheme({ videoFit: v })} />
+            </div>
+          </>
         )}
 
         <ColorRow label="Color del texto" value={theme.fontColor} onChange={v => updateTheme({ fontColor: v })} />
