@@ -13,6 +13,7 @@ import Topbar from './components/Topbar.jsx'
 import { useGlobalShortcuts } from './hooks/useShortcuts.js'
 import { selectSlide, setLive, useSlideStore } from './services/slideStore.js'
 import { syncFromMain } from './services/themeStore.js'
+import { refreshImportedVersions } from './services/bibleService.js'
 
 const PANELS = {
   bible:       BiblePanel,
@@ -33,7 +34,10 @@ export default function App() {
   const [settingsRev, setSettingsRev] = useState(0)
   const { live } = useSlideStore()
 
-  useEffect(() => { syncFromMain() }, [])
+  useEffect(() => {
+    syncFromMain()
+    refreshImportedVersions()  // carga las biblias importadas para que aparezcan en el selector
+  }, [])
 
   useGlobalShortcuts({
     onPanelChange: setActivePanel,

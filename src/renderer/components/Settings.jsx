@@ -4,6 +4,7 @@ import {
   listAvailableBibles, getEnabledBibles, setEnabledBibles,
 } from '../services/apiBible.js'
 import { useAppSettings, setSettings, pickDirectory } from '../services/appSettingsService.js'
+import { refreshImportedVersions } from '../services/bibleService.js'
 import {
   IconX, IconImage, IconVideo, IconMonitor, IconBible, IconMusic,
   IconBroadcast, IconSettings, IconUpload, IconTrash, IconCheck,
@@ -439,6 +440,7 @@ function SectionBiblias({ onUpdate }) {
     if (r.canceled) return
     if (r.ok) {
       setMsg({ ok: true, text: `✓ "${r.meta.name}" importada (${r.meta.books} libros)` })
+      await refreshImportedVersions()  // recarga el registry para que aparezca en BiblePanel
       refresh(); onUpdate?.()
     } else {
       setMsg({ ok: false, text: r.error })
@@ -448,6 +450,7 @@ function SectionBiblias({ onUpdate }) {
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar esta Biblia importada?')) return
     await window.electron.bibles.deleteImported(id)
+    await refreshImportedVersions()
     refresh(); onUpdate?.()
   }
 

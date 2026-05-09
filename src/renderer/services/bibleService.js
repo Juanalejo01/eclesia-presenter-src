@@ -66,9 +66,28 @@ const LOCAL_VERSIONS = [
 // --------- Estado ---------
 
 const localCache = new Map()      // versionId → array de libros completo
+const importedCache = new Map()   // versionId → array de libros (biblia importada por usuario)
 const remoteChapterCache = new Map()  // `${bibleId}::${bookIndex}::${chapterNum}` → array de strings
 const remoteSkeletonCache = new Map() // bibleId → libros con metadata (sin texto)
+let importedVersions = []          // metas de biblias importadas (cargadas via IPC en boot)
 let activeVersionId = 'rvr1909'
+
+/**
+ * Refresca el listado de Biblias importadas leyendo el registry del main.
+ * Debe llamarse al arrancar la app y cada vez que el usuario importe/elimine una.
+ */
+export async function refreshImportedVersions() {
+  if (!window.electron?.bibles) { importedVersions = []; return [] }
+  const list = await window.electron.bibles.listImported()
+  importedVersions = (list || []).map(meta => ({
+    id: meta.id,
+    short: meta.short,
+    name: meta.name,
+    license: meta.license || 'Importada',
+    type: 'imported',
+  }))
+  return importedVersions
+}
 
 // --------- Catálogo dinámico ---------
 
@@ -81,7 +100,7 @@ export function getAllVersions() {
     type: 'apibible',
     bibleId: b.id,
   }))
-  return [...LOCAL_VERSIONS, ...remote]
+  return [...LOCAL_VERSIONS, ...importedVersions, ...remote]
 }
 
 export function getActiveVersion() {
@@ -107,6 +126,26 @@ async function loadLocalVersion(version) {
   return books
 }
 
+// --------- Imported: lee del filesystem via IPC ---------
+
+async function loadImportedVersion(version) {
+  if (importedCache.has(version.id)) return importedCache.get(version.id)
+  if (!window.electron?.bibles) {
+    throw new Error('Biblias importadas requieren la app instalada (Electron)')
+  }
+  const raw = await window.electron.bibles.readImported(version.id)
+  if (!raw || !Array.isArray(raw)) {
+    throw new Error('Archivo de Biblia corrupto o vacío')
+  }
+  const books = raw.map((book, index) => ({
+    index,
+    name: BOOK_NAMES_ES[book.name] || book.name,
+    chapters: book.chapters,
+  }))
+  importedCache.set(version.id, books)
+  return books
+}
+
 // --------- Remoto: solo metadata, capítulos bajo demanda ---------
 
 async function loadRemoteSkeleton(version) {
@@ -128,6 +167,7 @@ async function loadRemoteSkeleton(version) {
 export async function getBooks(versionId = activeVersionId) {
   const v = getAllVersions().find(x => x.id === versionId) || LOCAL_VERSIONS[0]
   if (v.type === 'local')    return loadLocalVersion(v)
+  if (v.type === 'imported') return loadImportedVersion(v)
   if (v.type === 'apibible') return loadRemoteSkeleton(v)
   if (v.type === 'placeholder') {
     throw new Error(
@@ -141,8 +181,10 @@ export async function getBooks(versionId = activeVersionId) {
 export async function getChapter(bookIndex, chapterNum, versionId = activeVersionId) {
   const v = getAllVersions().find(x => x.id === versionId) || LOCAL_VERSIONS[0]
 
-  if (v.type === 'local') {
-    const books = await loadLocalVersion(v)
+  if (v.type === 'local' || v.type === 'imported') {
+    const books = v.type === 'imported'
+      ? await loadImportedVersion(v)
+      : await loadLocalVersion(v)
     const book = books[bookIndex]
     const chapter = book?.chapters[chapterNum - 1]
     if (!chapter) return null
@@ -178,9 +220,11 @@ export async function getChapterCount(bookIndex, versionId = activeVersionId) {
  *  api.bible tiene endpoint /search pero requiere otra integración. */
 export async function searchText(query, limit = 50, versionId = activeVersionId) {
   const v = getAllVersions().find(x => x.id === versionId) || LOCAL_VERSIONS[0]
-  if (v.type !== 'local') return []  // solo búsqueda local por ahora
+  if (v.type !== 'local' && v.type !== 'imported') return []  // búsqueda local o importada
 
-  const books = await loadLocalVersion(v)
+  const books = v.type === 'imported'
+    ? await loadImportedVersion(v)
+    : await loadLocalVersion(v)
   // Normaliza la query: tolerante a tildes, mayúsculas y puntuación.
   const q = normalizeText(query)
   if (q.length < 3) return []

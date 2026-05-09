@@ -4,11 +4,40 @@
 
 const { app, BrowserWindow, screen } = require('electron')
 const path = require('path')
+const fs = require('fs')
 
 const isDev = !app.isPackaged
 const projections = new Map()  // mode → { window, options }
 let currentSlide = null
 let currentTheme = defaultTheme()
+
+// --- Persistencia del theme en disco (sobrevive cierre de la app) ---
+const THEME_FILE = () => path.join(app.getPath('userData'), 'projection-theme.json')
+
+function loadPersistedTheme() {
+  try {
+    const file = THEME_FILE()
+    if (!fs.existsSync(file)) return
+    const data = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (data && typeof data === 'object') {
+      // Merge con defaults (en caso de añadir keys nuevas en updates)
+      currentTheme = { ...defaultTheme(), ...data, overlay: { ...defaultTheme().overlay, ...(data.overlay || {}) } }
+    }
+  } catch (e) {
+    console.warn('Could not load persisted theme:', e.message)
+  }
+}
+
+function persistTheme() {
+  try {
+    fs.writeFileSync(THEME_FILE(), JSON.stringify(currentTheme), 'utf8')
+  } catch (e) {
+    console.warn('Could not persist theme:', e.message)
+  }
+}
+
+// Carga al arrancar el módulo
+loadPersistedTheme()
 
 // IMPORTANTE: este default debe coincidir con DEFAULT_THEME en
 // src/renderer/services/themeStore.js para evitar desincronía visual.
@@ -190,6 +219,7 @@ function setTheme(patch) {
     next.overlay = { ...currentTheme.overlay, ...patch.overlay }
   }
   currentTheme = next
+  persistTheme()  // guarda a disco para sobrevivir cierres de la app
   broadcast('projection:theme', currentTheme)
 }
 

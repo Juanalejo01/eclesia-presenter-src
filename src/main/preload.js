@@ -7,9 +7,10 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Biblioteca de medios (imágenes/videos)
   media: {
-    pick:   (kind) => ipcRenderer.invoke('media:pick',   kind),
-    list:   (opts) => ipcRenderer.invoke('media:list',   opts),
-    delete: (id)   => ipcRenderer.invoke('media:delete', id),
+    pick:     (kind)  => ipcRenderer.invoke('media:pick',     kind),
+    list:     (opts)  => ipcRenderer.invoke('media:list',     opts),
+    delete:   (id)    => ipcRenderer.invoke('media:delete',   id),
+    addFiles: (paths) => ipcRenderer.invoke('media:addFiles', paths),
   },
 
   // Proyección externa (overlay / background — capturable por OBS, sin red)

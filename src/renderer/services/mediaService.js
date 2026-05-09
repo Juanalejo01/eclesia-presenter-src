@@ -60,6 +60,46 @@ async function idbDelete(id) {
 // --------- API pública ---------
 
 /**
+ * Añade archivos arrastrados (drag & drop) a la biblioteca.
+ *
+ * @param {File[] | FileList} files - File objects desde DataTransfer
+ * @param {'image'|'video'|'all'} kind
+ * @returns {Promise<Array>} items añadidos
+ */
+export async function addFiles(files, kind = 'all') {
+  const list = Array.from(files || [])
+  if (!list.length) return []
+
+  // Filtrar por tipo
+  const accepted = list.filter(f => {
+    const isImage = f.type.startsWith('image/')
+    const isVideo = f.type.startsWith('video/')
+    if (kind === 'image') return isImage
+    if (kind === 'video') return isVideo
+    return isImage || isVideo
+  })
+  if (!accepted.length) return []
+
+  // Electron: usar el path nativo del File (Chromium expone .path en Electron)
+  if (hasElectron && window.electron?.media?.addFiles) {
+    const paths = accepted.map(f => f.path).filter(Boolean)
+    if (paths.length > 0) return window.electron.media.addFiles(paths)
+  }
+
+  // Browser fallback: guardar el blob en IndexedDB
+  const added = []
+  for (const file of accepted) {
+    const type = file.type.startsWith('video/') ? 'video' : 'image'
+    const item = await idbAdd({
+      name: file.name, type, mime: file.type, size: file.size,
+      blob: file, addedAt: Date.now(),
+    })
+    added.push(item)
+  }
+  return added
+}
+
+/**
  * Abre el file picker. En Electron usa diálogo nativo.
  * En navegador usa <input type="file"> y guarda los blobs en IndexedDB.
  */

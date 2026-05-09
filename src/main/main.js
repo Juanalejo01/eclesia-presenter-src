@@ -103,6 +103,29 @@ ipcMain.handle('media:pick', async (_e, kind = 'all') => {
 ipcMain.handle('media:list',   (_e, opts) => db.listMedia(opts))
 ipcMain.handle('media:delete', (_e, id)   => db.deleteMedia(id))
 
+// Drag & drop: recibe paths absolutos de archivos arrastrados al renderer
+// y los copia a userData/media igual que media:pick.
+ipcMain.handle('media:addFiles', async (_e, sourcePaths = []) => {
+  const added = []
+  for (const sourcePath of sourcePaths) {
+    if (!sourcePath || !fs.existsSync(sourcePath)) continue
+    const detected = detectType(sourcePath)
+    if (!detected) continue
+    const name = path.basename(sourcePath)
+    const safe = `${Date.now()}-${name.replace(/[^\w.\-]/g, '_')}`
+    const dest = path.join(getMediaDir(), safe)
+    try {
+      fs.copyFileSync(sourcePath, dest)
+      const stats = fs.statSync(dest)
+      const item = db.addMedia({ name, type: detected.type, path: dest, mime: detected.mime, size: stats.size })
+      added.push(item)
+    } catch (err) {
+      console.error('media:addFiles copy failed', err)
+    }
+  }
+  return added
+})
+
 // IPC: songs CRUD
 ipcMain.handle('songs:list',     (_e, opts)    => db.listSongs(opts))
 ipcMain.handle('songs:get',      (_e, id)      => db.getSong(id))

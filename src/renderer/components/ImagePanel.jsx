@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  listMedia, pickMedia, deleteMedia, getMediaURL,
+  listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
 import { addItem as addToSchedule } from '../services/scheduleService.js'
 import {
@@ -14,11 +14,13 @@ import {
 export default function ImagePanel({ onSendSlide }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
-  const [selected, setSelected] = useState(null)   // item de la biblioteca
-  const [caption, setCaption] = useState('')        // texto opcional encima
+  const [selected, setSelected] = useState(null)
+  const [caption, setCaption] = useState('')
   const [reference, setReference] = useState('')
-  const [imageFit, setImageFit] = useState('cover')   // 'cover' | 'contain' | 'fill'
+  const [imageFit, setImageFit] = useState('cover')
   const [bgImageBlur, setBgImageBlur] = useState(0)
+  const [dragActive, setDragActive] = useState(false)
+  const dragCounter = useRef(0)
 
   const refresh = async () => {
     setLoading(true)
@@ -31,6 +33,28 @@ export default function ImagePanel({ onSendSlide }) {
 
   const handleUpload = async () => {
     const added = await pickMedia('image')
+    await refresh()
+    if (added?.[0]) setSelected(added[0])
+  }
+
+  // Drag & drop: arrastra archivos al panel para añadirlos sin pulsar Subir
+  const onDragEnter = (e) => {
+    e.preventDefault(); e.stopPropagation()
+    dragCounter.current++
+    if (e.dataTransfer?.types?.includes('Files')) setDragActive(true)
+  }
+  const onDragLeave = (e) => {
+    e.preventDefault(); e.stopPropagation()
+    dragCounter.current--
+    if (dragCounter.current <= 0) { setDragActive(false); dragCounter.current = 0 }
+  }
+  const onDragOver = (e) => { e.preventDefault(); e.stopPropagation() }
+  const onDrop = async (e) => {
+    e.preventDefault(); e.stopPropagation()
+    setDragActive(false); dragCounter.current = 0
+    const files = e.dataTransfer?.files
+    if (!files || files.length === 0) return
+    const added = await addFiles(files, 'image')
     await refresh()
     if (added?.[0]) setSelected(added[0])
   }
@@ -61,7 +85,33 @@ export default function ImagePanel({ onSendSlide }) {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      style={{ position: 'relative' }}>
+
+      {/* Overlay visual cuando se arrastra un archivo encima */}
+      {dragActive && (
+        <div style={{
+          position: 'absolute', inset: 16, zIndex: 50,
+          border: '2px dashed var(--copper-300)',
+          borderRadius: 'var(--r-lg)',
+          background: 'rgba(168, 95, 51, 0.08)',
+          display: 'grid', placeItems: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ textAlign: 'center', color: 'var(--copper-100)' }}>
+            <IconUpload size={36} />
+            <p style={{ marginTop: 12, fontSize: 18, fontWeight: 600 }}>Suelta para añadir</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
+              Solo se aceptan imágenes
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="ws-header">
         <div className="ws-title">
           <h1 className="ws-h1">Imagen</h1>

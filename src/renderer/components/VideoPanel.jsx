@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  listMedia, pickMedia, deleteMedia, getMediaURL,
+  listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
 import { addItem as addToSchedule } from '../services/scheduleService.js'
 import {
@@ -20,6 +20,8 @@ export default function VideoPanel({ onSendSlide }) {
   const [loop, setLoop] = useState(true)
   const [muted, setMuted] = useState(true)
   const [videoFit, setVideoFit] = useState('cover')
+  const [dragActive, setDragActive] = useState(false)
+  const dragCounter = useRef(0)
 
   const refresh = async () => {
     setLoading(true)
@@ -31,6 +33,27 @@ export default function VideoPanel({ onSendSlide }) {
 
   const handleUpload = async () => {
     const added = await pickMedia('video')
+    await refresh()
+    if (added?.[0]) setSelected(added[0])
+  }
+
+  const onDragEnter = (e) => {
+    e.preventDefault(); e.stopPropagation()
+    dragCounter.current++
+    if (e.dataTransfer?.types?.includes('Files')) setDragActive(true)
+  }
+  const onDragLeave = (e) => {
+    e.preventDefault(); e.stopPropagation()
+    dragCounter.current--
+    if (dragCounter.current <= 0) { setDragActive(false); dragCounter.current = 0 }
+  }
+  const onDragOver = (e) => { e.preventDefault(); e.stopPropagation() }
+  const onDrop = async (e) => {
+    e.preventDefault(); e.stopPropagation()
+    setDragActive(false); dragCounter.current = 0
+    const files = e.dataTransfer?.files
+    if (!files || files.length === 0) return
+    const added = await addFiles(files, 'video')
     await refresh()
     if (added?.[0]) setSelected(added[0])
   }
@@ -60,7 +83,32 @@ export default function VideoPanel({ onSendSlide }) {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      style={{ position: 'relative' }}>
+
+      {dragActive && (
+        <div style={{
+          position: 'absolute', inset: 16, zIndex: 50,
+          border: '2px dashed var(--copper-300)',
+          borderRadius: 'var(--r-lg)',
+          background: 'rgba(168, 95, 51, 0.08)',
+          display: 'grid', placeItems: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ textAlign: 'center', color: 'var(--copper-100)' }}>
+            <IconUpload size={36} />
+            <p style={{ marginTop: 12, fontSize: 18, fontWeight: 600 }}>Suelta para añadir</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
+              Solo se aceptan videos
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="ws-header">
         <div className="ws-title">
           <h1 className="ws-h1">Video</h1>
