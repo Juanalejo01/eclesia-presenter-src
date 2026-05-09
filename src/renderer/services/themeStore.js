@@ -81,9 +81,23 @@ export function setTheme(patch) {
   if (window.electron?.projection) window.electron.projection.theme(patch)
 }
 
-/** Patch específico del overlay (atajo). */
+/** Patch específico del overlay (atajo) — solo cambia los campos declarados. */
 export function setOverlay(overlayPatch) {
   setTheme({ overlay: overlayPatch })
+}
+
+/**
+ * Aplica un preset COMPLETO al overlay. A diferencia de setOverlay (que hace
+ * merge), esto reemplaza TODOS los campos del overlay para que el resultado
+ * sea predecible: lo que ves en el preset es lo que queda configurado, sin
+ * heredar valores residuales del estado anterior.
+ */
+export function applyOverlayPreset(presetOverlay) {
+  // Construye un overlay completo: base = DEFAULT_OVERLAY, override = preset.
+  // Luego hace setTheme con ese overlay completo. Como nuestro setTheme hace
+  // deep merge, el resultado es el preset entero efectivamente reemplazando
+  // el overlay actual (porque cada campo del DEFAULT está incluido en el patch).
+  setTheme({ overlay: { ...DEFAULT_OVERLAY, ...presetOverlay } })
 }
 
 export function subscribeTheme(fn) {

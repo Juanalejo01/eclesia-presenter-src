@@ -179,7 +179,14 @@ function setSlide(slide) {
 }
 
 function setTheme(patch) {
-  currentTheme = { ...currentTheme, ...patch }
+  // Deep merge para `overlay`: si no hacemos merge profundo aquí, mandar
+  // un patch como `{ overlay: { bgType: 'gradient' } }` borraría TODOS los
+  // demás campos del overlay (offsetY, fontSize, colores, etc.).
+  const next = { ...currentTheme, ...patch }
+  if (patch && patch.overlay) {
+    next.overlay = { ...currentTheme.overlay, ...patch.overlay }
+  }
+  currentTheme = next
   broadcast('projection:theme', currentTheme)
 }
 
