@@ -10,14 +10,23 @@ import SlideTransition from './SlideTransition.jsx'
  *
  * Usa container queries (cqw) para escalar tipografías proporcionalmente
  * al ancho real del contenedor, asumiendo target 1920×1080.
+ *
+ * Props:
+ *   - slide:         { text, reference, type, ... overrides visuales }
+ *   - theme:         tema global (themeStore)
+ *   - isBlackout:    fuerza fondo negro
+ *   - transparentBg: cuando true, bgType='transparent' usa fondo realmente
+ *                    transparente (ventana overlay de OBS). Cuando false,
+ *                    pinta un patrón ajedrez (preview en el panel).
  */
-export default function SlideRenderer({ slide, theme, isBlackout = false }) {
+export default function SlideRenderer({ slide, theme, isBlackout = false, transparentBg = false }) {
   // Mezcla: el slide puede sobreescribir aspectos visuales del tema global.
   const eff = mergeThemeWithSlide(theme, slide)
 
   const showVideo = eff.bgType === 'video' && eff.bgVideo
   const bg =
       isBlackout ? '#000000'
+    : eff.bgType === 'transparent' && transparentBg ? 'transparent'
     : eff.bgType === 'gradient' ? `linear-gradient(135deg, ${eff.bgGradient[0]}, ${eff.bgGradient[1]})`
     : eff.bgType === 'transparent' ? 'repeating-conic-gradient(#1a1410 0 25%, #2a1f17 0 50%) 50% / 14px 14px'
     : eff.bgType === 'image' && eff.bgImage ? `url("${eff.bgImage}") center/cover`

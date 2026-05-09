@@ -10,21 +10,23 @@ const projections = new Map()  // mode → { window, options }
 let currentSlide = null
 let currentTheme = defaultTheme()
 
+// IMPORTANTE: este default debe coincidir con DEFAULT_THEME en
+// src/renderer/services/themeStore.js para evitar desincronía visual.
 function defaultTheme() {
   return {
-    bgType: 'solid',         // 'solid' | 'gradient' | 'image' | 'video' | 'transparent'
-    bgColor: '#000000',
-    bgGradient: ['#1e3a5f', '#0f172a'],
-    bgImage: null,           // file:// path o URL
+    bgType: 'gradient',
+    bgColor: '#0a1620',
+    bgGradient: ['#0a1620', '#1e3a5f'],
+    bgImage: null,
     bgVideo: null,
-    fontFamily: 'Inter',
-    fontSize: 64,            // px
+    fontFamily: '"Cormorant Garamond", serif',
+    fontSize: 64,
     fontColor: '#ffffff',
-    fontWeight: 600,
+    fontWeight: 500,
     textShadow: true,
-    textAlign: 'center',     // 'top' | 'center' | 'bottom'
+    textAlign: 'center',
     referenceVisible: true,
-    transitionType: 'fade',  // 'none' | 'fade' | 'slide-left|right|up|down' | 'zoom-in|out'
+    transitionType: 'fade',
     transitionDuration: 500,
     transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
   }

@@ -1,29 +1,15 @@
 import { useEffect, useState } from 'react'
 import SlideRenderer from '../components/SlideRenderer.jsx'
-
-const DEFAULT_THEME = {
-  bgType: 'solid',
-  bgColor: '#000000',
-  bgGradient: ['#1e3a5f', '#0f172a'],
-  bgImage: null,
-  bgVideo: null,
-  fontFamily: 'Cormorant Garamond, serif',
-  fontSize: 64,
-  fontColor: '#ffffff',
-  fontWeight: 500,
-  textShadow: true,
-  textAlign: 'center',
-  referenceVisible: true,
-  transitionType: 'fade',
-  transitionDuration: 500,
-  transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-}
+import { DEFAULT_THEME } from '../services/themeStore.js'
 
 /**
  * Vista renderizada en la ventana de proyección (BrowserWindow nativa).
  * Recibe el slide y el theme via IPC desde el main process. Delega a
  * SlideRenderer para garantizar que el output coincide con la vista previa
  * del panel y el monitor PGM/PVW.
+ *
+ * Hace PULL del estado al montar (más confiable que esperar `projection:init`,
+ * que tiene race condition con el primer render del componente).
  */
 export default function ProjectionView() {
   const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
@@ -35,23 +21,35 @@ export default function ProjectionView() {
   useEffect(() => {
     const proj = window.electron?.projection
     if (!proj) return
-    proj.onInit(({ slide, theme }) => {
+
+    // PULL: pide el estado actual al montar. Más confiable que projection:init.
+    proj.state().then(state => {
+      if (state?.slide) setSlide(state.slide)
+      if (state?.theme) setTheme(prev => ({ ...prev, ...state.theme }))
+    }).catch(() => {})
+
+    // PUSH: y sigue suscrito a updates futuros.
+    const offInit = proj.onInit(({ slide, theme }) => {
       if (slide) setSlide(slide)
-      if (theme) setTheme(theme)
+      if (theme) setTheme(prev => ({ ...prev, ...theme }))
     })
-    proj.onSlide(setSlide)
-    proj.onTheme(setTheme)
+    const offSlide = proj.onSlide((s) => setSlide(s))
+    const offTheme = proj.onTheme((t) => setTheme(prev => ({ ...prev, ...t })))
+
+    return () => { offInit?.(); offSlide?.(); offTheme?.() }
   }, [])
 
-  // En modo overlay la ventana es transparente: forzamos bgType=transparent
-  // para que el SlideRenderer no pinte un fondo opaco encima.
-  const effectiveTheme = mode === 'overlay'
+  const isOverlay = mode === 'overlay'
+
+  // En modo overlay: NO pinta el fondo del tema. La ventana es transparente
+  // y SlideRenderer respeta eso con transparentBg=true.
+  const effectiveTheme = isOverlay
     ? { ...theme, bgType: 'transparent' }
     : theme
 
   return (
-    <div className="fixed inset-0 select-none" style={{ background: 'transparent' }}>
-      <SlideRenderer slide={slide} theme={effectiveTheme} />
+    <div style={{ position: 'fixed', inset: 0, background: 'transparent', userSelect: 'none' }}>
+      <SlideRenderer slide={slide} theme={effectiveTheme} transparentBg={isOverlay} />
     </div>
   )
 }
