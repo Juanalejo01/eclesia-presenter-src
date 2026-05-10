@@ -10,8 +10,10 @@ import {
   IconSearch, IconPlus, IconEdit, IconTrash, IconArrowRight,
   IconStar, IconStarFill, IconMusic, IconRefresh,
 } from './Icons.jsx'
+import { useT } from '../services/i18n.js'
 
 export default function SongsPanel({ onSendSlide }) {
+  const t = useT()
   const [songs, setSongs]           = useState([])
   const [search, setSearch]         = useState('')
   const [onlyFavorites, setFavOnly] = useState(false)  // 'Servicio del día' = canciones marcadas para hoy
@@ -37,7 +39,7 @@ export default function SongsPanel({ onSendSlide }) {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar esta canción?')) return
+    if (!confirm(t('songs.deleteConfirm'))) return
     await deleteSong(id)
     if (selected?.id === id) setSelected(null)
     refresh()
@@ -94,15 +96,15 @@ export default function SongsPanel({ onSendSlide }) {
     <div className="workspace">
       <div className="ws-header">
         <div className="ws-title">
-          <h1 className="ws-h1">Canciones</h1>
+          <h1 className="ws-h1">{t('nav.songs')}</h1>
           <span className="ws-sub">
-            {songs.length} canciones · {isUsingSQLite() ? 'SQLite' : 'localStorage (preview)'}
+            {t('songs.subtitle', { n: songs.length, storage: isUsingSQLite() ? t('songs.storageSqlite') : t('songs.storageLocal') })}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn"><IconRefresh size={14} /> Importar</button>
+          <button className="btn"><IconRefresh size={14} /> {t('songs.import')}</button>
           <button className="btn btn-primary" onClick={() => setEditing('new')}>
-            <IconPlus size={14} /> Nueva canción
+            <IconPlus size={14} /> {t('songs.new')}
           </button>
         </div>
       </div>
@@ -113,26 +115,26 @@ export default function SongsPanel({ onSendSlide }) {
             <div className="input-wrap" style={{ flex: 1 }}>
               <IconSearch size={15} className="input-icon" />
               <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar por título, autor o etiqueta (sin tildes ok)…" />
+                placeholder={t('songs.searchPlaceholder')} />
               <span className="input-kbd"><span className="kbd">/</span></span>
             </div>
             <button
               className={'btn' + (onlyFavorites ? ' btn-primary' : '')}
               onClick={() => setFavOnly(v => !v)}
-              title="Filtra solo las canciones marcadas para el servicio del día">
-              {onlyFavorites ? <IconStarFill size={14} /> : <IconStar size={14} />} Servicio del día
+              title={t('songs.serviceTitle')}>
+              {onlyFavorites ? <IconStarFill size={14} /> : <IconStar size={14} />} {t('songs.serviceDay')}
             </button>
             {onlyFavorites && songs.some(s => s.is_favorite) && (
               <button className="btn btn-ghost btn-danger"
                 onClick={async () => {
-                  if (!confirm('¿Quitar todas las canciones de la selección del día?')) return
+                  if (!confirm(t('songs.clearListConfirm'))) return
                   for (const s of songs.filter(x => x.is_favorite)) {
                     await toggleFavorite(s.id)
                   }
                   refresh()
                 }}
-                title="Quita la marca de servicio del día a TODAS las canciones marcadas">
-                Limpiar lista
+                title={t('songs.clearListTitle')}>
+                {t('songs.clearList')}
               </button>
             )}
           </div>
@@ -140,7 +142,7 @@ export default function SongsPanel({ onSendSlide }) {
           {songs.length === 0 && (
             <div className="card" style={{ textAlign: 'center', padding: 40 }}>
               <p className="empty-text">
-                {search || onlyFavorites ? 'Sin resultados' : 'No hay canciones todavía. Crea la primera.'}
+                {search || onlyFavorites ? t('songs.emptySearch') : t('songs.empty')}
               </p>
             </div>
           )}
@@ -166,11 +168,11 @@ export default function SongsPanel({ onSendSlide }) {
                         ))}
                       </div>
                       <div className="song-meta">
-                        <span className="author">{song.author || 'Sin autor'}</span>
+                        <span className="author">{song.author || t('songs.noAuthor')}</span>
                         {song.sections?.length > 0 && (
                           <>
                             <span style={{ margin: '0 8px', color: 'var(--text-4)' }}>·</span>
-                            {song.sections.length} secciones
+                            {t('songs.sectionsCount', { n: song.sections.length })}
                           </>
                         )}
                       </div>
@@ -189,8 +191,8 @@ export default function SongsPanel({ onSendSlide }) {
                           reference: song.author || '',
                           meta: { songId: song.id, sections: song.sections },
                         })}
-                        title="Añadir a lista del día">
-                        <IconPlus size={13} /> Lista
+                        title={t('songs.addToList')}>
+                        <IconPlus size={13} /> {t('songs.list')}
                       </button>
                       <button className="btn btn-ghost" onClick={() => setEditing(song)} title="Editar">
                         <IconEdit size={13} />

@@ -6,12 +6,14 @@ import { addItem as addToSchedule } from '../services/scheduleService.js'
 import {
   IconUpload, IconVideo, IconTrash, IconArrowRight, IconPlus, IconPlay, IconPause,
 } from './Icons.jsx'
+import { useT } from '../services/i18n.js'
 
 /**
  * Panel "Video" — proyecta videos (informes, anuncios, intros).
  * Envía un slide con bgType=video que se reproduce en la ventana de proyección.
  */
 export default function VideoPanel({ onSendSlide }) {
+  const t = useT()
   const [items, setItems]   = useState([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -101,9 +103,9 @@ export default function VideoPanel({ onSendSlide }) {
         }}>
           <div style={{ textAlign: 'center', color: 'var(--copper-100)' }}>
             <IconUpload size={36} />
-            <p style={{ marginTop: 12, fontSize: 18, fontWeight: 600 }}>Suelta para añadir</p>
+            <p style={{ marginTop: 12, fontSize: 18, fontWeight: 600 }}>{t('video.dropHere')}</p>
             <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-              Solo se aceptan videos
+              {t('video.dropVideosOnly')}
             </p>
           </div>
         </div>
@@ -111,12 +113,12 @@ export default function VideoPanel({ onSendSlide }) {
 
       <div className="ws-header">
         <div className="ws-title">
-          <h1 className="ws-h1">Video</h1>
-          <span className="ws-sub">{items.length} videos · informes, anuncios e intros</span>
+          <h1 className="ws-h1">{t('video.title')}</h1>
+          <span className="ws-sub">{t('video.subtitle', { n: items.length })}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-primary" onClick={handleUpload}>
-            <IconUpload size={14} /> Subir video
+            <IconUpload size={14} /> {t('video.upload')}
           </button>
         </div>
       </div>
@@ -127,16 +129,16 @@ export default function VideoPanel({ onSendSlide }) {
           {/* Ajuste de video */}
           <div className="card" style={{ padding: 16 }}>
             <div className="section-h" style={{ marginBottom: 10 }}>
-              <h3>Ajuste del video</h3>
-              <span className="sub">cómo encaja en pantalla 16:9</span>
+              <h3>{t('video.fitTitle')}</h3>
+              <span className="sub">{t('video.fitSubtitle')}</span>
             </div>
             <div className="field">
-              <span className="label">Modo</span>
+              <span className="label">{t('video.fitMode')}</span>
               <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 'var(--r-md)' }}>
                 {[
-                  { v: 'cover',   l: 'Cubrir (recorta)' },
-                  { v: 'contain', l: 'Contener (con barras)' },
-                  { v: 'fill',    l: 'Estirar (deforma)' },
+                  { v: 'cover',   l: t('video.fit.cover') },
+                  { v: 'contain', l: t('video.fit.contain') },
+                  { v: 'fill',    l: t('video.fit.fill') },
                 ].map(o => (
                   <button key={o.v}
                     className={'modal-tab ' + (videoFit === o.v ? 'active' : '')}
@@ -150,30 +152,30 @@ export default function VideoPanel({ onSendSlide }) {
           {/* Reproducción + caption */}
           <div className="card" style={{ padding: 16 }}>
             <div className="section-h">
-              <h3>Texto sobre el video <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(opcional)</span></h3>
-              <span className="sub">Con bucle y mute por defecto</span>
+              <h3>{t('video.captionTitle')}</h3>
+              <span className="sub">{t('video.captionSubtitle')}</span>
             </div>
             <div className="field-row">
               <div className="field">
-                <span className="label">Texto principal</span>
+                <span className="label">{t('video.captionMain')}</span>
                 <input className="field-input" value={caption} onChange={e => setCaption(e.target.value)}
-                  placeholder='Ej: "Informe misionero 2026"' />
+                  placeholder={t('video.captionMainPh')} />
               </div>
               <div className="field">
-                <span className="label">Referencia / subtítulo</span>
+                <span className="label">{t('video.captionRef')}</span>
                 <input className="field-input" value={reference} onChange={e => setReference(e.target.value)}
-                  placeholder='Ej: "Hermano Pablo · 3 min"' />
+                  placeholder={t('video.captionRefPh')} />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 16, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input type="checkbox" checked={loop} onChange={e => setLoop(e.target.checked)} />
-                Reproducir en bucle
+                {t('video.loop')}
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input type="checkbox" checked={muted} onChange={e => setMuted(e.target.checked)} />
-                Sin sonido (recomendado para fondo)
+                {t('video.muted')}
               </label>
 
               <span style={{ flex: 1 }} />
@@ -181,10 +183,10 @@ export default function VideoPanel({ onSendSlide }) {
               {selected && (
                 <>
                   <button className="btn" onClick={() => addToList(selected)}>
-                    <IconPlus size={13} /> Lista
+                    <IconPlus size={13} /> {t('songs.list')}
                   </button>
                   <button className="btn btn-primary" onClick={() => project(selected, !!(caption || reference))}>
-                    <IconArrowRight size={13} /> Proyectar
+                    <IconArrowRight size={13} /> {t('video.project')}
                   </button>
                 </>
               )}
@@ -194,14 +196,14 @@ export default function VideoPanel({ onSendSlide }) {
           {/* Galería de videos */}
           <div>
             <div className="section-h">
-              <h3>Biblioteca</h3>
-              <span className="sub">{loading ? 'cargando…' : `${items.length} elementos`}</span>
+              <h3>{t('video.libraryTitle')}</h3>
+              <span className="sub">{loading ? t('common.loading') : `${items.length}`}</span>
             </div>
 
             {items.length === 0 && !loading && (
               <div className="card" style={{ textAlign: 'center', padding: 40, borderStyle: 'dashed' }}>
                 <IconVideo size={36} style={{ color: 'var(--text-4)', marginBottom: 12 }} />
-                <p className="empty-text">No hay videos todavía. Sube el primero.</p>
+                <p className="empty-text">{t('video.libraryEmpty')}</p>
               </div>
             )}
 
@@ -213,7 +215,7 @@ export default function VideoPanel({ onSendSlide }) {
                   onSelect={() => setSelected(item)}
                   onProject={() => project(item)}
                   onDelete={async () => {
-                    if (confirm(`¿Eliminar "${item.name}"?`)) {
+                    if (confirm(t('video.deleteConfirm', { name: item.name }))) {
                       await deleteMedia(item.id); refresh()
                       if (selected?.id === item.id) setSelected(null)
                     }
@@ -228,6 +230,7 @@ export default function VideoPanel({ onSendSlide }) {
 }
 
 function VideoTile({ item, isSelected, onSelect, onProject, onDelete }) {
+  const t = useT()
   const videoRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const url = getMediaURL(item)
@@ -261,13 +264,13 @@ function VideoTile({ item, isSelected, onSelect, onProject, onDelete }) {
       }}>
         <button className="btn btn-ghost"
           style={{ background: 'rgba(0,0,0,0.5)', height: 28, width: 28, padding: 0, justifyContent: 'center' }}
-          onClick={togglePlay} title={playing ? 'Pausar' : 'Reproducir'}>
+          onClick={togglePlay}>
           {playing ? <IconPause size={12} /> : <IconPlay size={12} />}
         </button>
         <button className="btn btn-primary"
           style={{ flex: 1, justifyContent: 'center', height: 28, fontSize: 11 }}
           onClick={(e) => { e.stopPropagation(); onProject() }}>
-          <IconArrowRight size={12} /> Proyectar
+          <IconArrowRight size={12} /> {t('video.project')}
         </button>
         <button className="btn btn-ghost btn-danger"
           style={{ height: 28, padding: '0 8px' }}
@@ -278,7 +281,7 @@ function VideoTile({ item, isSelected, onSelect, onProject, onDelete }) {
 
       {isSelected && (
         <span className="tally live" style={{ position: 'absolute', top: 8, left: 8, fontSize: 9 }}>
-          <span className="led" /> Activo
+          <span className="led" /> {t('video.activeBadge')}
         </span>
       )}
 

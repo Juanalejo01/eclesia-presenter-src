@@ -3,6 +3,7 @@ import { addItem as addToSchedule } from '../services/scheduleService.js'
 import {
   IconArrowRight, IconPlus, IconBell, IconType,
 } from './Icons.jsx'
+import { useT } from '../services/i18n.js'
 
 /**
  * Panel "Texto" — alertas y texto rápido para proyectar.
@@ -34,6 +35,7 @@ function backgroundFor(emphasisId) {
 }
 
 export default function TextPanel({ onSendSlide }) {
+  const t = useT()
   const [text, setText]           = useState('')
   const [reference, setReference] = useState('')
   const [emphasis, setEmphasis]   = useState('normal')
@@ -75,15 +77,15 @@ export default function TextPanel({ onSendSlide }) {
     <div className="workspace">
       <div className="ws-header">
         <div className="ws-title">
-          <h1 className="ws-h1">Texto</h1>
-          <span className="ws-sub">Alertas, avisos y texto rápido para proyección</span>
+          <h1 className="ws-h1">{t('text.title')}</h1>
+          <span className="ws-sub">{t('text.subtitle')}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={addToList} disabled={!text.trim()}>
-            <IconPlus size={14} /> Añadir a lista
+            <IconPlus size={14} /> {t('text.addToList')}
           </button>
           <button className="btn btn-primary" onClick={project} disabled={!text.trim()}>
-            <IconArrowRight size={14} /> Proyectar
+            <IconArrowRight size={14} /> {t('text.project')}
           </button>
         </div>
       </div>
@@ -94,8 +96,8 @@ export default function TextPanel({ onSendSlide }) {
           {/* Énfasis (color/tono) */}
           <div className="card" style={{ padding: 16 }}>
             <div className="section-h" style={{ marginBottom: 10 }}>
-              <h3>Tono del aviso</h3>
-              <span className="sub">define color de fondo y texto</span>
+              <h3>{t('text.toneTitle')}</h3>
+              <span className="sub">{t('text.toneSubtitle')}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {EMPHASIS.map(e => (
@@ -121,8 +123,8 @@ export default function TextPanel({ onSendSlide }) {
           {/* Plantillas comunes */}
           <div>
             <div className="section-h">
-              <h3>Plantillas</h3>
-              <span className="sub">{TEMPLATES.length} avisos comunes</span>
+              <h3>{t('text.tplTitle')}</h3>
+              <span className="sub">{t('text.tplSubtitle', { n: TEMPLATES.length })}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
               {TEMPLATES.map(tpl => (
@@ -141,14 +143,14 @@ export default function TextPanel({ onSendSlide }) {
           {/* Editor de texto */}
           <div>
             <div className="section-h">
-              <h3>Mensaje</h3>
-              <span className="sub">{lines} líneas · {chars} caracteres</span>
+              <h3>{t('text.message')}</h3>
+              <span className="sub">{t('text.lines', { n: lines, chars })}</span>
             </div>
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <textarea
                 value={text}
                 onChange={e => setText(e.target.value)}
-                placeholder="Escribe el aviso aquí…"
+                placeholder={t('text.messagePh')}
                 rows={4}
                 className="field-input"
                 style={{
@@ -162,7 +164,7 @@ export default function TextPanel({ onSendSlide }) {
                   style={{ border: 0, padding: 0, height: 28, fontSize: 13 }}
                   value={reference}
                   onChange={e => setReference(e.target.value)}
-                  placeholder='Referencia o subtítulo (opcional)' />
+                  placeholder={t('text.refPh')} />
               </div>
             </div>
           </div>
@@ -170,7 +172,7 @@ export default function TextPanel({ onSendSlide }) {
           {/* Mini-preview del aviso */}
           <div>
             <div className="section-h">
-              <h3>Vista previa</h3>
+              <h3>{t('text.previewTitle')}</h3>
               <span className="sub">tono · {emphasis}</span>
             </div>
             <div style={{
@@ -190,7 +192,7 @@ export default function TextPanel({ onSendSlide }) {
                   color: EMPHASIS.find(e => e.id === emphasis)?.color || '#f4e6d7',
                   whiteSpace: 'pre-line',
                   textShadow: '0 4px 20px rgba(0,0,0,0.6)',
-                }}>{text || <span style={{ color: 'var(--text-4)', fontStyle: 'italic' }}>(escribe arriba)</span>}</p>
+                }}>{text || <span style={{ color: 'var(--text-4)', fontStyle: 'italic' }}>{t('text.previewEmpty')}</span>}</p>
                 {reference && (
                   <p style={{
                     marginTop: 18, fontFamily: 'var(--font-mono)',
@@ -201,12 +203,12 @@ export default function TextPanel({ onSendSlide }) {
               </div>
               {emphasis === 'urgente' && (
                 <span className="tally live" style={{ position: 'absolute', top: 12, right: 12 }}>
-                  <span className="led" /> URGENTE
+                  <span className="led" /> {t('text.urgent')}
                 </span>
               )}
               {emphasis === 'aviso' && (
                 <span className="tally preview" style={{ position: 'absolute', top: 12, right: 12 }}>
-                  <IconBell size={10} /> AVISO
+                  <IconBell size={10} /> {t('text.warning')}
                 </span>
               )}
             </div>

@@ -6,12 +6,14 @@ import { addItem as addToSchedule } from '../services/scheduleService.js'
 import {
   IconUpload, IconImage, IconTrash, IconArrowRight, IconPlus,
 } from './Icons.jsx'
+import { useT } from '../services/i18n.js'
 
 /**
  * Panel "Imagen" — proyecta imágenes (anuncios, fondos, fotos de eventos).
  * Envía un slide con bgType=image + texto opcional (titular/anuncio).
  */
 export default function ImagePanel({ onSendSlide }) {
+  const t = useT()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -104,9 +106,9 @@ export default function ImagePanel({ onSendSlide }) {
         }}>
           <div style={{ textAlign: 'center', color: 'var(--copper-100)' }}>
             <IconUpload size={36} />
-            <p style={{ marginTop: 12, fontSize: 18, fontWeight: 600 }}>Suelta para añadir</p>
+            <p style={{ marginTop: 12, fontSize: 18, fontWeight: 600 }}>{t('image.dropHere')}</p>
             <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-              Solo se aceptan imágenes
+              {t('image.dropImagesOnly')}
             </p>
           </div>
         </div>
@@ -114,12 +116,12 @@ export default function ImagePanel({ onSendSlide }) {
 
       <div className="ws-header">
         <div className="ws-title">
-          <h1 className="ws-h1">Imagen</h1>
-          <span className="ws-sub">{items.length} imágenes · proyecta fotos, anuncios y fondos</span>
+          <h1 className="ws-h1">{t('image.title')}</h1>
+          <span className="ws-sub">{t('image.subtitle', { n: items.length })}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-primary" onClick={handleUpload}>
-            <IconUpload size={14} /> Subir imagen
+            <IconUpload size={14} /> {t('image.upload')}
           </button>
         </div>
       </div>
@@ -130,17 +132,17 @@ export default function ImagePanel({ onSendSlide }) {
           {/* Ajuste de imagen */}
           <div className="card" style={{ padding: 16 }}>
             <div className="section-h" style={{ marginBottom: 10 }}>
-              <h3>Ajuste de la imagen</h3>
-              <span className="sub">cómo encaja en pantalla 16:9</span>
+              <h3>{t('image.fitTitle')}</h3>
+              <span className="sub">{t('image.fitSubtitle')}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div className="field">
-                <span className="label">Modo</span>
+                <span className="label">{t('image.fitMode')}</span>
                 <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 'var(--r-md)' }}>
                   {[
-                    { v: 'cover',   l: 'Cubrir' },
-                    { v: 'contain', l: 'Contener' },
-                    { v: 'fill',    l: 'Estirar' },
+                    { v: 'cover',   l: t('image.fit.cover') },
+                    { v: 'contain', l: t('image.fit.contain') },
+                    { v: 'fill',    l: t('image.fit.fill') },
                   ].map(o => (
                     <button key={o.v}
                       className={'modal-tab ' + (imageFit === o.v ? 'active' : '')}
@@ -151,7 +153,7 @@ export default function ImagePanel({ onSendSlide }) {
               </div>
               {imageFit === 'contain' && (
                 <div className="field">
-                  <span className="label">Blur de relleno · {bgImageBlur}px</span>
+                  <span className="label">{t('image.fitBlur', { n: bgImageBlur })}</span>
                   <input type="range" min="0" max="50" value={bgImageBlur}
                     onChange={e => setBgImageBlur(+e.target.value)}
                     className="slider"
@@ -160,35 +162,35 @@ export default function ImagePanel({ onSendSlide }) {
               )}
             </div>
             <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text-3)' }}>
-              <b style={{ color: 'var(--text-2)' }}>Cubrir</b> recorta · <b style={{ color: 'var(--text-2)' }}>Contener</b> muestra entera con barras (ideal para verticales) · <b style={{ color: 'var(--text-2)' }}>Estirar</b> deforma.
+              {t('image.fitHelp')}
             </p>
           </div>
 
           {/* Caption opcional */}
           <div className="card" style={{ padding: 16 }}>
             <div className="section-h">
-              <h3>Texto sobre la imagen <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(opcional)</span></h3>
-              <span className="sub">Anuncio · titular · descripción</span>
+              <h3>{t('image.captionTitle')}</h3>
+              <span className="sub">{t('image.captionSubtitle')}</span>
             </div>
             <div className="field-row">
               <div className="field">
-                <span className="label">Texto principal</span>
+                <span className="label">{t('image.captionMain')}</span>
                 <input className="field-input" value={caption} onChange={e => setCaption(e.target.value)}
-                  placeholder='Ej: "Conferencia anual 2026"' />
+                  placeholder={t('image.captionMainPh')} />
               </div>
               <div className="field">
-                <span className="label">Referencia / subtítulo</span>
+                <span className="label">{t('image.captionRef')}</span>
                 <input className="field-input" value={reference} onChange={e => setReference(e.target.value)}
-                  placeholder='Ej: "Inscripciones abiertas"' />
+                  placeholder={t('image.captionRefPh')} />
               </div>
             </div>
             {selected && (caption || reference) && (
               <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
                 <button className="btn" onClick={() => addToList(selected)}>
-                  <IconPlus size={13} /> Lista
+                  <IconPlus size={13} /> {t('songs.list')}
                 </button>
                 <button className="btn btn-primary" onClick={projectCaption}>
-                  <IconArrowRight size={13} /> Proyectar con texto
+                  <IconArrowRight size={13} /> {t('image.projectCaption')}
                 </button>
               </div>
             )}
@@ -197,14 +199,14 @@ export default function ImagePanel({ onSendSlide }) {
           {/* Galería */}
           <div>
             <div className="section-h">
-              <h3>Biblioteca</h3>
-              <span className="sub">{loading ? 'cargando…' : `${items.length} elementos`}</span>
+              <h3>{t('image.libraryTitle')}</h3>
+              <span className="sub">{loading ? t('common.loading') : `${items.length}`}</span>
             </div>
 
             {items.length === 0 && !loading && (
               <div className="card" style={{ textAlign: 'center', padding: 40, borderStyle: 'dashed' }}>
                 <IconImage size={36} style={{ color: 'var(--text-4)', marginBottom: 12 }} />
-                <p className="empty-text">No hay imágenes todavía. Sube la primera.</p>
+                <p className="empty-text">{t('image.libraryEmpty')}</p>
               </div>
             )}
 
@@ -238,13 +240,13 @@ export default function ImagePanel({ onSendSlide }) {
                       <button className="btn btn-primary"
                         style={{ flex: 1, justifyContent: 'center', height: 28, fontSize: 11 }}
                         onClick={(e) => { e.stopPropagation(); project(item) }}>
-                        <IconArrowRight size={12} /> Proyectar
+                        <IconArrowRight size={12} /> {t('image.project')}
                       </button>
                       <button className="btn btn-ghost btn-danger"
                         style={{ height: 28, padding: '0 8px' }}
                         onClick={async (e) => {
                           e.stopPropagation()
-                          if (confirm(`¿Eliminar "${item.name}"?`)) {
+                          if (confirm(t('image.deleteConfirm', { name: item.name }))) {
                             await deleteMedia(item.id); refresh()
                             if (selected?.id === item.id) setSelected(null)
                           }
@@ -255,7 +257,7 @@ export default function ImagePanel({ onSendSlide }) {
 
                     {isSel && (
                       <span className="tally live" style={{ position: 'absolute', top: 8, left: 8, fontSize: 9 }}>
-                        <span className="led" /> Activa
+                        <span className="led" /> {t('image.activeBadge')}
                       </span>
                     )}
 

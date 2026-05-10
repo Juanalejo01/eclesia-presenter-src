@@ -2,8 +2,10 @@ import { useTheme } from '../services/themeStore.js'
 import { useSlideStore, setPreviewMode, commitPreview, setLive } from '../services/slideStore.js'
 import SlideRenderer from './SlideRenderer.jsx'
 import { IconArrowRight, IconX } from './Icons.jsx'
+import { useT } from '../services/i18n.js'
 
 export default function SlidePreview() {
+  const t = useT()
   const theme = useTheme()
   const { live, preview, previewMode } = useSlideStore()
   const clearLive = () => setLive(null)
@@ -11,7 +13,7 @@ export default function SlidePreview() {
   return (
     <aside className="monitor">
       <div className="monitor-header">
-        <div className="monitor-title">Programa / <b>Preview</b></div>
+        <div className="monitor-title">{t('monitor.programPreview')}</div>
         <div className="pgm-switch">
           <button className={!previewMode ? 'active' : ''} onClick={() => setPreviewMode(false)}>PGM</button>
           <button className={previewMode ? 'active' : ''} onClick={() => setPreviewMode(true)}>Multi</button>
@@ -21,10 +23,10 @@ export default function SlidePreview() {
       <div className="monitor-body">
         <div className="mon-block">
           <div className="mon-label">
-            <span className="mon-label-text" style={{ color: 'var(--live)' }}>En vivo</span>
+            <span className="mon-label-text" style={{ color: 'var(--live)' }}>{t('monitor.live')}</span>
             <span className="mon-label-text">1920 × 1080</span>
           </div>
-          <MonScreen slide={live} theme={theme} isLive label="PGM" />
+          <MonScreen slide={live} theme={theme} isLive label="PGM" t={t} />
 
           {/* Botón limpiar pantalla — atajo F9 */}
           <button
@@ -36,9 +38,9 @@ export default function SlidePreview() {
               marginTop: 8, height: 36,
               opacity: live ? 1 : 0.5,
             }}
-            title="Quita el contenido del proyector (queda solo el fondo del tema). Atajo: F9">
+            title={t('monitor.clearScreenTitle')}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <IconX size={13} /> Limpiar pantalla
+              <IconX size={13} /> {t('monitor.clearScreen')}
             </span>
             <span className="kbd">F9</span>
           </button>
@@ -48,14 +50,14 @@ export default function SlidePreview() {
           <>
             <div className="mon-block">
               <div className="mon-label">
-                <span className="mon-label-text">Próximo</span>
+                <span className="mon-label-text">{t('monitor.next')}</span>
                 <span className="mon-label-text">HD</span>
               </div>
-              <MonScreen slide={preview} theme={theme} label="PVW" />
+              <MonScreen slide={preview} theme={theme} label="PVW" t={t} />
             </div>
 
             <button className="send-live" onClick={commitPreview} disabled={!preview}>
-              <span>Tomar al aire</span>
+              <span>{t('monitor.takeOnAir')}</span>
               <span className="arrow"><IconArrowRight size={14} /></span>
             </button>
           </>
@@ -65,15 +67,15 @@ export default function SlidePreview() {
   )
 }
 
-function MonScreen({ slide, theme, isLive, label }) {
+function MonScreen({ slide, theme, isLive, label, t }) {
   const isBlackout = slide?.type === 'blackout'
   return (
     <div className={'mon-screen' + (isLive ? ' live-screen' : '')} style={{ background: 'transparent' }}>
       <SlideRenderer slide={slide} theme={theme} isBlackout={isBlackout} />
       <span className="mon-corner left" style={{ zIndex: 2 }}>
         {isLive
-          ? <span className="tally live"><span className="led" /> ON AIR</span>
-          : <span className="tally preview"><span className="led" /> Preview</span>}
+          ? <span className="tally live"><span className="led" /> {t ? t('monitor.onAir') : 'ON AIR'}</span>
+          : <span className="tally preview"><span className="led" /> {t ? t('monitor.preview') : 'Preview'}</span>}
       </span>
       <span className="mon-corner right" style={{ zIndex: 2 }}>{label}</span>
     </div>

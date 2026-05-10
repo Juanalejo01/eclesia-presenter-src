@@ -6,6 +6,7 @@ import {
 import { normalizeText } from '../services/textUtils.js'
 import { subscribe } from '../hooks/useShortcuts.js'
 import { addItem as addToSchedule } from '../services/scheduleService.js'
+import { useT } from '../services/i18n.js'
 import { IconSearch, IconPlus, IconArrowRight } from './Icons.jsx'
 
 /**
@@ -16,6 +17,7 @@ import { IconSearch, IconPlus, IconArrowRight } from './Icons.jsx'
  *   ESC retrocede un paso, también hay breadcrumbs visibles para navegar.
  */
 export default function BiblePanel({ onSendSlide }) {
+  const t = useT()
   const [versions, setVersions] = useState(getAllVersions())
   const [versionId, setVersionId] = useState(getActiveVersion().id)
 
@@ -172,9 +174,9 @@ export default function BiblePanel({ onSendSlide }) {
     <div className="workspace">
       <div className="ws-header">
         <div className="ws-title">
-          <h1 className="ws-h1">Biblia</h1>
+          <h1 className="ws-h1">{t('nav.bible')}</h1>
           <span className="ws-sub">
-            {books.length > 0 && `${books.length} libros · `}{activeVersion?.license}
+            {books.length > 0 && `${t('bible.subtitle', { n: books.length })} · `}{activeVersion?.license}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -197,7 +199,7 @@ export default function BiblePanel({ onSendSlide }) {
             }}>⚠️ {loadError}</div>
           )}
 
-          {loading && <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '16px 0' }}>Cargando {activeVersion?.short}...</div>}
+          {loading && <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '16px 0' }}>{t('bible.loadingBibles', { short: activeVersion?.short })}</div>}
 
           {!loading && !loadError && books.length > 0 && (
             <>
@@ -206,7 +208,7 @@ export default function BiblePanel({ onSendSlide }) {
                 <div>
                   <div className="input-wrap">
                     <IconSearch size={15} className="input-icon" />
-                    <input placeholder='Buscar texto, versículo o referencia (sin tildes ok)'
+                    <input placeholder={t('bible.searchText')}
                       value={textSearch} onChange={e => setTextSearch(e.target.value)} />
                     <span className="input-kbd"><span className="kbd">/</span></span>
                   </div>
@@ -240,7 +242,7 @@ export default function BiblePanel({ onSendSlide }) {
               )}
               {isRemote && (
                 <p className="empty-text" style={{ fontStyle: 'italic' }}>
-                  Búsqueda de texto deshabilitada en versiones remotas (cada consulta usa cuota de tu API key).
+                  {t('bible.searchRemoteDisabled')}
                 </p>
               )}
 
@@ -251,12 +253,12 @@ export default function BiblePanel({ onSendSlide }) {
               {step === 'book' && (
                 <div>
                   <div className="section-h">
-                    <h3>Libros</h3>
+                    <h3>{t('bible.books')}</h3>
                     <span className="sub">{books.length} · {activeVersion?.short}</span>
                   </div>
                   <div className="input-wrap" style={{ marginBottom: 10 }}>
                     <IconSearch size={14} className="input-icon" />
-                    <input placeholder="Buscar libro (sin tildes)..." value={bookSearch} onChange={e => setBookSearch(e.target.value)} />
+                    <input placeholder={t('bible.searchBook')} value={bookSearch} onChange={e => setBookSearch(e.target.value)} />
                   </div>
                   <div className="book-grid" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}>
                     {filteredBooks.map(book => (
@@ -275,7 +277,7 @@ export default function BiblePanel({ onSendSlide }) {
                 <div>
                   <div className="section-h">
                     <h3>{currentBook.name}</h3>
-                    <span className="sub">{maxChapters} capítulos · ESC para volver</span>
+                    <span className="sub">{maxChapters} {t('bible.chapters')} · {t('bible.escBack')}</span>
                   </div>
                   <NumberGrid
                     count={maxChapters}
@@ -290,18 +292,18 @@ export default function BiblePanel({ onSendSlide }) {
                   <div className="section-h" style={{ alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                       <h3>{currentBook?.name} {chapter.chapterNum}</h3>
-                      <span className="sub">{chapter.verses.length} versículos · ESC volver</span>
+                      <span className="sub">{chapter.verses.length} {t('bible.verses')} · {t('bible.escBack')}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 6 }}>
                         {selectedVerses.length > 0
-                          ? `${selectedVerses.length} seleccionado${selectedVerses.length > 1 ? 's' : ''}`
-                          : 'Click · Shift = rango · Ctrl = agregar'}
+                          ? t(selectedVerses.length === 1 ? 'bible.selectedCount' : 'bible.selectedCountPlural', { n: selectedVerses.length })
+                          : t('bible.selectionInfo')}
                       </span>
-                      <button className="btn btn-ghost" onClick={() => setSelectedVerses([])} disabled={!selectedVerses.length}>Limpiar</button>
-                      <button className="btn" onClick={() => setSelectedVerses(chapter.verses.map(v => v.verseNum))}>Todos</button>
+                      <button className="btn btn-ghost" onClick={() => setSelectedVerses([])} disabled={!selectedVerses.length}>{t('common.clear')}</button>
+                      <button className="btn" onClick={() => setSelectedVerses(chapter.verses.map(v => v.verseNum))}>{t('common.all')}</button>
                       <button className="btn" onClick={addCurrentToList} disabled={!selectedVerses.length}>
-                        <IconPlus size={12} /> Lista
+                        <IconPlus size={12} /> {t('songs.list')}
                       </button>
                     </div>
                   </div>
