@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
+// Middleware defensivo: si Supabase no está configurado o falla,
+// deja pasar la request en lugar de romper toda la web con un 500.
 export async function middleware(request) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Si faltan las env vars, no podemos validar sesión. Dejamos pasar.
+  if (!url || !anonKey || !isValidHttpUrl(url)) {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({ request: { headers: request.headers } })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
+  try {
+    const supabase = createServerClient(url, anonKey, {
       cookies: {
         get(name) { return request.cookies.get(name)?.value },
         set(name, value, options) {
@@ -21,29 +29,38 @@ export async function middleware(request) {
           response.cookies.set({ name, value: '', ...options })
         },
       },
+    })
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const path = request.nextUrl.pathname
+
+    // Rutas protegidas: requieren sesión
+    if (path.startsWith('/cuenta') && !user) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', path)
+      return NextResponse.redirect(loginUrl)
     }
-  )
 
-  // Refresca tokens si están a punto de caducar
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const url = request.nextUrl
-  const path = url.pathname
-
-  // Rutas protegidas: requieren sesión
-  const isProtected = path.startsWith('/cuenta')
-  if (isProtected && !user) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('next', path)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  // Si ya está logueado y va a /login o /register → mándalo a /cuenta
-  if (user && (path === '/login' || path === '/register')) {
-    return NextResponse.redirect(new URL('/cuenta', request.url))
+    // Si ya está logueado y va a /login o /register → mándalo a /cuenta
+    if (user && (path === '/login' || path === '/register')) {
+      return NextResponse.redirect(new URL('/cuenta', request.url))
+    }
+  } catch (e) {
+    // Si algo falla con Supabase (URL invalida, cookies corruptas, red caida...),
+    // no rompemos la web. Loggeamos y seguimos sin sesión.
+    console.error('[middleware] Supabase error:', e?.message || e)
   }
 
   return response
+}
+
+function isValidHttpUrl(s) {
+  try {
+    const u = new URL(s)
+    return u.protocol === 'https:' || u.protocol === 'http:'
+  } catch {
+    return false
+  }
 }
 
 export const config = {

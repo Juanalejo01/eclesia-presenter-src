@@ -3,8 +3,17 @@ import Logo from './Logo'
 import { createClient } from '../lib/supabase/server'
 
 export default async function Navbar() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Defensivo: si Supabase no está configurado, mostramos navbar sin sesión.
+  let user = null
+  try {
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      const supabase = createClient()
+      const res = await supabase.auth.getUser()
+      user = res.data?.user || null
+    }
+  } catch (e) {
+    console.error('[Navbar] getUser error:', e?.message)
+  }
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-md bg-bg-0/70 border-b border-copper-300/10">
