@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
     './app/**/*.{js,jsx,ts,tsx,mdx}',
     './components/**/*.{js,jsx,ts,tsx}',
@@ -7,7 +7,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Paleta cobre cinemática igual que la app
         bg: {
           0: '#14100d',
           1: '#1a1410',
