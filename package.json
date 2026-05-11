@@ -62,13 +62,13 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "${productName}-${version}-portable.${ext}",
       "signAndEditExecutable": false
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
     "nsis": {
+      "artifactName": "${productName}-${version}-setup.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
