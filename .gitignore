@@ -7,6 +7,11 @@ dist-electron/
 out/
 build/
 
+# Next.js (web/) — siempre se ignora
+web/.next/
+web/out/
+web/.vercel
+
 # Environment / secrets
 .env
 .env.local
