@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import Logo from './Logo'
+import { createClient } from '../lib/supabase/server'
 
-export default function Navbar() {
+export default async function Navbar() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <header className="sticky top-0 z-50 backdrop-blur-md bg-bg-0/70 border-b border-copper-300/10">
       <div className="container mx-auto px-6 h-16 flex items-center justify-between">
@@ -31,19 +35,35 @@ export default function Navbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/login" className="hidden md:inline text-sm text-ink-2 hover:text-ink-1 transition-colors">
-            Iniciar sesión
-          </Link>
-          <Link
-            href="/download"
-            className="inline-flex items-center gap-2 px-4 h-9 rounded-lg
-                       bg-gradient-to-b from-copper-200 to-copper-300
-                       text-[#1a0e08] text-sm font-semibold
-                       shadow-copper-glow hover:from-copper-100 hover:to-copper-200
-                       transition-all"
-          >
-            Descargar gratis
-          </Link>
+          {user ? (
+            <Link
+              href="/cuenta"
+              className="inline-flex items-center gap-2 px-4 h-9 rounded-lg
+                         border border-copper-300/30 bg-bg-2 hover:bg-bg-3
+                         text-sm font-medium text-ink-1 transition-all"
+            >
+              <span className="w-6 h-6 rounded-full bg-gradient-to-br from-copper-200 to-copper-400 grid place-items-center text-[10px] font-bold text-[#1a0e08]">
+                {(user.email || '?')[0].toUpperCase()}
+              </span>
+              <span className="hidden sm:inline">Mi cuenta</span>
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="hidden md:inline text-sm text-ink-2 hover:text-ink-1 transition-colors">
+                Iniciar sesión
+              </Link>
+              <Link
+                href="/download"
+                className="inline-flex items-center gap-2 px-4 h-9 rounded-lg
+                           bg-gradient-to-b from-copper-200 to-copper-300
+                           text-[#1a0e08] text-sm font-semibold
+                           shadow-copper-glow hover:from-copper-100 hover:to-copper-200
+                           transition-all"
+              >
+                Descargar gratis
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

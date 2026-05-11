@@ -1,0 +1,149 @@
+'use client'
+
+import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '../../lib/supabase/client'
+
+export default function RegisterForm() {
+  const searchParams = useSearchParams()
+  const plan = searchParams.get('plan')
+
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [organization, setOrganization] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!email.trim()) return
+    setLoading(true); setError(null)
+
+    const supabase = createClient()
+    const callbackUrl = `${window.location.origin}/auth/callback?next=/cuenta${plan ? `&plan=${plan}` : ''}`
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: callbackUrl,
+        shouldCreateUser: true,
+        data: {
+          // Estos datos van a auth.users.raw_user_meta_data,
+          // y el trigger handle_new_user los copia a profiles.
+          name: name.trim() || null,
+          organization: organization.trim() || null,
+        },
+      },
+    })
+
+    setLoading(false)
+    if (error) {
+      setError(error.message)
+    } else {
+      setSent(true)
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="rounded-2xl border border-copper-300/30 bg-copper-300/5 p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-copper-300/20 grid place-items-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <path d="M3 7l9 6 9-6M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7M3 7l2-2h14l2 2"
+              stroke="#db9f75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h2 className="font-display text-2xl text-ink-1 mb-2">¡Casi listo!</h2>
+        <p className="text-ink-2 text-sm mb-2 leading-relaxed">
+          Te enviamos un enlace a <b className="text-copper-200">{email}</b>.
+        </p>
+        <p className="text-ink-2 text-sm leading-relaxed">
+          Haz click en el enlace para activar tu cuenta gratis. El enlace caduca en 1 hora.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-2xl border border-copper-300/20 bg-bg-2 p-8 space-y-5">
+      {plan && (
+        <div className="text-xs text-copper-200 bg-copper-300/10 border border-copper-300/20 px-3 py-2 rounded-md">
+          Plan seleccionado: <b className="capitalize">{plan.replace('_', ' ')}</b>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-mono uppercase tracking-widest text-ink-3 mb-2">
+          Nombre
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Tu nombre"
+          className="w-full h-12 px-4 rounded-lg bg-bg-1 border border-copper-300/15
+                     text-ink-1 placeholder-ink-4 outline-none
+                     focus:border-copper-300/50 focus:ring-2 focus:ring-copper-300/15"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-mono uppercase tracking-widest text-ink-3 mb-2">
+          Iglesia / Organización (opcional)
+        </label>
+        <input
+          type="text"
+          value={organization}
+          onChange={e => setOrganization(e.target.value)}
+          placeholder="Iglesia Central de..."
+          className="w-full h-12 px-4 rounded-lg bg-bg-1 border border-copper-300/15
+                     text-ink-1 placeholder-ink-4 outline-none
+                     focus:border-copper-300/50 focus:ring-2 focus:ring-copper-300/15"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-mono uppercase tracking-widest text-ink-3 mb-2">
+          Correo electrónico
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="tu@iglesia.com"
+          required
+          className="w-full h-12 px-4 rounded-lg bg-bg-1 border border-copper-300/15
+                     text-ink-1 placeholder-ink-4 outline-none
+                     focus:border-copper-300/50 focus:ring-2 focus:ring-copper-300/15"
+        />
+      </div>
+
+      {error && (
+        <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-md">
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={loading || !email.trim()}
+        className="w-full h-12 rounded-lg
+                   bg-gradient-to-b from-copper-200 to-copper-300
+                   text-[#1a0e08] font-semibold
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   hover:from-copper-100 hover:to-copper-200 transition-all"
+      >
+        {loading ? 'Creando…' : 'Crear cuenta gratis'}
+      </button>
+
+      <p className="text-xs text-ink-3 text-center pt-2">
+        ¿Ya tienes cuenta?{' '}
+        <Link href="/login" className="text-copper-200 hover:text-copper-100 underline underline-offset-2">
+          Iniciar sesión
+        </Link>
+      </p>
+    </form>
+  )
+}
