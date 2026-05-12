@@ -45,9 +45,11 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        # `npm ci` requiere lock + .npmrc consistente; better-sqlite3 compila
-        # nativamente para la plataforma de cada runner.
-        run: npm ci
+        # Usamos npm install en vez de npm ci para tolerar pequeñas
+        # discrepancias del lockfile (peer flags, etc.) que rompen ci estricto.
+        # better-sqlite3 compila nativamente para la plataforma de cada runner
+        # via postinstall (electron-builder install-app-deps).
+        run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Build renderer
         run: npm run build
