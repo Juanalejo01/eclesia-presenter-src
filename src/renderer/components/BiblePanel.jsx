@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   getAllVersions, getVisibleVersions, getActiveVersion, setActiveVersion,
   getBooks, getChapter, getChapterCount, searchText, combineVerses,
@@ -93,7 +93,36 @@ export default function BiblePanel({ onSendSlide }) {
 
   const goBack = () => {
     if (step === 'verse')        { setStep('chapter'); setSelectedVerses([]) }
-    else if (step === 'chapter') { setStep('book'); setSelectedBookIndex(null); setChapter(null) }
+    else if (step === 'chapter') { setStep('book'); setSelectedBookIndex(null); setChapter(null); setBookSearch('') }
+  }
+
+  // Navegación directa via breadcrumb
+  const goToBooks = () => {
+    setStep('book'); setSelectedBookIndex(null); setChapter(null); setSelectedVerses([]); setBookSearch('')
+  }
+  const goToChapters = () => {
+    if (selectedBookIndex !== null) { setStep('chapter'); setSelectedVerses([]) }
+  }
+
+  // Auto-focus de los buscadores al entrar en cada step
+  const bookSearchRef = useRef(null)
+  useEffect(() => {
+    if (step === 'book') {
+      // pequeño delay para que el input ya esté en DOM
+      requestAnimationFrame(() => bookSearchRef.current?.focus())
+    }
+  }, [step])
+
+  // Enter en el buscador de libros: si hay UN resultado o más, va al primero
+  const onBookSearchKey = (e) => {
+    if (e.key === 'Enter') {
+      const first = filteredBooks[0]
+      if (first) pickBook(first.index)
+    } else if (e.key === 'Escape' && bookSearch) {
+      // ESC primero limpia el filtro, segundo desfocus
+      e.stopPropagation()
+      setBookSearch('')
+    }
   }
 
   // Búsqueda de texto
@@ -249,8 +278,15 @@ export default function BiblePanel({ onSendSlide }) {
                 </p>
               )}
 
-              {/* Breadcrumb / navegación */}
-              <Breadcrumb step={step} bookName={currentBook?.name} chapterNum={chapterNum} onBack={goBack} />
+              {/* Breadcrumb / navegación (clickable) */}
+              <Breadcrumb
+                step={step}
+                bookName={currentBook?.name}
+                chapterNum={chapterNum}
+                onBack={goBack}
+                onGoBooks={goToBooks}
+                onGoChapters={goToChapters}
+              />
 
               {/* STEP: BOOKS */}
               {step === 'book' && (
@@ -261,13 +297,33 @@ export default function BiblePanel({ onSendSlide }) {
                   </div>
                   <div className="input-wrap" style={{ marginBottom: 10 }}>
                     <IconSearch size={14} className="input-icon" />
-                    <input placeholder={t('bible.searchBook')} value={bookSearch} onChange={e => setBookSearch(e.target.value)} />
+                    <input
+                      ref={bookSearchRef}
+                      autoFocus
+                      placeholder={t('bible.searchBook') + ' — escribe "sal" + Enter'}
+                      value={bookSearch}
+                      onChange={e => setBookSearch(e.target.value)}
+                      onKeyDown={onBookSearchKey}
+                    />
+                    {bookSearch && filteredBooks.length > 0 && (
+                      <span style={{
+                        position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                        fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)',
+                        letterSpacing: '0.06em', pointerEvents: 'none',
+                      }}>
+                        ↵ {filteredBooks[0].name}
+                      </span>
+                    )}
                   </div>
                   <div className="book-grid" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}>
-                    {filteredBooks.map(book => (
+                    {filteredBooks.map((book, i) => (
                       <div key={book.index}
-                        className="book-item"
-                        onClick={() => pickBook(book.index)}>
+                        className={'book-item' + (i === 0 && bookSearch ? ' book-item-suggested' : '')}
+                        onClick={() => pickBook(book.index)}
+                        style={i === 0 && bookSearch ? {
+                          border: '1px solid var(--copper-200)',
+                          background: 'linear-gradient(180deg, rgba(168, 95, 51, 0.18), rgba(128, 64, 18, 0.08))',
+                        } : undefined}>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.name}</span>
                       </div>
                     ))}
@@ -295,7 +351,7 @@ export default function BiblePanel({ onSendSlide }) {
                   <div className="section-h" style={{ alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                       <h3>{currentBook?.name} {chapter.chapterNum}</h3>
-                      <span className="sub">{chapter.verses.length} {t('bible.verses')} · {t('bible.escBack')}</span>
+                      <span className="sub">{chapter.verses.length} {t('bible.verses')}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 6 }}>
@@ -311,30 +367,60 @@ export default function BiblePanel({ onSendSlide }) {
                     </div>
                   </div>
 
-                  {/* Grid numérico de versículos */}
+                  {/* Grid numérico de versículos (jump rápido) */}
                   <NumberGrid
                     count={chapter.verses.length}
                     selectedNumbers={selectedVerses}
                     onPick={(n, e) => toggleVerse(n, e)}
                   />
 
-                  {/* Texto del versículo activo */}
-                  {selectedVerses.length > 0 && (
-                    <div className="card" style={{ marginTop: 12, padding: 16 }}>
-                      {selectedVerses
-                        .sort((a, b) => a - b)
-                        .map(vNum => {
-                          const verse = chapter.verses.find(v => v.verseNum === vNum)
-                          if (!verse) return null
-                          return (
-                            <div key={vNum} style={{ display: 'flex', gap: 14, padding: '6px 0' }}>
-                              <span className="verse-num" style={{ minWidth: 32 }}>{vNum}</span>
-                              <span className="verse-text">{verse.text}</span>
-                            </div>
-                          )
-                        })}
-                    </div>
-                  )}
+                  {/* Lista COMPLETA de versículos con texto — clickable, scrollable.
+                      Antes solo se mostraban los seleccionados (perdías el contexto).
+                      Ahora ves todo el capítulo y puedes clickar/Shift-clickar/Ctrl-clickar
+                      cualquier versículo igual que en el NumberGrid. */}
+                  <div className="card" style={{
+                    marginTop: 12, padding: 12,
+                    maxHeight: 'calc(100vh - 480px)',
+                    minHeight: 200,
+                    overflowY: 'auto',
+                  }}>
+                    {chapter.verses.map(v => {
+                      const isSelected = selectedVerses.includes(v.verseNum)
+                      return (
+                        <div
+                          key={v.verseNum}
+                          onClick={(e) => toggleVerse(v.verseNum, e)}
+                          style={{
+                            display: 'flex', gap: 14, padding: '8px 12px',
+                            cursor: 'pointer',
+                            borderRadius: 8,
+                            background: isSelected
+                              ? 'linear-gradient(180deg, rgba(168, 95, 51, 0.22), rgba(128, 64, 18, 0.10))'
+                              : 'transparent',
+                            border: '1px solid ' + (isSelected ? 'rgba(232,181,145,0.35)' : 'transparent'),
+                            transition: 'background 0.12s',
+                            marginBottom: 2,
+                          }}
+                          onMouseEnter={e => {
+                            if (!isSelected) e.currentTarget.style.background = 'var(--bg-3)'
+                          }}
+                          onMouseLeave={e => {
+                            if (!isSelected) e.currentTarget.style.background = 'transparent'
+                          }}
+                          title={isSelected ? 'Click para quitar · Shift+click rango · Ctrl+click múltiple' : 'Click para seleccionar'}
+                        >
+                          <span className="verse-num" style={{
+                            minWidth: 32,
+                            color: isSelected ? 'var(--copper-100)' : 'var(--copper-200)',
+                          }}>{v.verseNum}</span>
+                          <span className="verse-text" style={{
+                            color: isSelected ? 'var(--text-1)' : 'var(--text-2)',
+                            fontSize: 14, lineHeight: 1.6,
+                          }}>{v.text}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </>
@@ -345,34 +431,58 @@ export default function BiblePanel({ onSendSlide }) {
   )
 }
 
-function Breadcrumb({ step, bookName, chapterNum, onBack }) {
-  const crumbs = []
-  crumbs.push({ label: 'Libros', active: step === 'book' })
-  if (bookName) crumbs.push({ label: bookName, active: step === 'chapter' })
-  if (step === 'verse' && chapterNum) crumbs.push({ label: `Capítulo ${chapterNum}`, active: true })
+function Breadcrumb({ step, bookName, chapterNum, onBack, onGoBooks, onGoChapters }) {
+  // Cada crumb tiene un handler de click. El crumb activo se ve resaltado pero
+  // también es clickable (no-op si ya estás ahí).
+  const crumbs = [
+    { label: 'Libros',                  active: step === 'book',    onClick: onGoBooks },
+  ]
+  if (bookName) {
+    crumbs.push({ label: bookName,      active: step === 'chapter', onClick: onGoChapters })
+  }
+  if (step === 'verse' && chapterNum) {
+    crumbs.push({ label: `Capítulo ${chapterNum}`, active: true, onClick: null })
+  }
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
+      display: 'flex', alignItems: 'center', gap: 8,
       fontSize: 12, color: 'var(--text-3)',
     }}>
       {crumbs.map((c, i) => (
-        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {i > 0 && <IconArrowRight size={11} />}
-          <span style={{
-            color: c.active ? 'var(--copper-100)' : 'var(--text-3)',
-            fontWeight: c.active ? 600 : 400,
-          }}>{c.label}</span>
+          <button
+            type="button"
+            onClick={c.onClick || undefined}
+            disabled={c.active && !c.onClick}
+            style={{
+              all: 'unset',
+              cursor: c.onClick && !c.active ? 'pointer' : 'default',
+              color: c.active ? 'var(--copper-100)' : 'var(--text-3)',
+              fontWeight: c.active ? 600 : 500,
+              padding: '4px 8px',
+              borderRadius: 6,
+              fontSize: 12,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => {
+              if (c.onClick && !c.active) e.currentTarget.style.background = 'var(--bg-3)'
+            }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          >
+            {c.label}
+          </button>
         </span>
       ))}
+
+      {/* Botón ESC justo al lado de la guía (sin flex: 1 separador) */}
       {step !== 'book' && (
-        <>
-          <span style={{ flex: 1 }} />
-          <button className="btn btn-ghost" onClick={onBack}
-            style={{ fontSize: 11, height: 26 }}>
-            ← Volver <span className="kbd" style={{ marginLeft: 4 }}>ESC</span>
-          </button>
-        </>
+        <button className="btn btn-ghost" onClick={onBack}
+          style={{ fontSize: 11, height: 26, marginLeft: 4 }}
+          title="Atrás (Esc)">
+          ← Atrás <span className="kbd" style={{ marginLeft: 4 }}>ESC</span>
+        </button>
       )}
     </div>
   )

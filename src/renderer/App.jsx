@@ -11,7 +11,8 @@ import TransmisionPanel from './components/TransmisionPanel.jsx'
 import SlidePreview from './components/SlidePreview.jsx'
 import Topbar from './components/Topbar.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
-import { useGlobalShortcuts } from './hooks/useShortcuts.js'
+import Settings from './components/Settings.jsx'
+import { useGlobalShortcuts, subscribe } from './hooks/useShortcuts.js'
 import { selectSlide, setLive, useSlideStore } from './services/slideStore.js'
 import { syncFromMain } from './services/themeStore.js'
 import { refreshImportedVersions } from './services/bibleService.js'
@@ -34,11 +35,27 @@ export default function App() {
   const [activePanel, setActivePanel] = useState('bible')
   const [settingsRev, setSettingsRev] = useState(0)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const { live } = useSlideStore()
 
   useEffect(() => {
     syncFromMain()
     refreshImportedVersions()  // carga las biblias importadas para que aparezcan en el selector
+  }, [])
+
+  // Eventos globales emitidos desde shortcuts
+  useEffect(() => {
+    const offSettings = subscribe('settings:open', () => setSettingsOpen(true))
+    const offFullscreen = subscribe('projection:toggle-fullscreen', async () => {
+      if (!window.electron?.projection) return
+      const state = await window.electron.projection.state()
+      if (state.open.includes('background')) {
+        await window.electron.projection.close('background')
+      } else {
+        await window.electron.projection.open({ mode: 'background' })
+      }
+    })
+    return () => { offSettings(); offFullscreen() }
   }, [])
 
   useGlobalShortcuts({
@@ -54,7 +71,10 @@ export default function App() {
     <>
       <div className="vignette" />
       <div className="app-shell">
-        <Topbar onSettingsChange={() => setSettingsRev(r => r + 1)} />
+        <Topbar
+          onSettingsChange={() => setSettingsRev(r => r + 1)}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
         <div className="main-grid">
           <Sidebar active={activePanel} onChange={setActivePanel} />
           <Panel key={settingsRev} onSendSlide={selectSlide} slide={live} />
@@ -66,6 +86,12 @@ export default function App() {
         onClose={() => setPaletteOpen(false)}
         onPanelChange={setActivePanel}
       />
+      {settingsOpen && (
+        <Settings
+          onClose={() => setSettingsOpen(false)}
+          onUpdate={() => setSettingsRev(r => r + 1)}
+        />
+      )}
     </>
   )
 }

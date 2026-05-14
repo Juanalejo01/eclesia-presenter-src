@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
-import Settings from './Settings.jsx'
 import { LogoMonogram, IconSettings } from './Icons.jsx'
 import { useT } from '../services/i18n.js'
 
-export default function Topbar({ onSettingsChange }) {
+export default function Topbar({ onSettingsChange, onOpenSettings }) {
   const t = useT()
-  const [showSettings, setShowSettings] = useState(false)
   const [time, setTime] = useState(formatNow())
   const [projectorOn, setProjectorOn] = useState(true)
 
@@ -50,18 +48,14 @@ export default function Topbar({ onSettingsChange }) {
         </div>
 
         <div className="header-actions">
-          <button className="btn" onClick={() => setShowSettings(true)} title={t('topbar.settings')}>
+          <button className="btn" onClick={() => onOpenSettings?.()} title={t('topbar.settings') + ' (Ctrl+A)'}>
             <IconSettings size={14} /> {t('topbar.settings')}
           </button>
-          <button className="btn btn-primary" onClick={openPresenter}>
+          <button className="btn btn-primary" onClick={openPresenter} title="Abrir proyector (Ctrl+P)">
             {t('topbar.openProjector')}
           </button>
         </div>
       </header>
-
-      {showSettings && (
-        <Settings onClose={() => setShowSettings(false)} onUpdate={onSettingsChange} />
-      )}
     </>
   )
 }
