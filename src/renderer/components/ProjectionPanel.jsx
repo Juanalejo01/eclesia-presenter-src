@@ -205,7 +205,15 @@ function FullscreenEditor({ theme, preview, activePreset, setActivePreset, updat
           {FULLSCREEN_PRESETS.map(p => (
             <div key={p.id}
               className={'style-card' + (activePreset === p.id ? ' active' : '')}
-              onClick={() => { updateTheme(p.theme); setActivePreset(p.id) }}
+              onClick={() => {
+                // Aplicar SOLO los campos visuales del preset (fondo, colores).
+                // NO tocar tamaño de letra, alineación, fuente, etc. — esos son
+                // ajustes personales del usuario que no deben resetearse al
+                // cambiar de plantilla.
+                const { fontSize, fontFamily, fontWeight, textAlign, ...visualOnly } = p.theme
+                updateTheme(visualOnly)
+                setActivePreset(p.id)
+              }}
               style={{ background: p.bg }}>
               <span className="label-aa">Aa</span>
               <span className="label-name">{p.label}</span>

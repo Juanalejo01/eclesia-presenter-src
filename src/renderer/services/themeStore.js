@@ -94,17 +94,23 @@ export function setOverlay(overlayPatch) {
 }
 
 /**
- * Aplica un preset COMPLETO al overlay. A diferencia de setOverlay (que hace
- * merge), esto reemplaza TODOS los campos del overlay para que el resultado
- * sea predecible: lo que ves en el preset es lo que queda configurado, sin
- * heredar valores residuales del estado anterior.
+ * Aplica un preset al overlay reemplazando los campos visuales (fondo, colores,
+ * posición, tipografía del preset) pero PRESERVANDO los ajustes personales del
+ * usuario (tamaño de letra, alineación, peso, fuente personalizada).
+ *
+ * Esto evita que al hacer click en otro estilo predefinido se resetee el
+ * trabajo del usuario sobre la legibilidad.
  */
 export function applyOverlayPreset(presetOverlay) {
-  // Construye un overlay completo: base = DEFAULT_OVERLAY, override = preset.
-  // Luego hace setTheme con ese overlay completo. Como nuestro setTheme hace
-  // deep merge, el resultado es el preset entero efectivamente reemplazando
-  // el overlay actual (porque cada campo del DEFAULT está incluido en el patch).
-  setTheme({ overlay: { ...DEFAULT_OVERLAY, ...presetOverlay } })
+  // Campos del overlay actual que mantenemos pase lo que pase
+  const PRESERVED_KEYS = ['fontSize', 'fontFamily', 'fontWeight', 'textAlign']
+  const preserved = {}
+  for (const k of PRESERVED_KEYS) {
+    if (currentTheme.overlay && currentTheme.overlay[k] !== undefined) {
+      preserved[k] = currentTheme.overlay[k]
+    }
+  }
+  setTheme({ overlay: { ...DEFAULT_OVERLAY, ...presetOverlay, ...preserved } })
 }
 
 export function subscribeTheme(fn) {

@@ -283,3 +283,65 @@ export function combineVerses(bookName, chapterNum, verses) {
     : `${bookName} ${chapterNum}:${nums.join(',')}`
   return { text, reference }
 }
+
+/**
+ * Divide un versículo (o conjunto de versículos combinados) en N sub-slides si
+ * el texto excede `maxCharsPerSlide`. Cortes inteligentes: punto > punto y coma
+ * > coma > espacio (en ese orden de preferencia).
+ *
+ * Cuando se divide, la `reference` lleva un sufijo (1/3, 2/3, 3/3) para que el
+ * proyectista sepa que el versículo continúa.
+ *
+ * @param {{text:string, reference:string}} combined
+ * @param {number} [maxCharsPerSlide=280] - umbral. ~280 caracteres caben en
+ *        pantalla con fontSize 64px a 1920x1080 sin overflow.
+ * @returns {Array<{text:string, reference:string, part?:number, totalParts?:number}>}
+ */
+export function splitLongVerse(combined, maxCharsPerSlide = 280) {
+  if (!combined) return []
+  const { text, reference } = combined
+  if (!text || text.length <= maxCharsPerSlide) return [combined]
+
+  // Greedy split: vamos llenando chunks hasta el límite, prefiriendo
+  // cortar en límites naturales del idioma.
+  const chunks = []
+  let remaining = text.trim()
+
+  while (remaining.length > maxCharsPerSlide) {
+    const slice = remaining.slice(0, maxCharsPerSlide + 1)
+
+    // Buscar el mejor punto de corte (más cerca del fin, pero >50% del límite
+    // para no hacer chunks demasiado cortos)
+    const minCut = Math.floor(maxCharsPerSlide * 0.5)
+    let cutAt = -1
+
+    // 1. Punto o punto y coma
+    for (const sep of ['. ', '; ', '? ', '! ']) {
+      const idx = slice.lastIndexOf(sep)
+      if (idx > minCut && idx > cutAt) cutAt = idx + sep.length - 1
+    }
+    // 2. Coma (solo si no encontramos punto)
+    if (cutAt < 0) {
+      const idx = slice.lastIndexOf(', ')
+      if (idx > minCut) cutAt = idx + 1
+    }
+    // 3. Espacio (fallback)
+    if (cutAt < 0) {
+      const idx = slice.lastIndexOf(' ')
+      cutAt = idx > 0 ? idx : maxCharsPerSlide
+    }
+
+    chunks.push(remaining.slice(0, cutAt).trim())
+    remaining = remaining.slice(cutAt).trim()
+  }
+  if (remaining) chunks.push(remaining)
+
+  if (chunks.length === 1) return [{ text: chunks[0], reference }]
+
+  return chunks.map((chunk, i) => ({
+    text: chunk,
+    reference: `${reference} (${i + 1}/${chunks.length})`,
+    part: i + 1,
+    totalParts: chunks.length,
+  }))
+}

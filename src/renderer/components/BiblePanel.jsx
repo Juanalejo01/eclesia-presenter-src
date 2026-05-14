@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   getAllVersions, getVisibleVersions, getActiveVersion, setActiveVersion,
-  getBooks, getChapter, getChapterCount, searchText, combineVerses,
+  getBooks, getChapter, getChapterCount, searchText, combineVerses, splitLongVerse,
 } from '../services/bibleService.js'
 import { normalizeText } from '../services/textUtils.js'
 import { subscribe } from '../hooks/useShortcuts.js'
@@ -39,6 +39,12 @@ export default function BiblePanel({ onSendSlide }) {
   const [chapter, setChapter] = useState(null)
   const [chapterLoading, setChapterLoading] = useState(false)
   const [selectedVerses, setSelectedVerses] = useState([])
+
+  // Sub-slides cuando un versículo es muy largo y se divide en partes.
+  // verseSlides = array de {text, reference, part?, totalParts?}
+  // verseSlideIdx = índice activo dentro de verseSlides
+  const [verseSlides, setVerseSlides] = useState([])
+  const [verseSlideIdx, setVerseSlideIdx] = useState(0)
 
   // Cambio de versión
   useEffect(() => {
@@ -134,12 +140,22 @@ export default function BiblePanel({ onSendSlide }) {
     return () => clearTimeout(t)
   }, [textSearch, versionId])
 
-  // Envío al live cuando cambian versículos seleccionados
+  // Envío al live cuando cambian versículos seleccionados.
+  // Si el texto excede ~280 caracteres, se divide en N sub-slides
+  // navegables con ←/→ antes de saltar al siguiente versículo.
   useEffect(() => {
-    if (!chapter || selectedVerses.length === 0) return
+    if (!chapter || selectedVerses.length === 0) {
+      setVerseSlides([])
+      setVerseSlideIdx(0)
+      return
+    }
     const versesData = chapter.verses.filter(v => selectedVerses.includes(v.verseNum))
     const combined = combineVerses(chapter.bookName, chapter.chapterNum, versesData)
-    if (combined) onSendSlide({ ...combined, type: 'bible' })
+    if (!combined) return
+    const splits = splitLongVerse(combined)
+    setVerseSlides(splits)
+    setVerseSlideIdx(0)
+    onSendSlide({ ...splits[0], type: 'bible' })
   }, [selectedVerses, chapter])
 
   // Atajos: navegación + ESC retrocede + ←/→ entre versículos
@@ -158,7 +174,16 @@ export default function BiblePanel({ onSendSlide }) {
   useEffect(() => {
     if (step !== 'verse' || !chapter) return
     const max = chapter.verses.length
+
     const next = () => {
+      // Si estamos en medio de un versículo largo dividido, avanzar a la siguiente parte
+      if (verseSlides.length > 1 && verseSlideIdx < verseSlides.length - 1) {
+        const newIdx = verseSlideIdx + 1
+        setVerseSlideIdx(newIdx)
+        onSendSlide({ ...verseSlides[newIdx], type: 'bible' })
+        return
+      }
+      // Si no, saltar al siguiente versículo
       const current = selectedVerses[0] ?? 0
       if (current < max) setSelectedVerses([current + 1])
       else if (chapterNum < maxChapters) {
@@ -168,6 +193,13 @@ export default function BiblePanel({ onSendSlide }) {
       }
     }
     const prev = () => {
+      // Si estamos en parte 2+ de un versículo dividido, retroceder
+      if (verseSlides.length > 1 && verseSlideIdx > 0) {
+        const newIdx = verseSlideIdx - 1
+        setVerseSlideIdx(newIdx)
+        onSendSlide({ ...verseSlides[newIdx], type: 'bible' })
+        return
+      }
       const current = selectedVerses[0] ?? 1
       if (current > 1) setSelectedVerses([current - 1])
       else if (chapterNum > 1) {
@@ -180,7 +212,7 @@ export default function BiblePanel({ onSendSlide }) {
     const offPrev  = subscribe('navigate:prev', prev)
     const offClear = subscribe('selection:clear', () => setSelectedVerses([]))
     return () => { offNext(); offPrev(); offClear() }
-  }, [step, chapter, chapterNum, maxChapters, selectedVerses, selectedBookIndex])
+  }, [step, chapter, chapterNum, maxChapters, selectedVerses, selectedBookIndex, verseSlides, verseSlideIdx])
 
   const filteredBooks = useMemo(() => {
     if (!bookSearch) return books

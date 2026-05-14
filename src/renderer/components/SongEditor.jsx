@@ -13,26 +13,6 @@ const SECTION_TYPES = [
   { value: 'tag',     label: 'Tag' },
 ]
 
-const TEMPLATES = [
-  { id: 'simple', label: 'Verso · Coro', structure: [
-    { type: 'verse', label: 'Estrofa 1' }, { type: 'chorus', label: 'Coro' },
-  ]},
-  { id: 'classic', label: 'V · C · V · P · C', structure: [
-    { type: 'verse', label: 'Estrofa 1' }, { type: 'chorus', label: 'Coro' },
-    { type: 'verse', label: 'Estrofa 2' }, { type: 'chorus', label: 'Coro' },
-    { type: 'bridge', label: 'Puente' }, { type: 'chorus', label: 'Coro' },
-  ]},
-  { id: 'hymn', label: 'Himno (4 estrofas)', structure: [
-    { type: 'verse', label: 'Estrofa 1' }, { type: 'verse', label: 'Estrofa 2' },
-    { type: 'verse', label: 'Estrofa 3' }, { type: 'verse', label: 'Estrofa 4' },
-  ]},
-  { id: 'worship', label: 'V · C · P · C · Tag', structure: [
-    { type: 'intro', label: 'Intro' }, { type: 'verse', label: 'Estrofa' },
-    { type: 'chorus', label: 'Coro' }, { type: 'bridge', label: 'Puente' },
-    { type: 'chorus', label: 'Coro' }, { type: 'tag', label: 'Tag' },
-  ]},
-]
-
 export default function SongEditor({ song, onSave, onCancel }) {
   const [title, setTitle]       = useState(song?.title || '')
   const [author, setAuthor]     = useState(song?.author || '')
@@ -42,23 +22,11 @@ export default function SongEditor({ song, onSave, onCancel }) {
   )
   const [maxLines, setMaxLines] = useState(song?.maxLines ?? 4)
   const [tab, setTab] = useState('edit')
-  const [activeTpl, setActiveTpl] = useState(null)
 
   const presentationSlides = useMemo(
     () => songToSlides({ title, sections }, { maxLines }),
     [title, sections, maxLines]
   )
-
-  const applyTemplate = (template) => {
-    if (sections.some(s => s.text?.trim()) &&
-        !confirm('La canción tiene contenido. ¿Reemplazar con la plantilla? (se mantienen los textos coincidentes)')) return
-    const next = template.structure.map((slot, i) => {
-      const sameTypeMatch = sections.find((s, j) => s.type === slot.type && j === i)
-      return { ...slot, text: sameTypeMatch?.text || '' }
-    })
-    setSections(next)
-    setActiveTpl(template.id)
-  }
 
   const addSection = () => {
     const count = sections.filter(s => s.type === 'verse').length + 1
@@ -93,7 +61,8 @@ export default function SongEditor({ song, onSave, onCancel }) {
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()}
+        style={{ width: 'min(1200px, 96vw)', maxHeight: '92vh' }}>
         <div className="modal-header">
           <div className="modal-title">{song ? 'Editar canción' : 'Nueva canción'}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -127,20 +96,6 @@ export default function SongEditor({ song, onSave, onCancel }) {
                   <span className="label">Etiquetas</span>
                   <input className="field-input" placeholder="adoración, clásica…"
                     value={tags} onChange={e => setTags(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="field">
-                <span className="label">Plantilla de estructura</span>
-                <div className="template-grid">
-                  {TEMPLATES.map(t => (
-                    <button key={t.id}
-                      className={'template-card' + (activeTpl === t.id ? ' active' : '')}
-                      onClick={() => applyTemplate(t)}>
-                      <span className="template-card-title">{t.label}</span>
-                      <span className="template-card-meta">{t.structure.length} secciones</span>
-                    </button>
-                  ))}
                 </div>
               </div>
 
@@ -239,7 +194,12 @@ function SectionRow({ section, index, total, maxLines, onChange, onRemove, onMov
         <button className="btn btn-ghost btn-danger" onClick={onRemove}><IconX size={12} /></button>
       </div>
       <textarea className="field-input"
-        style={{ border: 0, borderRadius: 0, minHeight: 96 }}
+        style={{
+          border: 0, borderRadius: 0,
+          minHeight: 140, width: '100%', resize: 'vertical',
+          fontSize: 14, lineHeight: 1.5,
+          padding: '12px 16px',
+        }}
         value={section.text} onChange={e => onChange({ text: e.target.value })}
         placeholder="Escribe la letra aquí…&#10;Cada salto de línea se respeta como línea del slide." />
       <div style={{ padding: '6px 12px', fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
