@@ -83,16 +83,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- MACOS: dmg (arm64 + x64) + zip ---
-      # Sin firma/notarización (identity: null en package.json). Los users veran
+      # --- MACOS: zip arm64 (M1/M2/M3) ---
+      # Sin firma/notarización (identity: null en package.json). Los users verán
       # "no se puede verificar al desarrollador" la primera vez.
       # Workaround: click derecho -> Abrir (solo la 1a vez).
+      # Solo arm64 + zip por ahora (dmg/x64 dan problemas en CI sin firma).
       - name: Build (macOS)
         if: matrix.platform == 'mac'
-        run: npx electron-builder --mac --publish never
+        run: npx electron-builder --mac --arm64 --publish never 2>&1 | tee mac-build.log
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      # Si falló, mostrar el log para diagnostico
+      - name: Mac build log (on failure)
+        if: matrix.platform == 'mac' && failure()
+        shell: bash
+        run: |
+          echo "=== Last 100 lines of mac-build.log ==="
+          tail -100 mac-build.log || echo "no log"
+          echo "=== dist-electron contents ==="
+          ls -la dist-electron/ || true
 
       - name: List built artifacts
         run: ls -la dist-electron/ || dir dist-electron
