@@ -777,6 +777,11 @@ function SectionLicencia({ onUpdate }) {
     if (!window.electron?.license) return
     const s = await window.electron.license.state()
     setState(s)
+    // Notificar al store global (BiblePanel, TransmisionPanel, etc.)
+    try {
+      const mod = await import('../services/licenseStore.js')
+      await mod.forceRefresh()
+    } catch {}
   }
 
   useEffect(() => { refresh() }, [])

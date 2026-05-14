@@ -48,14 +48,29 @@ jobs:
           echo "OS: ${{ matrix.os }}"
         shell: bash
 
-      # Paso 1: instalar deps SIN ejecutar postinstall (que es el que rebuilda
-      # native modules contra Electron). Si esto falla, el problema es npm/lockfile.
-      - name: Install dependencies (no scripts)
-        run: npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts
+      # Estrategia: borrar lockfile + node_modules + cache, dejar que npm
+      # resuelva desde cero. Esto evita problemas de drift entre Windows
+      # (donde se generó el lockfile) y macOS (donde podría haber diferencias
+      # en optionalDependencies cross-platform).
+      - name: Clean state
+        shell: bash
+        run: |
+          rm -f package-lock.json
+          rm -rf node_modules
+          npm cache clean --force || true
 
-      # Paso 2: rebuild de los modulos nativos (better-sqlite3) contra Electron.
-      # Si esto falla, el problema es la compilación nativa.
+      - name: Install dependencies (no scripts, fresh)
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts 2>&1 | tee install.log
+          echo "--- Install completed. Top of node_modules: ---"
+          ls -la node_modules/ | head -25
+        env:
+          CI: 'true'
+
+      # Rebuild de los módulos nativos (better-sqlite3) contra Electron.
       - name: Rebuild native modules for Electron
+        shell: bash
         run: npx electron-builder install-app-deps
 
       - name: Build renderer
