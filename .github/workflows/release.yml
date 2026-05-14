@@ -28,9 +28,6 @@ jobs:
             platform: win
           - os: macos-latest
             platform: mac
-          # Linux opcional — descomenta si lo quieres también
-          # - os: ubuntu-latest
-          #   platform: linux
 
     runs-on: ${{ matrix.os }}
 
@@ -42,14 +39,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # Sin cache npm para evitar issues raros con lockfile
 
-      - name: Install dependencies
-        # Usamos npm install en vez de npm ci para tolerar pequeñas
-        # discrepancias del lockfile (peer flags, etc.) que rompen ci estricto.
-        # better-sqlite3 compila nativamente para la plataforma de cada runner
-        # via postinstall (electron-builder install-app-deps).
-        run: npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Show environment
+        run: |
+          node --version
+          npm --version
+          echo "OS: ${{ matrix.os }}"
+        shell: bash
+
+      # Paso 1: instalar deps SIN ejecutar postinstall (que es el que rebuilda
+      # native modules contra Electron). Si esto falla, el problema es npm/lockfile.
+      - name: Install dependencies (no scripts)
+        run: npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts
+
+      # Paso 2: rebuild de los modulos nativos (better-sqlite3) contra Electron.
+      # Si esto falla, el problema es la compilación nativa.
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps
 
       - name: Build renderer
         run: npm run build
@@ -57,27 +64,25 @@ jobs:
       # --- WINDOWS: portable + NSIS installer ---
       - name: Build (Windows)
         if: matrix.platform == 'win'
-        run: npx electron-builder --win portable nsis
+        run: npx electron-builder --win portable nsis --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # --- MACOS: dmg (arm64 + x64) + zip ---
-      # Sin firma/notarización (identity: null en package.json). Los usuarios
-      # verán un aviso "no se puede verificar al desarrollador" la primera vez.
-      # Workaround para el usuario final: click derecho -> Abrir (solo la 1a vez).
+      # Sin firma/notarización (identity: null en package.json). Los users veran
+      # "no se puede verificar al desarrollador" la primera vez.
+      # Workaround: click derecho -> Abrir (solo la 1a vez).
       - name: Build (macOS)
         if: matrix.platform == 'mac'
-        run: npx electron-builder --mac
+        run: npx electron-builder --mac --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      # --- LINUX: AppImage ---
-      - name: Build (Linux)
-        if: matrix.platform == 'linux'
-        run: npx electron-builder --linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: List built artifacts
+        run: ls -la dist-electron/ || dir dist-electron
+        shell: bash
+        continue-on-error: true
 
       - name: Upload artifacts to Release
         uses: softprops/action-gh-release@v2
@@ -88,7 +93,6 @@ jobs:
             dist-electron/*.exe
             dist-electron/*.dmg
             dist-electron/*.zip
-            dist-electron/*.AppImage
           fail_on_unmatched_files: false
           generate_release_notes: false
           draft: false
