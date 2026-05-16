@@ -58,6 +58,7 @@ ipcMain.handle('server:info', () => {
     port: serverHandle.port,
     remoteUrl: `http://${serverHandle.getLocalIP()}:${serverHandle.port}/remote`,
     overlayUrl: `http://${serverHandle.getLocalIP()}:${serverHandle.port}/overlay`,
+    pairingPin: serverHandle.getPairingPin?.() || null,
   }
 })
 

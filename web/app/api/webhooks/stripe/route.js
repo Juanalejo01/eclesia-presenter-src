@@ -36,6 +36,22 @@ export async function POST(request) {
 
   const admin = createAdminClient()
 
+  // IDEMPOTENCY: si Stripe reenvía el mismo event.id, no procesar dos veces.
+  // Usamos la tabla `stripe_events_processed` (idempotency_key = event.id).
+  // Si la tabla no existe todavía (deploy nuevo), seguimos sin idempotency
+  // pero al menos no rompemos.
+  try {
+    const { error: dupErr } = await admin
+      .from('stripe_events_processed')
+      .insert({ event_id: event.id, event_type: event.type })
+    if (dupErr && dupErr.code === '23505') {
+      // unique_violation → ya procesado, devolvemos 200 silencioso
+      return NextResponse.json({ received: true, idempotent: true })
+    }
+  } catch {
+    // tabla no existe → seguimos sin idempotency check
+  }
+
   try {
     switch (event.type) {
       // ----- Checkout completado (subscription O one-time) -----

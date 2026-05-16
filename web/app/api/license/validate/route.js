@@ -1,72 +1,57 @@
 // POST /api/license/validate
 //
 // La app llama aquí al arrancar para verificar que la licencia sigue válida.
-// Si la suscripción fue cancelada/expirada/revocada desde otra vía (web, Stripe),
-// este endpoint devuelve ok=false y la app desktop debe bajar a Free.
-//
-// También actualiza el last_seen_at del device (heartbeat).
-//
-// Body JSON:
-//   { license_key, device_id, app_version? }
-//
-// Respuesta:
-//   { ok: true, plan, max_devices, expires_at, status }
-//   o { ok: false, reason: 'license_no_existe' | 'license_inactiva' | 'expirada' | 'device_no_activado' }
+// Si la suscripción fue cancelada/expirada/revocada, este endpoint devuelve
+// ok=false y la app desktop baja a Free.
 
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '../../../../lib/supabase/admin'
+import { checkRateLimit, getClientIP } from '../../../../lib/ratelimit'
 
 export const dynamic = 'force-dynamic'
 
+const LICENSE_KEY_FORMAT = /^EP-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/
+
 export async function POST(request) {
+  const ip = getClientIP(request)
+  const rl = checkRateLimit(ip, 'validate')
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, reason: 'rate_limit', retry_after: rl.retryAfter },
+      { status: 429 }
+    )
+  }
+
   try {
-    const body = await request.json()
+    const body = await request.json().catch(() => null)
     const { license_key, device_id, app_version } = body || {}
 
     if (!license_key || !device_id) {
-      return NextResponse.json(
-        { ok: false, reason: 'parametros_faltantes' },
-        { status: 400 }
-      )
+      return NextResponse.json({ ok: false, reason: 'parametros_faltantes' }, { status: 400 })
+    }
+    if (typeof license_key !== 'string' || !LICENSE_KEY_FORMAT.test(license_key.toUpperCase())) {
+      return NextResponse.json({ ok: false, reason: 'invalida' })
+    }
+    if (typeof device_id !== 'string' || device_id.length < 16 || device_id.length > 128) {
+      return NextResponse.json({ ok: false, reason: 'invalida' })
     }
 
     const admin = createAdminClient()
 
-    // 1. Buscar licencia
     const { data: license } = await admin
       .from('licenses')
       .select('id, plan, status, max_devices, current_period_end')
-      .eq('license_key', license_key)
+      .eq('license_key', license_key.toUpperCase())
       .maybeSingle()
 
-    if (!license) {
-      return NextResponse.json(
-        { ok: false, reason: 'license_no_existe' },
-        { status: 404 }
-      )
-    }
-
-    // 2. Status
+    if (!license) return NextResponse.json({ ok: false, reason: 'invalida' })
     if (license.status !== 'active' && license.status !== 'trialing') {
-      return NextResponse.json({
-        ok: false,
-        reason: 'license_inactiva',
-        status: license.status,
-      })
+      return NextResponse.json({ ok: false, reason: 'invalida', status: license.status })
+    }
+    if (license.current_period_end && new Date(license.current_period_end) < new Date()) {
+      return NextResponse.json({ ok: false, reason: 'invalida' })
     }
 
-    // 3. Expiración (Lifetime = null)
-    if (license.current_period_end) {
-      if (new Date(license.current_period_end) < new Date()) {
-        return NextResponse.json({
-          ok: false,
-          reason: 'expirada',
-          expires_at: license.current_period_end,
-        })
-      }
-    }
-
-    // 4. Verificar que ESTE device está activado para ESTA licencia
     const { data: activation } = await admin
       .from('activations')
       .select('id')
@@ -75,15 +60,18 @@ export async function POST(request) {
       .maybeSingle()
 
     if (!activation) {
+      // SÍ distinguimos este caso porque el cliente legítimo necesita saberlo
+      // (puede que desactivó este PC desde la web).
       return NextResponse.json({ ok: false, reason: 'device_no_activado' })
     }
 
-    // 5. Heartbeat: actualizar last_seen
+    // Heartbeat
+    const safeVersion = typeof app_version === 'string' ? app_version.slice(0, 32) : undefined
     await admin
       .from('activations')
       .update({
         last_seen_at: new Date().toISOString(),
-        app_version: app_version || undefined,
+        ...(safeVersion ? { app_version: safeVersion } : {}),
       })
       .eq('id', activation.id)
 
@@ -95,7 +83,7 @@ export async function POST(request) {
       status: license.status,
     })
   } catch (e) {
-    console.error('[api/license/validate] uncaught:', e)
+    console.error('[api/license/validate] uncaught')
     return NextResponse.json({ ok: false, reason: 'server_error' }, { status: 500 })
   }
 }

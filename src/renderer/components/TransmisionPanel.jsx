@@ -279,6 +279,30 @@ function RemoteSection() {
           <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0, fontFamily: 'var(--font-mono)' }}>
             Puerto: {info.port} · IP local: {info.ip}
           </p>
+
+          {info.pairingPin && (
+            <div style={{
+              marginTop: 14, padding: '12px 16px',
+              background: 'linear-gradient(180deg, rgba(168,95,51,0.16), rgba(128,64,18,0.06))',
+              border: '1px solid rgba(232,181,145,0.30)', borderRadius: 10,
+              display: 'flex', alignItems: 'center', gap: 14,
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--copper-200)',
+                  letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  PIN de seguridad
+                </div>
+                <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', color: 'var(--copper-100)',
+                  letterSpacing: '0.4em', fontWeight: 700 }}>
+                  {info.pairingPin}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', maxWidth: 180, lineHeight: 1.4 }}>
+                Introduce este PIN en el móvil para autorizar el control.
+                Cambia al reiniciar la app.
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

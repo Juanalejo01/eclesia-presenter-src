@@ -1,16 +1,26 @@
-// Endpoint de diagnóstico — devuelve el estado de las env vars
-// SIN exponer sus valores completos. Solo prefijos y longitudes.
+// Endpoint de diagnóstico — protegido con secret + minimiza la metadata expuesta.
+//
+// HISTORIAL: este endpoint se creó para diagnosticar problemas con las env vars
+// de Supabase en producción cuando el deploy fallaba con "Invalid URL" sin más
+// pistas. AHORA QUE LA APP YA FUNCIONA, lo dejamos pero protegido para evitar
+// que un atacante use sus respuestas para hacer fingerprinting de secretos.
+//
+// Para acceder:  GET /api/healthcheck?key=<HEALTHCHECK_TOKEN>
+// El token se configura en una env var del mismo nombre.
+// Si no hay token configurado, devolvemos 404 (endpoint efectivamente
+// deshabilitado en producción).
+
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-function describe(value) {
+function describeSafe(value) {
+  // No devolvemos prefijos/sufijos del valor real. Solo presencia + longitud aproximada
+  // y flags de formato problemático que ayudan a diagnosticar sin filtrar el secret.
   if (!value) return { present: false }
   return {
     present: true,
-    length: value.length,
-    starts_with: value.slice(0, 14),
-    ends_with: value.slice(-6),
+    length_bucket: value.length < 50 ? 'short' : value.length < 100 ? 'medium' : value.length < 200 ? 'long' : 'very_long',
     has_whitespace: /\s/.test(value),
     has_quotes: /["']/.test(value),
     has_newline: /\n|\r/.test(value),
@@ -25,60 +35,43 @@ function isValidUrl(s) {
   } catch { return false }
 }
 
-export async function GET() {
+// Comparación de tokens en tiempo constante (resistente a timing attacks)
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  if (a.length !== b.length) return false
+  let result = 0
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return result === 0
+}
+
+export async function GET(request) {
+  const expected = process.env.HEALTHCHECK_TOKEN
+  if (!expected) {
+    // En producción sin token configurado → 404 (endpoint inexistente)
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const provided = searchParams.get('key') || ''
+  if (!timingSafeEqual(provided, expected)) {
+    // Devolver 404 (no 401/403) para no confirmar la existencia del endpoint
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const service = process.env.SUPABASE_SERVICE_ROLE
 
-  // Intentar inicializar Supabase y hacer una petición trivial
-  let supabaseTest = { ok: false, error: null }
-  try {
-    if (url && anon && isValidUrl(url)) {
-      const { createClient } = await import('@supabase/supabase-js')
-      const client = createClient(url, anon, { auth: { persistSession: false } })
-      const { error } = await client.from('profiles').select('count', { count: 'exact', head: true })
-      // Sin sesión RLS bloqueará el SELECT — eso es OK, significa que el server responde.
-      // Solo "permission denied" es señal de que la conexión está bien.
-      if (!error || error.message?.includes('permission') || error.code === 'PGRST301') {
-        supabaseTest.ok = true
-      } else {
-        supabaseTest.error = error.message
-      }
-    }
-  } catch (e) {
-    supabaseTest.error = e?.message || String(e)
-  }
-
   return NextResponse.json({
     timestamp: new Date().toISOString(),
     env_vars: {
-      NEXT_PUBLIC_SUPABASE_URL: {
-        ...describe(url),
-        is_valid_url: isValidUrl(url),
-      },
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: describe(anon),
-      SUPABASE_SERVICE_ROLE: describe(service),
-    },
-    supabase_connection: supabaseTest,
-    diagnostics: {
-      url_format_ok: isValidUrl(url),
-      url_has_problems:
-        !url ? 'falta la variable' :
-        !url.startsWith('https://') ? 'no empieza con https://' :
-        /\s/.test(url) ? 'tiene espacios' :
-        /["']/.test(url) ? 'tiene comillas dentro del valor' :
-        url.endsWith('/') ? 'tiene slash al final (no rompe pero mejor sin él)' :
-        null,
-      anon_format:
-        !anon ? 'falta' :
-        anon.startsWith('sb_publishable_') ? 'nuevo formato (sb_publishable_) — compatible' :
-        anon.startsWith('eyJhbGc') ? 'formato JWT legacy — compatible' :
-        'formato no reconocido',
-      service_format:
-        !service ? 'falta' :
-        service.startsWith('sb_secret_') ? 'nuevo formato (sb_secret_) — compatible' :
-        service.startsWith('eyJhbGc') ? 'formato JWT legacy — compatible' :
-        'formato no reconocido',
+      NEXT_PUBLIC_SUPABASE_URL: { ...describeSafe(url), is_valid_url: isValidUrl(url) },
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: describeSafe(anon),
+      SUPABASE_SERVICE_ROLE: describeSafe(service),
+      STRIPE_SECRET_KEY: describeSafe(process.env.STRIPE_SECRET_KEY),
+      STRIPE_WEBHOOK_SECRET: describeSafe(process.env.STRIPE_WEBHOOK_SECRET),
     },
   })
 }

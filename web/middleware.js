@@ -37,7 +37,11 @@ export async function middleware(request) {
     // Rutas protegidas: requieren sesión
     if (path.startsWith('/cuenta') && !user) {
       const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('next', path)
+      // path siempre empieza con '/' simple porque viene de request.nextUrl.pathname.
+      // Pero por seguridad defensiva: solo lo pasamos si es ruta interna válida.
+      if (path.startsWith('/') && !path.startsWith('//')) {
+        loginUrl.searchParams.set('next', path)
+      }
       return NextResponse.redirect(loginUrl)
     }
 

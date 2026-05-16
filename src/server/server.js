@@ -11,12 +11,26 @@ const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
 const os = require('os')
+const crypto = require('crypto')
 
 const PORT = 3434  // movido del clásico 3000 para evitar choque con otros dev servers
 
 // Estado del slide actual (lo mantiene el server para enviarlo a clientes nuevos)
 let currentSlide = { text: '', reference: '', type: 'blank' }
 let currentTheme = null
+
+// PIN de pairing — 6 dígitos generados al arrancar la app.
+// El móvil tiene que escribirlo para poder ENVIAR comandos.
+// Sin PIN solo puede VER el slide actual (modo read-only).
+// El operador del PC ve el PIN en el panel Transmisión.
+const PAIRING_PIN = String(crypto.randomInt(100000, 1000000))
+const authorizedTokens = new Set()  // tokens emitidos tras validar el PIN
+
+function issueToken() {
+  const token = crypto.randomBytes(24).toString('hex')
+  authorizedTokens.add(token)
+  return token
+}
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces()
@@ -67,8 +81,28 @@ function pushSongs(songs) {
 function startServer() {
   const app = express()
   const httpServer = http.createServer(app)
-  const io = new Server(httpServer, { cors: { origin: '*' } })
+  // CORS restringido a same-origin + cualquier IP local (no '*').
+  // Solo clientes de la propia LAN deberían poder conectar.
+  const io = new Server(httpServer, {
+    cors: {
+      origin: (origin, cb) => {
+        // Permitir conexiones sin Origin (apps móviles, file://, curl)
+        if (!origin) return cb(null, true)
+        // Permitir mismo origen
+        try {
+          const u = new URL(origin)
+          // Solo IPs privadas (10.x, 192.168.x, 172.16-31.x) y localhost
+          if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return cb(null, true)
+          if (u.hostname.match(/^192\.168\./)) return cb(null, true)
+          if (u.hostname.match(/^10\./)) return cb(null, true)
+          if (u.hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./)) return cb(null, true)
+        } catch {}
+        cb(new Error('CORS: origin no permitido'))
+      },
+    },
+  })
   _io = io
+  app.use(express.json({ limit: '8kb' }))
 
   // Página raíz: bienvenida + link al remote
   app.get('/', (_req, res) => {
@@ -82,27 +116,49 @@ function startServer() {
   // Mobile remote control
   app.get('/remote', (_req, res) => res.send(REMOTE_PAGE))
 
+  // Endpoint para que el móvil valide el PIN y reciba un token de autorización
+  app.post('/api/pair', (req, res) => {
+    const submitted = String(req.body?.pin || '').trim()
+    if (submitted !== PAIRING_PIN) {
+      return res.status(401).json({ ok: false, error: 'pin_incorrecto' })
+    }
+    res.json({ ok: true, token: issueToken() })
+  })
+
   io.on('connection', (socket) => {
-    // Estado inicial al conectar
+    // Estado inicial al conectar — read-only es libre
     socket.emit('slide:update', currentSlide)
     if (currentTheme) socket.emit('theme:update', currentTheme)
     if (_songsCache) socket.emit('songs:list', _songsCache)
 
-    // Comandos desde móvil → bridge al main process
-    socket.on('remote:next',  () => emitRemoteEvent('next'))
-    socket.on('remote:prev',  () => emitRemoteEvent('prev'))
-    socket.on('remote:blank', () => emitRemoteEvent('blank'))
-    socket.on('remote:black', () => emitRemoteEvent('black'))
-    socket.on('remote:clear', () => emitRemoteEvent('clear'))
+    // Endpoint para autenticarse via socket con un token previamente emitido
+    let isAuthorized = false
+    socket.on('auth:token', (token) => {
+      if (typeof token === 'string' && authorizedTokens.has(token)) {
+        isAuthorized = true
+        socket.emit('auth:ok')
+      } else {
+        socket.emit('auth:fail')
+      }
+    })
 
-    // Buscador de Biblia desde el móvil (query libre tipo "salmos 22:1")
-    socket.on('remote:bible-ref', (payload) => {
-      emitRemoteEvent('bible-ref', payload || {})
-    })
-    // Proyectar canción por id desde el móvil
-    socket.on('remote:song', (payload) => {
-      emitRemoteEvent('song', payload || {})
-    })
+    // Middleware: solo dejar pasar comandos si está autorizado
+    const requireAuth = (handler) => (...args) => {
+      if (!isAuthorized) {
+        socket.emit('auth:required')
+        return
+      }
+      handler(...args)
+    }
+
+    // Comandos desde móvil → bridge al main process (requieren auth)
+    socket.on('remote:next',  requireAuth(() => emitRemoteEvent('next')))
+    socket.on('remote:prev',  requireAuth(() => emitRemoteEvent('prev')))
+    socket.on('remote:blank', requireAuth(() => emitRemoteEvent('blank')))
+    socket.on('remote:black', requireAuth(() => emitRemoteEvent('black')))
+    socket.on('remote:clear', requireAuth(() => emitRemoteEvent('clear')))
+    socket.on('remote:bible-ref', requireAuth((p) => emitRemoteEvent('bible-ref', p || {})))
+    socket.on('remote:song',      requireAuth((p) => emitRemoteEvent('song', p || {})))
   })
 
   httpServer.listen(PORT, '0.0.0.0', () => {
@@ -113,7 +169,11 @@ function startServer() {
     console.log(`  OBS overlay:      http://${ip}:${PORT}/overlay`)
   })
 
-  return { io, getLocalIP, port: PORT, pushSlide, pushTheme, pushSongs, onRemoteEvent }
+  return {
+    io, getLocalIP, port: PORT,
+    pushSlide, pushTheme, pushSongs, onRemoteEvent,
+    getPairingPin: () => PAIRING_PIN,
+  }
 }
 
 // ------------ PAGES ------------
@@ -335,12 +395,38 @@ const REMOTE_PAGE = `<!DOCTYPE html>
     <div id="songList"></div>
   </section>
 
-  <!-- TABS -->
+  <!-- TABS (deshabilitadas hasta pairing OK) -->
   <nav class="tabs">
     <button class="tab active" data-view="mando"     onclick="setView('mando')">Mando</button>
     <button class="tab"        data-view="biblia"    onclick="setView('biblia')">Biblia</button>
     <button class="tab"        data-view="canciones" onclick="setView('canciones')">Canciones</button>
   </nav>
+
+  <!-- PAIRING OVERLAY (se oculta cuando el token es válido) -->
+  <div id="pair-overlay" style="position:fixed; inset:0; background:rgba(12,10,9,0.96); z-index:50;
+       display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; gap:18px;">
+    <div style="font-family:'Cormorant Garamond',serif; font-size:24px; font-style:italic; color:var(--copper-100);">
+      Eclesia<em style="color:var(--copper-200);font-style:normal;">Remote</em>
+    </div>
+    <div style="text-align:center; max-width:300px;">
+      <div style="font-size:14px; color:var(--text-2); margin-bottom:8px;">Introduce el PIN de 6 dígitos</div>
+      <div style="font-size:11px; color:var(--text-3); font-family:'Courier New',monospace; letter-spacing:0.06em;">
+        Lo verás en el PC →<br>Transmisión → Control remoto
+      </div>
+    </div>
+    <input id="pin-input" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+      placeholder="000000" autocomplete="off"
+      style="width:200px; height:64px; text-align:center; font-size:32px; font-family:'Courier New',monospace;
+             letter-spacing:0.4em; border:1px solid rgba(232,181,145,.25); border-radius:14px;
+             background:var(--bg-2); color:var(--copper-100); padding:0;" />
+    <button id="pair-btn"
+      style="width:200px; height:52px; border:0; border-radius:14px;
+             background:linear-gradient(180deg, var(--copper-200), var(--copper-300));
+             color:#1a0e08; font-size:15px; font-weight:700; cursor:pointer;">
+      Conectar
+    </button>
+    <p id="pair-err" style="color:var(--danger); font-size:13px; min-height:18px; margin:0;"></p>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -433,6 +519,57 @@ const REMOTE_PAGE = `<!DOCTYPE html>
 
     // Estado inicial vacío
     renderSongs()
+
+    // --- PAIRING ---
+    const pinInput = document.getElementById('pin-input')
+    const pairBtn = document.getElementById('pair-btn')
+    const pairErr = document.getElementById('pair-err')
+    const pairOverlay = document.getElementById('pair-overlay')
+    let token = sessionStorage.getItem('ecl-remote-token') || null
+
+    function authWithToken(t) {
+      socket.emit('auth:token', t)
+    }
+    socket.on('auth:ok',      () => { pairOverlay.style.display = 'none' })
+    socket.on('auth:fail',    () => { token = null; sessionStorage.removeItem('ecl-remote-token'); pairOverlay.style.display = 'flex' })
+    socket.on('auth:required',() => { pairOverlay.style.display = 'flex' })
+    socket.on('connect', () => { if (token) authWithToken(token) })
+
+    async function doPair() {
+      const pin = (pinInput.value || '').trim()
+      if (pin.length !== 6) { pairErr.textContent = 'El PIN tiene 6 dígitos'; return }
+      pairBtn.disabled = true; pairBtn.textContent = 'Conectando...'
+      try {
+        const r = await fetch('/api/pair', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+        })
+        const data = await r.json()
+        if (data.ok && data.token) {
+          token = data.token
+          sessionStorage.setItem('ecl-remote-token', token)
+          authWithToken(token)
+          pairErr.textContent = ''
+        } else {
+          pairErr.textContent = 'PIN incorrecto'
+          pinInput.value = ''; pinInput.focus()
+        }
+      } catch (e) {
+        pairErr.textContent = 'Error de red'
+      } finally {
+        pairBtn.disabled = false; pairBtn.textContent = 'Conectar'
+      }
+    }
+    pairBtn.onclick = doPair
+    pinInput.addEventListener('keydown', e => { if (e.key === 'Enter') doPair() })
+
+    // Si ya teníamos token guardado, intentar usarlo
+    if (token) {
+      // Esperar a que conecte el socket
+    } else {
+      pairOverlay.style.display = 'flex'
+      setTimeout(() => pinInput.focus(), 100)
+    }
   </script>
 </body>
 </html>`

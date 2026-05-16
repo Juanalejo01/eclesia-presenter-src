@@ -3,11 +3,35 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '../../../lib/supabase/server'
 
+// SEGURIDAD: valida que `next` sea una ruta INTERNA. Previene open redirect
+// del tipo /auth/callback?next=//evil.com que el navegador interpreta como
+// protocol-relative → te lleva a evil.com (phishing post-login).
+function safeNextPath(next) {
+  if (!next || typeof next !== 'string') return '/cuenta'
+  // Debe empezar por exactamente UN slash y no por doble slash
+  if (!next.startsWith('/') || next.startsWith('//')) return '/cuenta'
+  // Bloquear /\evil.com (Windows-style back-slashes que algunos parsers tratan como slash)
+  if (next.startsWith('/\\')) return '/cuenta'
+  // No permitir protocolos escapados embebidos
+  if (next.match(/^\/+[a-z]+:/i)) return '/cuenta'
+  // Whitelist de prefijos válidos
+  const ALLOWED = ['/cuenta', '/checkout', '/pricing', '/docs', '/download', '/']
+  if (!ALLOWED.some(p => next === p || next.startsWith(p + '?') || next.startsWith(p + '/'))) {
+    return '/cuenta'
+  }
+  return next
+}
+
+function safePlan(plan) {
+  const ALLOWED = ['pro_monthly', 'pro_yearly', 'lifetime']
+  return ALLOWED.includes(plan) ? plan : null
+}
+
 export async function GET(request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') || '/cuenta'
-  const plan = searchParams.get('plan')
+  const next = safeNextPath(searchParams.get('next'))
+  const plan = safePlan(searchParams.get('plan'))
 
   if (code) {
     const supabase = createClient()
