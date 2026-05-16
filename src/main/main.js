@@ -1,6 +1,31 @@
 const { app, BrowserWindow, ipcMain, dialog, protocol } = require('electron')
 const path = require('path')
 const fs = require('fs')
+
+// Sentry — solo si está configurado y NO en dev (evita ruido durante npm run dev)
+// El DSN se inyecta en build vía electron-builder. Si falta, Sentry queda inactivo.
+const SENTRY_DSN = process.env.SENTRY_DSN_DESKTOP || ''
+if (SENTRY_DSN) {
+  try {
+    const Sentry = require('@sentry/electron/main')
+    Sentry.init({
+      dsn: SENTRY_DSN,
+      release: `eclesia-presenter@${app.getVersion()}`,
+      environment: app.isPackaged ? 'production' : 'development',
+      enabled: app.isPackaged,
+      tracesSampleRate: 0.1,
+      // No enviar el path del usuario (PII)
+      beforeSend(event) {
+        if (event.user) delete event.user.username
+        if (event.user) delete event.user.email
+        return event
+      },
+    })
+  } catch (e) {
+    console.warn('[main] Sentry init failed (paquete no instalado?):', e.message)
+  }
+}
+
 const { startServer } = require('../server/server')
 const db = require('./database')
 const projection = require('./projection')

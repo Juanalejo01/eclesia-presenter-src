@@ -4,38 +4,54 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../lib/supabase/client'
+import Turnstile from '../../components/Turnstile'
 
 export default function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/cuenta'
-  const plan = searchParams.get('plan')  // si viene de /pricing con un plan elegido
+  const plan = searchParams.get('plan')
 
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
+  const [captchaToken, setCaptchaToken] = useState(null)
+
+  // Si Turnstile no está configurado, el componente devuelve 'disabled' y dejamos pasar.
+  const captchaReady = captchaToken !== null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email.trim()) return
+    if (!captchaReady) {
+      setError('Por favor, completa la verificación de seguridad.')
+      return
+    }
     setLoading(true); setError(null)
 
     const supabase = createClient()
     const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}${plan ? `&plan=${plan}` : ''}`
 
-    // Timeout defensivo de 15s para no dejar al user esperando indefinidamente.
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('La petición a Supabase tardó más de 15 segundos. Verifica tu conexión y que los Redirect URLs estén configurados en Supabase → Auth → URL Configuration.')), 15000)
     )
 
     try {
+      // Opciones de signInWithOtp: pasamos captchaToken solo si tenemos uno real.
+      // Si el captcha está deshabilitado (sin env var), captchaToken === 'disabled'
+      // y NO lo enviamos a Supabase (sino fallaría).
+      const otpOptions = {
+        emailRedirectTo: callbackUrl,
+        shouldCreateUser: true,
+      }
+      if (captchaToken && captchaToken !== 'disabled') {
+        otpOptions.captchaToken = captchaToken
+      }
+
       const result = await Promise.race([
         supabase.auth.signInWithOtp({
           email: email.trim(),
-          options: {
-            emailRedirectTo: callbackUrl,
-            shouldCreateUser: true,  // crea cuenta si no existe (magic link = login + signup)
-          },
+          options: otpOptions,
         }),
         timeoutPromise,
       ])
@@ -44,6 +60,8 @@ export default function LoginForm() {
       if (result.error) {
         console.error('[login] Supabase error:', result.error)
         setError(result.error.message || JSON.stringify(result.error))
+        // Resetear token: Turnstile genera otro automáticamente
+        setCaptchaToken(null)
       } else {
         setSent(true)
       }
@@ -51,6 +69,7 @@ export default function LoginForm() {
       setLoading(false)
       console.error('[login] Exception:', e)
       setError(e?.message || String(e))
+      setCaptchaToken(null)
     }
   }
 
@@ -70,7 +89,7 @@ export default function LoginForm() {
         </p>
         <p className="text-xs text-ink-3">
           ¿No lo ves? Revisa la carpeta de spam o{' '}
-          <button onClick={() => { setSent(false); setEmail('') }}
+          <button onClick={() => { setSent(false); setEmail(''); setCaptchaToken(null) }}
             className="text-copper-200 hover:text-copper-100 underline underline-offset-2">
             prueba otro correo
           </button>.
@@ -104,6 +123,9 @@ export default function LoginForm() {
         />
       </div>
 
+      {/* Cloudflare Turnstile — invisible si no hay env var, "managed" si la hay */}
+      <Turnstile onVerify={setCaptchaToken} theme="dark" />
+
       {error && (
         <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-md">
           {error}
@@ -112,7 +134,7 @@ export default function LoginForm() {
 
       <button
         type="submit"
-        disabled={loading || !email.trim()}
+        disabled={loading || !email.trim() || !captchaReady}
         className="w-full h-12 rounded-lg
                    bg-gradient-to-b from-copper-200 to-copper-300
                    text-[#1a0e08] font-semibold

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../lib/supabase/client'
+import Turnstile from '../../components/Turnstile'
 
 export default function RegisterForm() {
   const searchParams = useSearchParams()
@@ -15,10 +16,13 @@ export default function RegisterForm() {
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const captchaReady = captchaToken !== null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email.trim()) return
+    if (!captchaReady) { setError('Completa la verificación de seguridad'); return }
     setLoading(true); setError(null)
 
     const supabase = createClient()
@@ -32,18 +36,20 @@ export default function RegisterForm() {
     )
 
     try {
+      const otpOptions = {
+        emailRedirectTo: callbackUrl,
+        shouldCreateUser: true,
+        data: {
+          name: name.trim() || null,
+          organization: organization.trim() || null,
+        },
+      }
+      if (captchaToken && captchaToken !== 'disabled') {
+        otpOptions.captchaToken = captchaToken
+      }
+
       const result = await Promise.race([
-        supabase.auth.signInWithOtp({
-          email: email.trim(),
-          options: {
-            emailRedirectTo: callbackUrl,
-            shouldCreateUser: true,
-            data: {
-              name: name.trim() || null,
-              organization: organization.trim() || null,
-            },
-          },
-        }),
+        supabase.auth.signInWithOtp({ email: email.trim(), options: otpOptions }),
         timeoutPromise,
       ])
 
@@ -51,6 +57,7 @@ export default function RegisterForm() {
       if (result.error) {
         console.error('[register] Supabase error:', result.error)
         setError(result.error.message || JSON.stringify(result.error))
+        setCaptchaToken(null)  // reset captcha tras fallo
       } else {
         setSent(true)
       }
@@ -58,6 +65,7 @@ export default function RegisterForm() {
       setLoading(false)
       console.error('[register] Exception:', e)
       setError(e?.message || String(e))
+      setCaptchaToken(null)
     }
   }
 
@@ -135,6 +143,9 @@ export default function RegisterForm() {
         />
       </div>
 
+      {/* Cloudflare Turnstile — invisible si no hay env var */}
+      <Turnstile onVerify={setCaptchaToken} theme="dark" />
+
       {error && (
         <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-md">
           {error}
@@ -143,7 +154,7 @@ export default function RegisterForm() {
 
       <button
         type="submit"
-        disabled={loading || !email.trim()}
+        disabled={loading || !email.trim() || !captchaReady}
         className="w-full h-12 rounded-lg
                    bg-gradient-to-b from-copper-200 to-copper-300
                    text-[#1a0e08] font-semibold

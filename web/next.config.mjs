@@ -28,12 +28,12 @@ const nextConfig = {
           // - frame-ancestors: 'none' (refuerza X-Frame-Options)
           { key: 'Content-Security-Policy', value: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.vercel-analytics.com https://*.vercel-insights.com",
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com https://challenges.cloudflare.com https://*.vercel-analytics.com https://*.vercel-insights.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: blob: https:",
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.vercel-analytics.com https://*.vercel-insights.com",
-            "frame-src https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://billing.stripe.com",
+            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io https://*.vercel-analytics.com https://*.vercel-insights.com",
+            "frame-src https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://billing.stripe.com https://challenges.cloudflare.com",
             "frame-ancestors 'none'",
             "base-uri 'self'",
             "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
@@ -57,4 +57,26 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+// Sentry: wrap solo si está instalado (para que el deploy no rompa si
+// alguien clona el repo sin instalar el paquete).
+async function withSentry(config) {
+  if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return config
+  try {
+    const sentry = await import('@sentry/nextjs')
+    return sentry.withSentryConfig(config, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      // Solo subir source maps si tenemos token de auth (en CI/Vercel)
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.SENTRY_AUTH_TOKEN,
+      widenClientFileUpload: true,
+      hideSourceMaps: true,
+      disableLogger: true,
+    })
+  } catch (e) {
+    console.warn('[next.config] Sentry not installed, skipping wrap:', e?.message)
+    return config
+  }
+}
+
+export default await withSentry(nextConfig)

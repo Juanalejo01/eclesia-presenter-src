@@ -36,7 +36,7 @@ const INVALID_LICENSE_ERROR = {
 export async function POST(request) {
   // 1. Rate limit
   const ip = getClientIP(request)
-  const rl = checkRateLimit(ip, 'activate')
+  const rl = await checkRateLimit(ip, 'activate')
   if (!rl.ok) {
     return NextResponse.json(
       { ok: false, error: 'rate_limit', retry_after: rl.retryAfter },

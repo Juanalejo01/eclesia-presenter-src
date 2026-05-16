@@ -14,7 +14,7 @@ const LICENSE_KEY_FORMAT = /^EP-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$
 
 export async function POST(request) {
   const ip = getClientIP(request)
-  const rl = checkRateLimit(ip, 'validate')
+  const rl = await checkRateLimit(ip, 'validate')
   if (!rl.ok) {
     return NextResponse.json(
       { ok: false, reason: 'rate_limit', retry_after: rl.retryAfter },
