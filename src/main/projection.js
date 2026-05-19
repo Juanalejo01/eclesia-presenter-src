@@ -11,6 +11,8 @@ const isDev = !app.isPackaged
 const projections = new Map()  // mode → { window, options }
 let currentSlide = null
 let currentTheme = defaultTheme()
+let currentNotes = ''  // notas del predicador, solo visibles en Stage Display
+let currentCountdown = null  // {running, endsAt, message, endMessage} | null
 
 // --- Persistencia del theme en disco (sobrevive cierre de la app) ---
 const THEME_FILE = () => path.join(app.getPath('userData'), 'projection-theme.json')
@@ -243,6 +245,24 @@ function setSlide(slide) {
   broadcast('projection:slide', slide)
 }
 
+/**
+ * Notas del predicador — texto libre que solo aparece en Stage Display
+ * (NO se proyecta al público).
+ */
+function setNotes(text) {
+  currentNotes = typeof text === 'string' ? text : ''
+  broadcast('projection:notes', currentNotes)
+}
+
+/**
+ * Estado del countdown — para que Stage Display lo muestre prominente
+ * incluso si el auto-project del countdown está desactivado.
+ */
+function setCountdown(state) {
+  currentCountdown = state || null
+  broadcast('projection:countdown', currentCountdown)
+}
+
 function setTheme(patch) {
   // Deep merge para `overlay`: si no hacemos merge profundo aquí, mandar
   // un patch como `{ overlay: { bgType: 'gradient' } }` borraría TODOS los
@@ -260,6 +280,8 @@ function getState() {
   return {
     slide: currentSlide,
     theme: currentTheme,
+    notes: currentNotes,
+    countdown: currentCountdown,
     open: [...projections.keys()],
     displays: getDisplays(),
   }
@@ -267,6 +289,6 @@ function getState() {
 
 module.exports = {
   openProjection, closeProjection, closeAll,
-  setSlide, setTheme, getState,
+  setSlide, setTheme, setNotes, setCountdown, getState,
   toggleOverlayVisible,
 }

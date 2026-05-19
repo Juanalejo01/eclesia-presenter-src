@@ -20,9 +20,13 @@ contextBridge.exposeInMainWorld('electron', {
     theme: (patch) => ipcRenderer.invoke('projection:theme', patch),
     state: ()      => ipcRenderer.invoke('projection:state'),
     toggleOverlayVisible: (visible) => ipcRenderer.invoke('projection:toggleOverlayVisible', visible),
-    onInit:  (cb)  => { ipcRenderer.on('projection:init',  (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:init') },
-    onSlide: (cb)  => { ipcRenderer.on('projection:slide', (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:slide') },
-    onTheme: (cb)  => { ipcRenderer.on('projection:theme', (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:theme') },
+    setNotes:     (text)  => ipcRenderer.invoke('projection:setNotes', text),
+    setCountdown: (state) => ipcRenderer.invoke('projection:setCountdown', state),
+    onInit:      (cb) => { ipcRenderer.on('projection:init',      (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:init') },
+    onSlide:     (cb) => { ipcRenderer.on('projection:slide',     (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:slide') },
+    onTheme:     (cb) => { ipcRenderer.on('projection:theme',     (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:theme') },
+    onNotes:     (cb) => { ipcRenderer.on('projection:notes',     (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:notes') },
+    onCountdown: (cb) => { ipcRenderer.on('projection:countdown', (_e, d) => cb(d));  return () => ipcRenderer.removeAllListeners('projection:countdown') },
   },
 
   // Songs CRUD (SQLite vía main process)

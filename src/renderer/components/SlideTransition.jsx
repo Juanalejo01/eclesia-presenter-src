@@ -49,6 +49,34 @@ const TRANSITIONS = {
     active:   { transform: 'scale(1)',    opacity: 1 },
     exiting:  { transform: 'scale(0.82)', opacity: 0 },
   },
+  'flip': {
+    entering: { transform: 'perspective(1200px) rotateY(90deg)',  opacity: 0 },
+    active:   { transform: 'perspective(1200px) rotateY(0)',      opacity: 1 },
+    exiting:  { transform: 'perspective(1200px) rotateY(-90deg)', opacity: 0 },
+  },
+  'flip-x': {
+    entering: { transform: 'perspective(1200px) rotateX(90deg)',  opacity: 0 },
+    active:   { transform: 'perspective(1200px) rotateX(0)',      opacity: 1 },
+    exiting:  { transform: 'perspective(1200px) rotateX(-90deg)', opacity: 0 },
+  },
+  'dissolve': {
+    // Cross-fade con blur sutil — más cinematográfico que fade puro
+    entering: { opacity: 0, filter: 'blur(8px)' },
+    active:   { opacity: 1, filter: 'blur(0px)' },
+    exiting:  { opacity: 0, filter: 'blur(8px)' },
+  },
+  'reveal': {
+    // Clip-path desde abajo — útil para revelar versículos largos
+    entering: { clipPath: 'inset(100% 0 0 0)', opacity: 1 },
+    active:   { clipPath: 'inset(0 0 0 0)',     opacity: 1 },
+    exiting:  { clipPath: 'inset(0 0 100% 0)',  opacity: 1 },
+  },
+  'ken-burns': {
+    // Zoom muy suave + leve traslación: efecto cinematográfico contemplativo
+    entering: { transform: 'scale(1.08) translate(-1%, -1%)', opacity: 0 },
+    active:   { transform: 'scale(1) translate(0, 0)',         opacity: 1 },
+    exiting:  { transform: 'scale(1.08) translate(1%, 1%)',    opacity: 0 },
+  },
 }
 
 const slideKey = (slide) =>
@@ -106,10 +134,14 @@ export default function SlideTransition({ slide, theme, render }) {
     <>
       {layers.map(layer => {
         const base = TRANSITIONS[type][layer.phase] || TRANSITIONS[type].active
+        // Construir lista de propiedades a animar según el tipo
+        const animProps = ['opacity', 'transform']
+        if (type === 'dissolve') animProps.push('filter')
+        if (type === 'reveal')   animProps.push('clip-path')
         const style = {
           ...base,
-          transition: `opacity ${duration}ms ${easing}, transform ${duration}ms ${easing}`,
-          willChange: 'opacity, transform',
+          transition: animProps.map(p => `${p} ${duration}ms ${easing}`).join(', '),
+          willChange: animProps.join(', '),
         }
         return (
           <div key={layer.id} className="absolute inset-0 flex" style={style}>

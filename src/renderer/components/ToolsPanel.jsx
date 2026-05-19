@@ -13,14 +13,16 @@ import {
 import {
   useCountdown, setCountdownField, startCountdown, pauseCountdown, resetCountdown,
   useStopwatch, startStopwatch, stopStopwatch, resetStopwatch, lapStopwatch,
+  useNotes, setNotes,
 } from '../services/toolsStore.js'
-import { IconHourglass, IconTimer, IconDice, IconWheel } from './Icons.jsx'
+import { IconHourglass, IconTimer, IconDice, IconWheel, IconNotes } from './Icons.jsx'
 
 const WIDGETS = [
   { id: 'countdown', label: 'Cuenta atrás',  Icon: IconHourglass },
   { id: 'stopwatch', label: 'Cronómetro',    Icon: IconTimer },
   { id: 'verse',     label: 'Verso al azar', Icon: IconDice },
   { id: 'wheel',     label: 'Ruleta',        Icon: IconWheel },
+  { id: 'notes',     label: 'Notas Stage',   Icon: IconNotes },
 ]
 
 export default function ToolsPanel() {
@@ -55,6 +57,7 @@ export default function ToolsPanel() {
           {active === 'stopwatch' && <StopwatchWidget />}
           {active === 'verse'     && <VerseRandomWidget />}
           {active === 'wheel'     && <WheelWidget />}
+          {active === 'notes'     && <NotesWidget />}
         </div>
       </div>
     </div>
@@ -536,6 +539,80 @@ function WheelWidget() {
           })}>
           Proyectar ganador
         </button>
+      </div>
+    </>
+  )
+}
+
+// ============================================================
+// 5. NOTAS DEL PREDICADOR — solo se ven en Stage Display, NO en el proyector
+// ============================================================
+function NotesWidget() {
+  const notes = useNotes()
+
+  const examples = [
+    '— Llamado al altar —',
+    'Después de este punto: oración por sanidad',
+    'Si tengo tiempo: 1 testimonio breve',
+    'Recordar: ofrenda especial para misiones',
+  ]
+
+  return (
+    <>
+      <div className="card" style={{ padding: 20 }}>
+        <div className="section-h" style={{ marginBottom: 14 }}>
+          <h3>Notas del predicador</h3>
+          <span className="sub">solo visibles en Stage Display</span>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 14px', lineHeight: 1.5 }}>
+          Lo que escribas aquí <strong style={{ color: 'var(--copper-100)' }}>SOLO</strong> aparece en la pantalla
+          del músico/predicador (Stage Display). <strong>NO</strong> se proyecta al público.
+          Útil para guías personales, recordatorios o el siguiente punto del sermón.
+        </p>
+
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Escribe aquí las notas que solo el músico/predicador verá en su pantalla..."
+          rows={12}
+          style={{
+            width: '100%', resize: 'vertical', minHeight: 240,
+            padding: 16, borderRadius: 10,
+            background: 'var(--bg-2)', color: 'var(--text-1)',
+            border: '1px solid var(--line-1)',
+            fontFamily: 'var(--font-display)', fontSize: 16, lineHeight: 1.6,
+            outline: 'none',
+          }} />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            {notes.length} caracteres · {notes.split('\n').filter(l => l.trim()).length} líneas
+          </span>
+          <button className="btn btn-ghost" onClick={() => setNotes('')}>
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 16 }}>
+        <div className="section-h" style={{ marginBottom: 10 }}>
+          <h3 style={{ fontSize: 13 }}>Ejemplos útiles</h3>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {examples.map((ex, i) => (
+            <button key={i}
+              onClick={() => setNotes(notes ? notes + '\n' + ex : ex)}
+              style={{
+                textAlign: 'left', padding: '8px 12px', borderRadius: 6,
+                background: 'transparent', border: '1px solid var(--line-1)',
+                color: 'var(--text-2)', fontSize: 12, cursor: 'pointer',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              + {ex}
+            </button>
+          ))}
+        </div>
       </div>
     </>
   )

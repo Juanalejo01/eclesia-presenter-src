@@ -51,6 +51,7 @@ export const IconHourglass = (p) => <Icon {...p}><path d="M5 22h14M5 2h14M17 22v
 export const IconTimer = (p) => <Icon {...p}><circle cx="12" cy="14" r="8"/><path d="M5 2l-2 2M19 2l2 2M9 1h6M12 11v3l2 2"/></Icon>
 export const IconDice = (p) => <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="16" cy="16" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></Icon>
 export const IconWheel = (p) => <Icon {...p}><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M5.6 18.4 18.4 5.6"/></Icon>
+export const IconNotes = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></Icon>
 
 // Brand monogram logo — copper-gradient stylized "E"
 export const LogoMonogram = ({ size = 28 }) => (

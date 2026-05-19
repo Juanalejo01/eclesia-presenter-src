@@ -11,14 +11,19 @@ import {
 } from './Icons.jsx'
 
 const TRANSITION_TYPES = [
-  { value: 'none', label: 'Ninguna' },
-  { value: 'fade', label: 'Fade' },
-  { value: 'slide-left', label: 'Slide ◀' },
+  { value: 'none',        label: 'Ninguna' },
+  { value: 'fade',        label: 'Fade' },
+  { value: 'dissolve',    label: 'Dissolve (cine)' },
+  { value: 'slide-left',  label: 'Slide ◀' },
   { value: 'slide-right', label: 'Slide ▶' },
-  { value: 'slide-up', label: 'Slide ▲' },
-  { value: 'slide-down', label: 'Slide ▼' },
-  { value: 'zoom-in', label: 'Zoom in' },
-  { value: 'zoom-out', label: 'Zoom out' },
+  { value: 'slide-up',    label: 'Slide ▲' },
+  { value: 'slide-down',  label: 'Slide ▼' },
+  { value: 'zoom-in',     label: 'Zoom in' },
+  { value: 'zoom-out',    label: 'Zoom out' },
+  { value: 'flip',        label: 'Flip horizontal' },
+  { value: 'flip-x',      label: 'Flip vertical' },
+  { value: 'reveal',      label: 'Reveal ↑' },
+  { value: 'ken-burns',   label: 'Ken Burns' },
 ]
 
 const DEMO_SLIDES = [

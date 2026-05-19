@@ -114,6 +114,9 @@ ipcMain.handle('projection:close', (_e, mode)   => projection.closeProjection(mo
 ipcMain.handle('projection:theme', (_e, patch)  => { projection.setTheme(patch); return projection.getState().theme })
 ipcMain.handle('projection:state', ()           => projection.getState())
 ipcMain.handle('projection:toggleOverlayVisible', (_e, visible) => projection.toggleOverlayVisible(visible))
+// Stage Display v2: notas del predicador + countdown integrado
+ipcMain.handle('projection:setNotes',     (_e, text)  => projection.setNotes(text))
+ipcMain.handle('projection:setCountdown', (_e, state) => projection.setCountdown(state))
 
 // --------- Media library ---------
 

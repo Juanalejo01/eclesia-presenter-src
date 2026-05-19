@@ -1,4 +1,4 @@
-// Store persistente para Countdown y Cronómetro.
+// Store persistente para Countdown, Cronómetro y Notas del predicador.
 //
 // Los componentes del ToolsPanel se desmontan cada vez que cambias de panel
 // (Ctrl+B, Ctrl+Q, etc), lo que reseteaba el estado de los timers. Este
@@ -28,6 +28,15 @@ let cdTimer = null  // interval id
 
 function cdEmit() {
   for (const fn of cdListeners) try { fn({ ...countdown, now: Date.now() }) } catch {}
+  // Broadcast al main process para que Stage Display lo vea
+  try {
+    window.electron?.projection?.setCountdown({
+      running: countdown.running,
+      endsAt: countdown.endsAt,
+      message: countdown.message,
+      endMessage: countdown.endMessage,
+    })
+  } catch {}
 }
 
 function startTicking() {
@@ -160,4 +169,28 @@ export function useStopwatch() {
     return () => swListeners.delete(off)
   }, [])
   return state
+}
+
+// ============================================================
+// NOTES STATE — sincronizado con Stage Display vía IPC
+// ============================================================
+let notesText = ''
+const notesListeners = new Set()
+
+export function getNotes() { return notesText }
+
+export function setNotes(text) {
+  notesText = String(text || '')
+  for (const fn of notesListeners) try { fn(notesText) } catch {}
+  // Push al main process para que Stage Display las muestre
+  try { window.electron?.projection?.setNotes(notesText) } catch {}
+}
+
+export function useNotes() {
+  const [text, setText] = useState(notesText)
+  useEffect(() => {
+    notesListeners.add(setText)
+    return () => notesListeners.delete(setText)
+  }, [])
+  return text
 }
