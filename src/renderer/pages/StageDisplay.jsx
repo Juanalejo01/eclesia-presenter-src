@@ -181,7 +181,7 @@ function StageBody({ slide, notes, theme }) {
       <aside style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0 }}>
         {/* Notas del predicador — protagonistas */}
         <section style={{
-          flex: 1, minHeight: 0,
+          flex: 1,
           background: 'rgba(255, 255, 200, 0.04)',
           border: '1px solid rgba(255, 220, 100, 0.20)',
           borderRadius: 12, padding: '18px 20px',
