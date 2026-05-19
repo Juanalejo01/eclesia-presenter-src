@@ -43,11 +43,21 @@ const isDev = !app.isPackaged
 let mainWindow = null
 
 function createMainWindow() {
-  // Buscar el icono empaquetado. En dev: build/icon.ico. En producción: el
-  // empaquetador lo embebe en el .exe pero igualmente lo asignamos a la
-  // BrowserWindow para que aparezca en la barra de tareas y Alt+Tab.
-  const iconPath = path.join(__dirname, '../../build/icon.ico')
+  // Resolver el path del icono según si estamos empaquetados o en dev.
+  // - Producción: el .ico va en resources/ (configurado en build.extraResources)
+  //   → path = process.resourcesPath + 'icon.ico'
+  // - Dev: leemos directamente de build/icon.ico
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.ico')
+    : path.join(__dirname, '../../build/icon.ico')
   const iconExists = (() => { try { return fs.existsSync(iconPath) } catch { return false } })()
+
+  // En Windows, además de pasar icon a BrowserWindow, conviene setear el
+  // AppUserModelID para que Windows agrupe correctamente y use nuestro icono
+  // en la barra de tareas (no el de Electron por defecto).
+  if (process.platform === 'win32') {
+    try { app.setAppUserModelId('com.eclesiapresenter.app') } catch {}
+  }
 
   mainWindow = new BrowserWindow({
     // Tamaño inicial razonable para cuando el usuario "restaura" la ventana

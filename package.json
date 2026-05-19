@@ -58,6 +58,10 @@
       "package.json",
       "!**/*.map"
     ],
+    "extraResources": [
+      { "from": "build/icon.ico", "to": "icon.ico" },
+      { "from": "build/icon.png", "to": "icon.png" }
+    ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
     ],

@@ -63,35 +63,42 @@ export default function Hero() {
                           bg-gradient-to-br from-bg-2 via-bg-1 to-bg-0
                           shadow-2xl shadow-black/50
                           relative">
-            {/* Frame top bar */}
-            <div className="absolute top-0 left-0 right-0 h-10 bg-bg-1/80 border-b border-copper-300/10
-                            flex items-center px-4 gap-2">
-              <span className="w-3 h-3 rounded-full bg-ink-4/40" />
-              <span className="w-3 h-3 rounded-full bg-ink-4/40" />
-              <span className="w-3 h-3 rounded-full bg-ink-4/40" />
-              <span className="ml-4 text-xs font-mono text-ink-3">
+            {/* Frame top bar (escalable) */}
+            <div className="absolute top-0 left-0 right-0 h-7 sm:h-9 md:h-10
+                            bg-bg-1/80 border-b border-copper-300/10
+                            flex items-center px-2 sm:px-4 gap-1.5 sm:gap-2">
+              <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 rounded-full bg-ink-4/40" />
+              <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 rounded-full bg-ink-4/40" />
+              <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 rounded-full bg-ink-4/40" />
+              <span className="ml-2 sm:ml-4 text-[9px] sm:text-xs font-mono text-ink-3 truncate">
                 EclesiaPresenter · Salmos 23:1
               </span>
             </div>
 
-            {/* Fake projection content */}
-            <div className="absolute inset-0 pt-10 flex items-center justify-center px-12">
+            {/* Fake projection content — padding responsivo */}
+            <div className="absolute inset-0 pt-7 sm:pt-9 md:pt-10 flex items-center justify-center
+                            px-4 sm:px-8 md:px-12">
               <div className="text-center max-w-3xl">
-                <p className="font-display text-3xl md:text-5xl lg:text-6xl leading-tight text-ink-1 mb-6">
+                <p className="font-display text-xl sm:text-3xl md:text-5xl lg:text-6xl
+                              leading-tight text-ink-1 mb-3 sm:mb-6">
                   &ldquo;Jehová es mi pastor;<br/>nada me faltará.&rdquo;
                 </p>
-                <p className="font-mono text-xs md:text-sm tracking-[0.2em] text-copper-200 uppercase">
+                <p className="font-mono text-[9px] sm:text-xs md:text-sm
+                              tracking-[0.2em] text-copper-200 uppercase">
                   Salmos 23 : 1
                 </p>
               </div>
             </div>
 
-            {/* Live tally */}
-            <div className="absolute top-12 right-4 flex items-center gap-2
-                            px-3 py-1.5 rounded
-                            bg-red-500/90 text-white text-[10px] font-mono font-bold uppercase tracking-widest
+            {/* Live tally — escala con el viewport para no robar el slide */}
+            <div className="absolute top-9 sm:top-11 md:top-12 right-2 sm:right-3 md:right-4
+                            flex items-center gap-1 sm:gap-1.5 md:gap-2
+                            px-2 sm:px-2.5 md:px-3 py-1 sm:py-1.5 rounded
+                            bg-red-500/90 text-white
+                            text-[7px] sm:text-[9px] md:text-[10px]
+                            font-mono font-bold uppercase tracking-wider sm:tracking-widest
                             shadow-lg shadow-red-500/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white animate-pulse" />
               ON AIR
             </div>
           </div>

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Logo from './Logo'
+import MobileMenu from './MobileMenu'
 import { createClient } from '../lib/supabase/server'
 
 export default async function Navbar() {
@@ -44,10 +45,11 @@ export default async function Navbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          {user ? (
+          {/* Mi cuenta visible siempre que esté logueado, en móvil solo el avatar */}
+          {user && (
             <Link
               href="/cuenta"
-              className="inline-flex items-center gap-2 px-4 h-9 rounded-lg
+              className="inline-flex items-center gap-2 px-3 md:px-4 h-9 rounded-lg
                          border border-copper-300/30 bg-bg-2 hover:bg-bg-3
                          text-sm font-medium text-ink-1 transition-all"
             >
@@ -56,14 +58,17 @@ export default async function Navbar() {
               </span>
               <span className="hidden sm:inline">Mi cuenta</span>
             </Link>
-          ) : (
+          )}
+
+          {/* CTAs solo en desktop. En móvil van dentro del MobileMenu */}
+          {!user && (
             <>
               <Link href="/login" className="hidden md:inline text-sm text-ink-2 hover:text-ink-1 transition-colors">
                 Iniciar sesión
               </Link>
               <Link
                 href="/download"
-                className="inline-flex items-center gap-2 px-4 h-9 rounded-lg
+                className="hidden md:inline-flex items-center gap-2 px-4 h-9 rounded-lg
                            bg-gradient-to-b from-copper-200 to-copper-300
                            text-[#1a0e08] text-sm font-semibold
                            shadow-copper-glow hover:from-copper-100 hover:to-copper-200
@@ -73,6 +78,9 @@ export default async function Navbar() {
               </Link>
             </>
           )}
+
+          {/* Hamburger — solo visible en móvil */}
+          <MobileMenu user={user ? { email: user.email } : null} />
         </div>
       </div>
     </header>
