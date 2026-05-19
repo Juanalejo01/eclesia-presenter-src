@@ -5,7 +5,13 @@ node_modules/
 dist/
 dist-electron/
 out/
-build/
+
+# Recursos de build (icons, etc.) NO se ignoran — son source files.
+# electron-builder los usa como input desde build/icon.ico, build/icon.png, etc.
+# Las imágenes PNG generadas a partir del SVG sí se ignoran para no inflar el repo.
+build/icon-*.png
+build/icon.png
+build/icon.ico
 
 # Next.js (web/) — siempre se ignora
 web/.next/
