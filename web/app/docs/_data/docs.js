@@ -89,6 +89,7 @@ export const DOCS = [
       { type: 'kbd', keys: ['Ctrl', 'I'], desc: 'Panel Imágenes' },
       { type: 'kbd', keys: ['Ctrl', 'H'], desc: 'Panel Videos' },
       { type: 'kbd', keys: ['Ctrl', '6'], desc: 'Texto libre' },
+      { type: 'kbd', keys: ['Ctrl', 'T'], desc: 'Herramientas (countdown, cronómetro, ruleta, verso al azar)' },
       { type: 'kbd', keys: ['Ctrl', 'Q'], desc: 'Proyección (ajustes de tema)' },
       { type: 'kbd', keys: ['Ctrl', '8'], desc: 'Transmisión' },
       { type: 'note', text: 'Las teclas Ctrl+1..8 siguen funcionando como alternativa al orden de la sidebar.' },
@@ -175,6 +176,56 @@ export const DOCS = [
         ['Biblias importadas', 'cualquier biblia que importes manualmente (XMM, JSON) está disponible en todos los planes.'],
       ]},
       { type: 'link', href: '/docs/biblias-custom', label: 'Cómo importar tus propias biblias →' },
+    ],
+  },
+
+  {
+    slug: 'herramientas',
+    title: 'Panel Herramientas',
+    section: 'Primeros pasos',
+    lastUpdated: '2026-05',
+    summary: 'Cuenta atrás, cronómetro, ruleta y verso al azar para tu servicio.',
+    content: [
+      { type: 'p', text: 'El panel Herramientas (Ctrl+T) reúne 4 utilidades pensadas para dinámicas, llamados, pre-servicio y momentos específicos del culto. Cualquiera de ellas puede proyectarse al live respetando tu tema visual.' },
+
+      { type: 'h2', text: 'Cuenta atrás (countdown)' },
+      { type: 'p', text: 'Útil para anunciar el inicio del servicio, un break o el regreso después de la oración.' },
+      { type: 'list', items: [
+        ['Modo "Duración"', 'pones horas, minutos y segundos (ej: 1h 26min hasta empezar).'],
+        ['Modo "Hora destino"', 'eliges fecha y hora exacta (ej: 11:00 del domingo).'],
+        ['Mensaje principal', 'el texto que aparece arriba del contador. Default: "El servicio inicia en".'],
+        ['Mensaje al terminar', 'el texto que aparece al llegar a 00:00. Default: "¡Empezamos!".'],
+        ['Auto-proyección', 'marcado por defecto. La cuenta atrás se actualiza en el proyector cada segundo automáticamente.'],
+      ]},
+      { type: 'tip', text: 'El contador sigue corriendo aunque cambies de panel. Si pulsas Ctrl+Q para ajustar la transición visual y luego vuelves a Herramientas (Ctrl+T), el contador continúa exactamente donde estaba.' },
+
+      { type: 'h2', text: 'Cronómetro' },
+      { type: 'p', text: 'Cuenta hacia adelante con precisión de centésimas. Útil para dinámicas con tiempo límite (testimonios de 1 minuto, retos cronometrados, etc.).' },
+      { type: 'list', items: [
+        ['Iniciar / Detener', 'control normal de cronómetro.'],
+        ['Vuelta', 'registra el tiempo actual sin detener el contador. Cada vuelta queda listada.'],
+        ['Proyectar', 'manda el tiempo actual al live (se actualiza solo si pulsas otra vez).'],
+        ['Reset', 'pone a cero el contador y borra las vueltas.'],
+      ]},
+
+      { type: 'h2', text: 'Verso al azar' },
+      { type: 'p', text: 'Sortea un versículo aleatorio para dinámicas tipo "te toca a ti leer", devocional rápido o ilustración.' },
+      { type: 'list', items: [
+        ['Versión', 'elige entre las biblias locales o importadas de tu instalación.'],
+        ['Buscar en', 'limita el sorteo a: Toda la Biblia · NT · AT · Solo Salmos · Solo Proverbios · Solo Evangelios.'],
+        ['Historial', 'guarda los últimos 5 sorteados. Click en cualquiera para reproyectarlo.'],
+        ['Proyectar al live', 'envía el versículo a la ventana del proyector como si lo seleccionaras desde el panel Biblia.'],
+      ]},
+      { type: 'note', text: 'El sorteo es uniformemente aleatorio: cualquier versículo dentro del ámbito tiene la misma probabilidad. Si te gustaría tener "versículos preseleccionados favoritos", escríbenos.' },
+
+      { type: 'h2', text: 'Ruleta' },
+      { type: 'p', text: 'Selecciona un ganador al azar de una lista de nombres. Útil para sorteos navideños, dinámicas de juventud, "el que toca lee la lectura", etc.' },
+      { type: 'list', items: [
+        ['Lista de nombres', 'un nombre por línea. Editable en cualquier momento.'],
+        ['Animación', 'la ruleta resalta cada nombre uno tras otro, acelera y frena hasta el ganador final.'],
+        ['Quitar al ganador', 'modo "sorteo sin repetir": al girar otra vez, el ganador anterior ya no está en la lista.'],
+        ['Proyectar ganador', 'envía el nombre al live a tamaño grande.'],
+      ]},
     ],
   },
 
@@ -373,11 +424,13 @@ export const DOCS = [
       { type: 'ol', items: [
         'En el PC ve a Transmisión (Ctrl+8).',
         'Baja hasta la sección "Control remoto desde el móvil".',
-        'Verás un código QR y la URL (ej: http://192.168.1.42:3434/remote).',
+        'Verás un código QR, la URL local (ej: http://192.168.1.42:3434/remote) y un PIN de 6 dígitos.',
         'En el móvil, asegúrate de estar conectado al mismo WiFi que el PC.',
         'Escanea el QR con la cámara, o escribe la URL en el navegador.',
+        'En la pantalla del móvil te pedirá el PIN de 6 dígitos. Lo escribes y queda autorizado.',
       ]},
       { type: 'note', text: 'Si la cámara del móvil no escanea el QR (algunos modelos antiguos), copia la URL desde el botón "Copiar" y pégala en el navegador.' },
+      { type: 'tip', text: 'El PIN cambia cada vez que reinicias la app. Si alguien curioseaba en tu WiFi y se había conectado al remote, al reiniciar pierde el acceso. El móvil del operador puede re-pairearse rápido escribiendo el nuevo PIN.' },
 
       { type: 'h2', text: 'Pestañas del mando' },
       { type: 'h3', text: 'Mando' },

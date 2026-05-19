@@ -1,15 +1,19 @@
-// Panel "Herramientas" — utilidades complementarias para el servicio:
-//   1. Countdown / Cuenta atrás (ej: "El servicio empieza en 1:26:43")
-//   2. Cronómetro para dinámicas
-//   3. Verso aleatorio para devocionales / dinámicas
-//   4. Ruleta de nombres
+// Panel "Herramientas" — utilidades complementarias para el servicio.
 //
-// Cada widget puede proyectar su resultado al live. Comparten el mismo
-// SlideRenderer del proyector así que respetan el tema visual configurado.
+// El estado de countdown y cronómetro vive en toolsStore.js (módulo) para
+// que persista cuando el usuario navega a otros paneles. Si el componente
+// se desmonta, los timers siguen ejecutándose; al volver, lee el estado
+// actualizado y renderiza correctamente.
 
 import { useEffect, useRef, useState } from 'react'
 import { selectSlide } from '../services/slideStore.js'
-import { getAllVersions, getActiveVersion, getBooks, getChapter } from '../services/bibleService.js'
+import {
+  getAllVersions, getActiveVersion, getBooks, getChapter, getChapterCount,
+} from '../services/bibleService.js'
+import {
+  useCountdown, setCountdownField, startCountdown, pauseCountdown, resetCountdown,
+  useStopwatch, startStopwatch, stopStopwatch, resetStopwatch, lapStopwatch,
+} from '../services/toolsStore.js'
 import { IconHourglass, IconTimer, IconDice, IconWheel } from './Icons.jsx'
 
 const WIDGETS = [
@@ -32,7 +36,6 @@ export default function ToolsPanel() {
       </div>
 
       <div className="ws-body">
-        {/* Tabs de widgets */}
         <div style={{
           display: 'grid', gridTemplateColumns: `repeat(${WIDGETS.length}, 1fr)`,
           gap: 8, marginBottom: 22,
@@ -47,7 +50,6 @@ export default function ToolsPanel() {
           ))}
         </div>
 
-        {/* Widget activo */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {active === 'countdown' && <CountdownWidget />}
           {active === 'stopwatch' && <StopwatchWidget />}
@@ -60,28 +62,13 @@ export default function ToolsPanel() {
 }
 
 // ============================================================
-// 1. COUNTDOWN
+// 1. COUNTDOWN — estado persistente vía toolsStore
 // ============================================================
 function CountdownWidget() {
-  const [mode, setMode] = useState('duration')  // 'duration' | 'target'
-  const [hours, setHours] = useState(0)
-  const [minutes, setMinutes] = useState(15)
-  const [seconds, setSeconds] = useState(0)
-  const [targetDate, setTargetDate] = useState('')
-  const [message, setMessage] = useState('El servicio inicia en')
-  const [endMessage, setEndMessage] = useState('¡Empezamos!')
-  const [running, setRunning] = useState(false)
-  const [endsAt, setEndsAt] = useState(null)
-  const [now, setNow] = useState(Date.now())
-  const [autoProject, setAutoProject] = useState(true)
+  const state = useCountdown()
+  const { mode, hours, minutes, seconds, targetDate, message, endMessage, running, endsAt, autoProject, now } = state
 
-  useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => setNow(Date.now()), 250)
-    return () => clearInterval(id)
-  }, [running])
-
-  // Cuando cambia el tiempo restante, si está en autoProject, mandar al live
+  // Auto-proyección al live cuando está corriendo
   useEffect(() => {
     if (!running || !endsAt || !autoProject) return
     const remaining = Math.max(0, endsAt - now)
@@ -90,27 +77,8 @@ function CountdownWidget() {
       type: 'countdown',
       text,
       reference: message,
-      bgType: undefined, // hereda del tema actual
     })
   }, [now, running, endsAt, autoProject, message, endMessage])
-
-  const start = () => {
-    let end
-    if (mode === 'duration') {
-      const ms = (hours * 3600 + minutes * 60 + seconds) * 1000
-      if (ms <= 0) return
-      end = Date.now() + ms
-    } else {
-      if (!targetDate) return
-      end = new Date(targetDate).getTime()
-      if (end <= Date.now()) return
-    }
-    setEndsAt(end)
-    setRunning(true)
-  }
-
-  const pause = () => setRunning(false)
-  const reset = () => { setRunning(false); setEndsAt(null); setNow(Date.now()) }
 
   const remaining = endsAt ? Math.max(0, endsAt - now) : (hours * 3600 + minutes * 60 + seconds) * 1000
 
@@ -124,44 +92,45 @@ function CountdownWidget() {
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           <button className={'btn ' + (mode === 'duration' ? 'btn-primary' : '')}
-            onClick={() => setMode('duration')}>Duración</button>
+            onClick={() => setCountdownField({ mode: 'duration' })} disabled={running}>Duración</button>
           <button className={'btn ' + (mode === 'target' ? 'btn-primary' : '')}
-            onClick={() => setMode('target')}>Hora destino</button>
+            onClick={() => setCountdownField({ mode: 'target' })} disabled={running}>Hora destino</button>
         </div>
 
         {mode === 'duration' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <NumberField label="Horas"    value={hours}    onChange={setHours} min={0} max={23} />
-            <NumberField label="Minutos"  value={minutes}  onChange={setMinutes} min={0} max={59} />
-            <NumberField label="Segundos" value={seconds}  onChange={setSeconds} min={0} max={59} />
+            <NumberField label="Horas"    value={hours}    onChange={v => setCountdownField({ hours: v })} min={0} max={23} disabled={running} />
+            <NumberField label="Minutos"  value={minutes}  onChange={v => setCountdownField({ minutes: v })} min={0} max={59} disabled={running} />
+            <NumberField label="Segundos" value={seconds}  onChange={v => setCountdownField({ seconds: v })} min={0} max={59} disabled={running} />
           </div>
         )}
 
         {mode === 'target' && (
           <div className="field" style={{ marginBottom: 12 }}>
             <span className="label">Hora destino</span>
-            <input type="datetime-local" className="field-input"
-              value={targetDate} onChange={e => setTargetDate(e.target.value)} />
+            <input type="datetime-local" className="field-input" disabled={running}
+              value={targetDate} onChange={e => setCountdownField({ targetDate: e.target.value })} />
           </div>
         )}
 
         <div className="field" style={{ marginBottom: 8 }}>
           <span className="label">Mensaje principal</span>
           <input className="field-input" value={message}
-            onChange={e => setMessage(e.target.value)}
+            onChange={e => setCountdownField({ message: e.target.value })}
             placeholder="El servicio inicia en" />
         </div>
 
         <div className="field" style={{ marginBottom: 14 }}>
           <span className="label">Mensaje al terminar</span>
           <input className="field-input" value={endMessage}
-            onChange={e => setEndMessage(e.target.value)}
+            onChange={e => setCountdownField({ endMessage: e.target.value })}
             placeholder="¡Empezamos!" />
         </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)' }}>
-          <input type="checkbox" checked={autoProject} onChange={e => setAutoProject(e.target.checked)} />
-          Proyectar al live automáticamente (actualiza cada segundo)
+          <input type="checkbox" checked={autoProject}
+            onChange={e => setCountdownField({ autoProject: e.target.checked })} />
+          Proyectar al live automáticamente (se actualiza cada segundo)
         </label>
       </div>
 
@@ -174,12 +143,18 @@ function CountdownWidget() {
           color: 'var(--copper-100)', lineHeight: 1, letterSpacing: '0.04em' }}>
           {remaining > 0 ? formatCountdown(remaining) : endMessage}
         </div>
+        {running && (
+          <div style={{ fontSize: 10, color: 'var(--copper-200)', marginTop: 8,
+            fontFamily: 'var(--font-mono)', letterSpacing: '0.1em' }}>
+            ● corriendo en segundo plano
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        {!running && <button className="btn btn-primary" onClick={start} style={{ flex: 1 }}>▶ Empezar</button>}
-        {running  && <button className="btn" onClick={pause} style={{ flex: 1 }}>❚❚ Pausar</button>}
-        <button className="btn btn-ghost" onClick={reset}>↻ Reset</button>
+        {!running && <button className="btn btn-primary" onClick={startCountdown} style={{ flex: 1 }}>▶ Empezar</button>}
+        {running  && <button className="btn" onClick={pauseCountdown} style={{ flex: 1 }}>❚❚ Pausar</button>}
+        <button className="btn btn-ghost" onClick={resetCountdown}>↻ Reset</button>
         <button className="btn" onClick={() => selectSlide({
           type: 'countdown',
           text: remaining > 0 ? formatCountdown(remaining) : endMessage,
@@ -200,27 +175,11 @@ function formatCountdown(ms) {
 }
 
 // ============================================================
-// 2. STOPWATCH
+// 2. STOPWATCH — estado persistente vía toolsStore
 // ============================================================
 function StopwatchWidget() {
-  const [running, setRunning] = useState(false)
-  const [elapsed, setElapsed] = useState(0)  // ms acumulados
-  const [startedAt, setStartedAt] = useState(null)
-  const [laps, setLaps] = useState([])
-  const [now, setNow] = useState(Date.now())
-
-  useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => setNow(Date.now()), 50)
-    return () => clearInterval(id)
-  }, [running])
-
-  const current = running && startedAt ? elapsed + (now - startedAt) : elapsed
-
-  const start = () => { setStartedAt(Date.now()); setRunning(true) }
-  const stop  = () => { setElapsed(current); setRunning(false); setStartedAt(null) }
-  const reset = () => { setRunning(false); setStartedAt(null); setElapsed(0); setLaps([]) }
-  const lap   = () => setLaps([{ time: current, n: laps.length + 1 }, ...laps])
+  const state = useStopwatch()
+  const { running, current, laps } = state
 
   return (
     <>
@@ -229,13 +188,19 @@ function StopwatchWidget() {
           color: 'var(--copper-100)', lineHeight: 1, letterSpacing: '0.04em', fontWeight: 600 }}>
           {formatStopwatch(current)}
         </div>
+        {running && (
+          <div style={{ fontSize: 10, color: 'var(--copper-200)', marginTop: 8,
+            fontFamily: 'var(--font-mono)', letterSpacing: '0.1em' }}>
+            ● corriendo en segundo plano
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        {!running && <button className="btn btn-primary" onClick={start} style={{ flex: 1 }}>▶ Iniciar</button>}
-        {running  && <button className="btn" onClick={stop} style={{ flex: 1 }}>❚❚ Detener</button>}
-        <button className="btn" onClick={lap} disabled={!running}>⚐ Vuelta</button>
-        <button className="btn btn-ghost" onClick={reset}>↻ Reset</button>
+        {!running && <button className="btn btn-primary" onClick={startStopwatch} style={{ flex: 1 }}>▶ Iniciar</button>}
+        {running  && <button className="btn" onClick={stopStopwatch} style={{ flex: 1 }}>❚❚ Detener</button>}
+        <button className="btn" onClick={lapStopwatch} disabled={!running}>⚐ Vuelta</button>
+        <button className="btn btn-ghost" onClick={resetStopwatch}>↻ Reset</button>
         <button className="btn" onClick={() => selectSlide({
           type: 'stopwatch', text: formatStopwatch(current), reference: 'Cronómetro',
         })}>Proyectar</button>
@@ -273,62 +238,99 @@ function formatStopwatch(ms) {
 }
 
 // ============================================================
-// 3. VERSO ALEATORIO
+// 3. VERSO ALEATORIO — FIX: usa getChapterCount + maneja versiones remotas + error visible
 // ============================================================
 const VERSE_SCOPES = [
-  { id: 'all',         label: 'Toda la Biblia',         range: null },
-  { id: 'nt',          label: 'Nuevo Testamento',       range: [39, 65] },
-  { id: 'ot',          label: 'Antiguo Testamento',     range: [0, 38] },
-  { id: 'psalms',      label: 'Solo Salmos',            books: ['Salmos'] },
-  { id: 'proverbs',    label: 'Solo Proverbios',        books: ['Proverbios'] },
-  { id: 'gospels',     label: 'Solo Evangelios',        books: ['Mateo', 'Marcos', 'Lucas', 'Juan'] },
+  { id: 'all',         label: 'Toda la Biblia',     filterBooks: null },
+  { id: 'nt',          label: 'Nuevo Testamento',   ntOnly: true },
+  { id: 'ot',          label: 'Antiguo Testamento', otOnly: true },
+  { id: 'psalms',      label: 'Solo Salmos',        bookNames: ['Salmos', 'Psalms'] },
+  { id: 'proverbs',    label: 'Solo Proverbios',    bookNames: ['Proverbios', 'Proverbs'] },
+  { id: 'gospels',     label: 'Solo Evangelios',    bookNames: ['Mateo', 'Marcos', 'Lucas', 'Juan', 'Matthew', 'Mark', 'Luke', 'John'] },
 ]
 
+const NT_FIRST_BOOK_NAMES = ['Mateo', 'Matthew']
+
 function VerseRandomWidget() {
+  // Solo versiones LOCALES o importadas (no api.bible que es async por capítulo).
+  const localVersions = getAllVersions().filter(v => v.type === 'local' || v.type === 'imported')
+  const defaultActive = getActiveVersion()
+  const defaultVersionId = (defaultActive && (defaultActive.type === 'local' || defaultActive.type === 'imported'))
+    ? defaultActive.id
+    : (localVersions[0]?.id || 'rvr1960')
+
   const [scope, setScope] = useState('all')
-  const [versionId, setVersionId] = useState(getActiveVersion()?.id || 'rvr1960')
-  const [versions] = useState(getAllVersions().filter(v => v.type === 'local' || v.type === 'imported'))
+  const [versionId, setVersionId] = useState(defaultVersionId)
   const [books, setBooks] = useState([])
+  const [booksLoading, setBooksLoading] = useState(true)
   const [current, setCurrent] = useState(null)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
+  // Cargar libros cuando cambia la versión
   useEffect(() => {
-    getBooks(versionId).then(setBooks).catch(() => {})
+    setBooksLoading(true)
+    setError(null)
+    getBooks(versionId)
+      .then(b => { setBooks(b); setBooksLoading(false) })
+      .catch(e => { setError(`No se pudieron cargar libros: ${e?.message || e}`); setBooksLoading(false) })
   }, [versionId])
 
   const draw = async () => {
-    if (books.length === 0) return
+    setError(null)
+    if (booksLoading) { setError('Los libros aún se están cargando, espera un instante…'); return }
+    if (books.length === 0) { setError('Esta versión no tiene libros disponibles'); return }
+
     setLoading(true)
     try {
+      // 1. Filtrar libros según el scope
       const scopeData = VERSE_SCOPES.find(s => s.id === scope)
       let candidates = books
-      if (scopeData?.range) {
-        candidates = books.slice(scopeData.range[0], scopeData.range[1] + 1)
-      } else if (scopeData?.books) {
-        candidates = books.filter(b => scopeData.books.includes(b.name))
+      if (scopeData?.bookNames) {
+        candidates = books.filter(b => scopeData.bookNames.includes(b.name))
+      } else if (scopeData?.ntOnly || scopeData?.otOnly) {
+        const ntStart = books.findIndex(b => NT_FIRST_BOOK_NAMES.includes(b.name))
+        if (ntStart > 0) {
+          candidates = scopeData.ntOnly ? books.slice(ntStart) : books.slice(0, ntStart)
+        }
       }
-      if (candidates.length === 0) { setLoading(false); return }
+      if (candidates.length === 0) {
+        setError('No hay libros que coincidan con el filtro')
+        setLoading(false); return
+      }
 
+      // 2. Elegir libro al azar
       const book = candidates[Math.floor(Math.random() * candidates.length)]
-      const chapter = await getChapter(book.index, 1, versionId)
-      const totalChapters = book.chapters || 1
-      const randomChapter = Math.floor(Math.random() * Math.min(totalChapters, 50)) + 1
-      let chapterData
+
+      // 3. Obtener el número real de capítulos del libro
+      let chapterCount = 1
       try {
-        chapterData = await getChapter(book.index, randomChapter, versionId)
-      } catch {
-        chapterData = chapter
+        chapterCount = await getChapterCount(book.index, versionId)
+      } catch {}
+      if (!chapterCount || chapterCount < 1) chapterCount = 1
+
+      // 4. Capítulo al azar
+      const randomChapter = Math.floor(Math.random() * chapterCount) + 1
+
+      // 5. Cargar capítulo + elegir versículo al azar
+      const chapterData = await getChapter(book.index, randomChapter, versionId)
+      if (!chapterData || !chapterData.verses || chapterData.verses.length === 0) {
+        setError('El capítulo sorteado está vacío, prueba otra vez')
+        setLoading(false); return
       }
-      const verses = chapterData.verses
-      const v = verses[Math.floor(Math.random() * verses.length)]
+
+      const v = chapterData.verses[Math.floor(Math.random() * chapterData.verses.length)]
       const result = {
         text: v.text,
         reference: `${chapterData.bookName} ${chapterData.chapterNum}:${v.verseNum}`,
         type: 'bible',
       }
       setCurrent(result)
-      setHistory(h => [result, ...h].slice(0, 5))
+      setHistory(h => [result, ...h.filter(x => x.reference !== result.reference)].slice(0, 5))
+    } catch (e) {
+      console.error('[verse-random]', e)
+      setError(`Error al sortear: ${e?.message || e}`)
     } finally {
       setLoading(false)
     }
@@ -343,8 +345,9 @@ function VerseRandomWidget() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <div className="field">
             <span className="label">Versión</span>
-            <select className="field-input" value={versionId} onChange={e => setVersionId(e.target.value)}>
-              {versions.map(v => <option key={v.id} value={v.id}>{v.short} — {v.name}</option>)}
+            <select className="field-input" value={versionId}
+              onChange={e => setVersionId(e.target.value)}>
+              {localVersions.map(v => <option key={v.id} value={v.id}>{v.short} — {v.name}</option>)}
             </select>
           </div>
           <div className="field">
@@ -354,7 +357,18 @@ function VerseRandomWidget() {
             </select>
           </div>
         </div>
+        <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>
+          {booksLoading
+            ? 'Cargando libros…'
+            : `${books.length} libros disponibles en esta versión`}
+        </p>
       </div>
+
+      {error && (
+        <div className="card" style={{ padding: 14, background: 'rgba(244,184,64,0.08)', borderColor: 'rgba(244,184,64,0.35)' }}>
+          <p style={{ fontSize: 13, color: 'var(--preview)', margin: 0 }}>⚠️ {error}</p>
+        </div>
+      )}
 
       <div className="card" style={{ padding: 28, minHeight: 180 }}>
         {!current ? (
@@ -376,8 +390,8 @@ function VerseRandomWidget() {
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" onClick={draw} disabled={loading} style={{ flex: 1 }}>
-          🎲 {loading ? 'Sorteando...' : current ? 'Otro versículo' : 'Sortear'}
+        <button className="btn btn-primary" onClick={draw} disabled={loading || booksLoading} style={{ flex: 1 }}>
+          🎲 {loading ? 'Sorteando…' : booksLoading ? 'Cargando…' : current ? 'Otro versículo' : 'Sortear'}
         </button>
         <button className="btn" disabled={!current}
           onClick={() => current && selectSlide(current)}>
@@ -402,7 +416,7 @@ function VerseRandomWidget() {
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: 'var(--copper-200)', fontFamily: 'var(--font-mono)', fontSize: 10,
                 letterSpacing: '0.1em', marginRight: 8 }}>{v.reference}</span>
-              {v.text.slice(0, 80)}{v.text.length > 80 && '...'}
+              {v.text.slice(0, 80)}{v.text.length > 80 && '…'}
             </button>
           ))}
         </div>
@@ -430,7 +444,6 @@ function WheelWidget() {
     setWinner(null)
     setHighlightIdx(0)
 
-    // Animación: ir resaltando uno a uno, cada vez más lento
     let speed = 60
     let totalIters = 30 + Math.floor(Math.random() * 20)
     let count = 0
@@ -482,7 +495,6 @@ function WheelWidget() {
         </label>
       </div>
 
-      {/* Lista visual de candidatos con el highlight */}
       <div className="card" style={{ padding: 18, minHeight: 180 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
           {names.map((n, i) => {
@@ -514,7 +526,7 @@ function WheelWidget() {
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-primary" onClick={spin} disabled={names.length < 2 || spinning} style={{ flex: 1 }}>
-          {spinning ? 'Girando...' : '🎡 Girar ruleta'}
+          {spinning ? 'Girando…' : '🎡 Girar ruleta'}
         </button>
         <button className="btn" disabled={!winner || spinning}
           onClick={() => winner && selectSlide({
@@ -532,11 +544,12 @@ function WheelWidget() {
 // ============================================================
 // HELPERS
 // ============================================================
-function NumberField({ label, value, onChange, min = 0, max = 99 }) {
+function NumberField({ label, value, onChange, min = 0, max = 99, disabled }) {
   return (
     <div className="field">
       <span className="label">{label}</span>
       <input type="number" min={min} max={max} value={value}
+        disabled={disabled}
         onChange={e => {
           let v = parseInt(e.target.value || '0', 10)
           if (isNaN(v)) v = 0
