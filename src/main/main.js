@@ -1,11 +1,51 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, protocol } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, nativeImage } = require('electron')
 const path = require('path')
 const fs = require('fs')
 
+// === APP USER MODEL ID (Windows) ===
+// MUY IMPORTANTE: setAppUserModelId DEBE llamarse antes de cualquier ventana.
+// Sin esto, Windows agrupa la app bajo el AUMID por defecto de Electron y
+// usa el icono de Electron en la barra de tareas, ignorando nuestro icon.ico.
+// Lo ponemos al inicio del módulo, no en createMainWindow.
+if (process.platform === 'win32') {
+  try {
+    app.setAppUserModelId('com.eclesiapresenter.app')
+  } catch (e) {
+    console.warn('[main] setAppUserModelId failed:', e?.message)
+  }
+}
+
 // Quitar la barra de menú nativa (File / Edit / View / Window / Help).
-// Nuestra app no la necesita — toda la navegación está en la sidebar y los
-// shortcuts de teclado (Ctrl+M abre el Command Palette).
 Menu.setApplicationMenu(null)
+
+// === ICON PATH RESOLVER (con logging detallado) ===
+// Intenta múltiples ubicaciones en orden hasta encontrar una válida.
+// Logueamos a stderr para que aparezca en electron logs del usuario en caso
+// de que el icono no aparezca y queramos diagnosticar.
+function resolveAppIcon() {
+  const candidates = []
+  if (app.isPackaged) {
+    // Producción (NSIS install o portable): extraResources copia a resources/
+    candidates.push(path.join(process.resourcesPath, 'icon.ico'))
+    candidates.push(path.join(process.resourcesPath, 'icon.png'))
+    // Fallback inesperado: junto al ejecutable
+    candidates.push(path.join(path.dirname(app.getPath('exe')), 'icon.ico'))
+  } else {
+    // Dev
+    candidates.push(path.join(__dirname, '../../build/icon.ico'))
+    candidates.push(path.join(__dirname, '../../build/icon.png'))
+  }
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        console.log('[main] Using app icon:', p)
+        return p
+      }
+    } catch {}
+  }
+  console.warn('[main] No app icon found. Tried:', candidates)
+  return null
+}
 
 // Sentry — solo si está configurado y NO en dev (evita ruido durante npm run dev)
 // El DSN se inyecta en build vía electron-builder. Si falta, Sentry queda inactivo.
@@ -43,20 +83,20 @@ const isDev = !app.isPackaged
 let mainWindow = null
 
 function createMainWindow() {
-  // Resolver el path del icono según si estamos empaquetados o en dev.
-  // - Producción: el .ico va en resources/ (configurado en build.extraResources)
-  //   → path = process.resourcesPath + 'icon.ico'
-  // - Dev: leemos directamente de build/icon.ico
-  const iconPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'icon.ico')
-    : path.join(__dirname, '../../build/icon.ico')
-  const iconExists = (() => { try { return fs.existsSync(iconPath) } catch { return false } })()
-
-  // En Windows, además de pasar icon a BrowserWindow, conviene setear el
-  // AppUserModelID para que Windows agrupe correctamente y use nuestro icono
-  // en la barra de tareas (no el de Electron por defecto).
-  if (process.platform === 'win32') {
-    try { app.setAppUserModelId('com.eclesiapresenter.app') } catch {}
+  const iconPath = resolveAppIcon()
+  // Cargar como nativeImage (mejor que pasar path crudo — Electron a veces
+  // tiene problemas leyendo .ico desde paths con espacios o caracteres especiales)
+  let appIcon = null
+  if (iconPath) {
+    try {
+      appIcon = nativeImage.createFromPath(iconPath)
+      if (appIcon.isEmpty()) {
+        console.warn('[main] nativeImage empty from', iconPath)
+        appIcon = null
+      }
+    } catch (e) {
+      console.warn('[main] Failed to load icon:', e?.message)
+    }
   }
 
   mainWindow = new BrowserWindow({
@@ -78,7 +118,7 @@ function createMainWindow() {
       symbolColor: '#c9b29c', // color de los botones min/max/cerrar (ink-2)
       height: 32,
     },
-    ...(iconExists ? { icon: iconPath } : {}),
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -86,8 +126,13 @@ function createMainWindow() {
     },
   })
 
-  // Belt-and-suspenders: además de la setApplicationMenu(null) global,
-  // ocultamos la menubar específica de esta ventana
+  // Belt-and-suspenders: además del icon: en el constructor, llamamos
+  // setIcon() después. Esto FUERZA a Windows a actualizar el icono de la
+  // barra de tareas inmediatamente.
+  if (appIcon) {
+    try { mainWindow.setIcon(appIcon) } catch (e) { console.warn('[main] setIcon failed:', e?.message) }
+  }
+
   mainWindow.setMenuBarVisibility(false)
 
   // Arrancar maximizada (ocupa el área visible respetando la barra de tareas).
