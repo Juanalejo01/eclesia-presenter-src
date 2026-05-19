@@ -29,25 +29,33 @@ export default function Topbar({ onSettingsChange, onOpenSettings }) {
     }
   }
 
+  // -webkit-app-region: drag → toda la header es zona arrastrable de la ventana
+  // (como en Discord o VS Code). Los botones/links interactivos llevan
+  // no-drag para que sigan clickables.
+  const dragStyle = { WebkitAppRegion: 'drag' }
+  const noDragStyle = { WebkitAppRegion: 'no-drag' }
+
+  // Padding-right para dejar hueco a los botones de Windows (min/max/cerrar)
+  // que ahora se dibujan en overlay sobre la app por titleBarOverlay (~138px en Win11).
   return (
     <>
-      <header className="header">
-        <div className="brand">
+      <header className="header" style={{ ...dragStyle, paddingRight: 152 }}>
+        <div className="brand" style={noDragStyle}>
           <div className="brand-mark"><LogoMonogram size={28} /></div>
           <div className="brand-name">Eclesia<em>Presenter</em></div>
           <span className="brand-version">v 0.2</span>
         </div>
 
         <div className="header-status">
-          <span className="status-pill">
+          <span className="status-pill" style={noDragStyle}>
             <span className={'dot ' + (projectorOn ? '' : 'off')} />
             {projectorOn ? t('topbar.connected') : t('topbar.disconnected')}
           </span>
-          <span className="timecode">{time}</span>
+          <span className="timecode" style={noDragStyle}>{time}</span>
           <span style={{ flex: 1 }} />
         </div>
 
-        <div className="header-actions">
+        <div className="header-actions" style={noDragStyle}>
           <button className="btn" onClick={() => onOpenSettings?.()} title={t('topbar.settings') + ' (Ctrl+A)'}>
             <IconSettings size={14} /> {t('topbar.settings')}
           </button>

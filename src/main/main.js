@@ -1,6 +1,11 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol } = require('electron')
 const path = require('path')
 const fs = require('fs')
+
+// Quitar la barra de menú nativa (File / Edit / View / Window / Help).
+// Nuestra app no la necesita — toda la navegación está en la sidebar y los
+// shortcuts de teclado (Ctrl+M abre el Command Palette).
+Menu.setApplicationMenu(null)
 
 // Sentry — solo si está configurado y NO en dev (evita ruido durante npm run dev)
 // El DSN se inyecta en build vía electron-builder. Si falta, Sentry queda inactivo.
@@ -52,6 +57,17 @@ function createMainWindow() {
     minHeight: 600,
     show: false,  // no mostrar hasta que esté maximizada (evita "salto" visible)
     title: 'EclesiaPresenter',
+    autoHideMenuBar: true,  // por si Menu.setApplicationMenu(null) no aplica en algún caso
+    backgroundColor: '#14100d',  // fondo oscuro coincidente con el tema, evita flash blanco al cargar
+    // Barra de título nativa estilo Windows 11 pero coloreada con la paleta
+    // del brand (cobre/marrón oscuro). Solo se aplica en Win 11+. En versiones
+    // antiguas cae al título nativo normal sin romper.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#14100d',       // fondo de la barra (mismo que bg-1)
+      symbolColor: '#c9b29c', // color de los botones min/max/cerrar (ink-2)
+      height: 32,
+    },
     ...(iconExists ? { icon: iconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -59,6 +75,10 @@ function createMainWindow() {
       nodeIntegration: false,
     },
   })
+
+  // Belt-and-suspenders: además de la setApplicationMenu(null) global,
+  // ocultamos la menubar específica de esta ventana
+  mainWindow.setMenuBarVisibility(false)
 
   // Arrancar maximizada (ocupa el área visible respetando la barra de tareas).
   // No usamos fullscreen (que oculta la barra de tareas) — esto se siente
