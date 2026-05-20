@@ -60,11 +60,16 @@ jobs:
           npm cache clean --force || true
 
       - name: Install dependencies (no scripts, fresh)
+        # set +o pipefail: macOS exit-1 con 'ls | head' por SIGPIPE/Broken pipe.
+        # GitHub Actions runner usa bash -eo pipefail por defecto y `head` cierra
+        # el pipe antes de que `ls` termine, lo que rompe el step aunque el
+        # npm install haya funcionado perfectamente.
         shell: bash
         run: |
+          set +o pipefail
           npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts 2>&1 | tee install.log
           echo "--- Install completed. Top of node_modules: ---"
-          ls -la node_modules/ | head -25
+          ls -la node_modules/ 2>/dev/null | head -25 || true
         env:
           CI: 'true'
 

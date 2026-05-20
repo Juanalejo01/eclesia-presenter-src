@@ -8,10 +8,11 @@ out/
 
 # Recursos de build (icons, etc.) NO se ignoran — son source files.
 # electron-builder los usa como input desde build/icon.ico, build/icon.png, etc.
-# Las imágenes PNG generadas a partir del SVG sí se ignoran para no inflar el repo.
+# Las imágenes PNG numeradas intermedias (icon-16.png, icon-32.png, …) SÍ se
+# ignoran porque son outputs regenerables del script npm run icon.
+# Pero icon.ico y icon.png deben estar versionados para que el workflow de
+# release.yml los encuentre (no corremos npm run icon en CI).
 build/icon-*.png
-build/icon.png
-build/icon.ico
 
 # Next.js (web/) — siempre se ignora
 web/.next/
