@@ -24,6 +24,7 @@
   "dependencies": {
     "@sentry/electron": "^5.10.0",
     "better-sqlite3": "^11.10.0",
+    "electron-updater": "^6.8.3",
     "express": "^4.18.3",
     "socket.io": "^4.7.4",
     "socket.io-client": "^4.7.4"
@@ -127,6 +128,13 @@
       "category": "AudioVideo",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
-    "publish": null
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Juanalejo01",
+        "repo": "eclesia-presenter",
+        "releaseType": "release"
+      }
+    ]
   }
 }

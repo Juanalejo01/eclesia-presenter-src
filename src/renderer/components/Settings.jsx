@@ -878,9 +878,65 @@ function SectionApiBible({ onUpdate }) {
 // ---------- ACERCA DE ----------
 function SectionAcerca() {
   const [info, setInfo] = useState(null)
+  const [upd, setUpd] = useState(null)
+  const [checking, setChecking] = useState(false)
+  const [lastCheckMsg, setLastCheckMsg] = useState('')
+
   useEffect(() => {
     if (window.electron?.app) window.electron.app.info().then(setInfo)
+    if (window.electron?.updater) {
+      window.electron.updater.state().then(setUpd)
+      const off1 = window.electron.updater.onChecking(() => { setChecking(true); setLastCheckMsg('Buscando actualizaciones…') })
+      const off2 = window.electron.updater.onAvailable((d) => {
+        setChecking(false)
+        setLastCheckMsg(`Hay una versión nueva: v${d.version}`)
+        setUpd(prev => ({ ...prev, available: d }))
+      })
+      const off3 = window.electron.updater.onNotAvailable((d) => {
+        setChecking(false)
+        setLastCheckMsg(`Ya estás en la última versión (v${d?.version || ''}).`)
+      })
+      const off4 = window.electron.updater.onDownloadProgress((p) => {
+        setUpd(prev => ({ ...prev, downloading: true, downloadProgress: p }))
+      })
+      const off5 = window.electron.updater.onDownloaded((d) => {
+        setUpd(prev => ({ ...prev, downloading: false, downloaded: true, available: d }))
+      })
+      const off6 = window.electron.updater.onError((e) => {
+        setChecking(false)
+        setLastCheckMsg(`Error: ${e?.error || 'desconocido'}`)
+      })
+      return () => { off1(); off2(); off3(); off4(); off5(); off6() }
+    }
   }, [])
+
+  const handleCheck = async () => {
+    setChecking(true)
+    setLastCheckMsg('Buscando…')
+    const res = await window.electron.updater.check()
+    if (!res.ok) {
+      setChecking(false)
+      const friendly = {
+        dev_mode: 'En modo desarrollo no se chequea (solo en .exe instalado).',
+      }[res.error] || `No se pudo comprobar: ${res.error}`
+      setLastCheckMsg(friendly)
+    }
+  }
+
+  const handleDownload = async () => {
+    const res = await window.electron.updater.download()
+    if (!res.ok && res.error === 'portable_no_download') {
+      setLastCheckMsg('La versión portable no se actualiza automáticamente. Descarga la nueva desde GitHub.')
+    }
+  }
+
+  const handleInstall = () => window.electron.updater.install()
+
+  const isPortable = upd?.isPortable
+  const hasUpdate = !!upd?.available && upd.available.version !== upd.currentVersion
+  const isDownloading = !!upd?.downloading
+  const isDownloaded = !!upd?.downloaded
+  const dp = upd?.downloadProgress
 
   return (
     <div>
@@ -891,10 +947,14 @@ function SectionAcerca() {
         Software de presentación para iglesias.
       </p>
 
-      <div className="card" style={{ padding: 18, fontSize: 13, lineHeight: 1.8 }}>
+      {/* Card: info de versión */}
+      <div className="card" style={{ padding: 18, fontSize: 13, lineHeight: 1.8, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
           <span style={{ color: 'var(--text-3)' }}>Versión</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-1)' }}>{info?.version || '0.2.0'}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-1)' }}>
+            {info?.version || upd?.currentVersion || '0.2.0'}
+            {isPortable && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)' }}>(portable)</span>}
+          </span>
           <span style={{ color: 'var(--text-3)' }}>Datos del usuario</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-2)' }}>{info?.userData || '...'}</span>
           <span style={{ color: 'var(--text-3)' }}>Repositorio</span>
@@ -905,6 +965,99 @@ function SectionAcerca() {
           <span style={{ color: 'var(--text-3)' }}>Licencia</span>
           <span>MIT</span>
         </div>
+      </div>
+
+      {/* Card: actualizaciones */}
+      <div className="card" style={{ padding: 18 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 4px' }}>
+          Actualizaciones
+        </h3>
+        <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 14px' }}>
+          {isPortable
+            ? 'Las versiones portables no se actualizan solas — te avisamos cuándo hay versión nueva.'
+            : 'Las actualizaciones se buscan automáticamente al arrancar. Puedes forzar una comprobación.'}
+        </p>
+
+        {!hasUpdate && !isDownloaded && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleCheck}
+              disabled={checking}
+              style={{ fontSize: 12 }}>
+              {checking ? 'Comprobando…' : 'Buscar actualizaciones'}
+            </button>
+            {lastCheckMsg && (
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{lastCheckMsg}</span>
+            )}
+          </div>
+        )}
+
+        {hasUpdate && !isDownloading && !isDownloaded && (
+          <div style={{
+            padding: 12, borderRadius: 8,
+            background: 'rgba(217, 159, 117, 0.08)',
+            border: '1px solid rgba(217, 159, 117, 0.3)',
+          }}>
+            <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 4 }}>
+              <strong style={{ color: 'var(--copper-100)' }}>Nueva versión disponible:</strong>{' '}
+              v{upd.available.version}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 10 }}>
+              Tu versión actual: v{upd.currentVersion}
+            </div>
+            {isPortable ? (
+              <a
+                href={`https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v${upd.available.version}`}
+                target="_blank" rel="noreferrer"
+                className="btn btn-primary"
+                style={{ fontSize: 12, textDecoration: 'none' }}>
+                Descargar desde GitHub →
+              </a>
+            ) : (
+              <button className="btn btn-primary" onClick={handleDownload} style={{ fontSize: 12 }}>
+                Descargar e instalar
+              </button>
+            )}
+          </div>
+        )}
+
+        {isDownloading && dp && (
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 6 }}>
+              Descargando v{upd.available?.version}… {Math.round(dp.percent || 0)}%
+            </div>
+            <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${dp.percent || 0}%`,
+                background: 'linear-gradient(90deg, var(--copper-200), var(--copper-300))',
+                transition: 'width 0.2s',
+              }} />
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+              {((dp.transferred || 0) / 1024 / 1024).toFixed(1)} / {((dp.total || 0) / 1024 / 1024).toFixed(1)} MB
+              {dp.bytesPerSecond > 0 && ` · ${((dp.bytesPerSecond || 0) / 1024 / 1024).toFixed(1)} MB/s`}
+            </div>
+          </div>
+        )}
+
+        {isDownloaded && (
+          <div style={{
+            padding: 12, borderRadius: 8,
+            background: 'rgba(107, 207, 142, 0.08)',
+            border: '1px solid rgba(107, 207, 142, 0.3)',
+          }}>
+            <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8 }}>
+              ✓ Descargada v{upd.available?.version} — lista para instalar.
+            </div>
+            <button className="btn btn-primary" onClick={handleInstall} style={{ fontSize: 12 }}>
+              Reiniciar e instalar
+            </button>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '8px 0 0' }}>
+              La app se cerrará y se instalará la nueva versión. Tus datos se mantienen.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

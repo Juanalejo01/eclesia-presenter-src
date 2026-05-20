@@ -164,6 +164,8 @@ jobs:
             dist-electron/*.exe
             dist-electron/*.dmg
             dist-electron/*.zip
+            dist-electron/*.blockmap
+            dist-electron/latest*.yml
           fail_on_unmatched_files: false
           generate_release_notes: false
           draft: false

@@ -84,6 +84,20 @@ contextBridge.exposeInMainWorld('electron', {
     onError: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:error', h); return () => ipcRenderer.removeListener('cloud-sync:error', h) },
   },
 
+  // Auto-updater (electron-updater + GitHub Releases)
+  updater: {
+    state:    ()  => ipcRenderer.invoke('updater:state'),
+    check:    ()  => ipcRenderer.invoke('updater:check'),
+    download: ()  => ipcRenderer.invoke('updater:download'),
+    install:  ()  => ipcRenderer.invoke('updater:install'),
+    onChecking:        (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('updater:checking',        h); return () => ipcRenderer.removeListener('updater:checking', h) },
+    onAvailable:       (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('updater:available',       h); return () => ipcRenderer.removeListener('updater:available', h) },
+    onNotAvailable:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('updater:not-available',   h); return () => ipcRenderer.removeListener('updater:not-available', h) },
+    onDownloadProgress:(cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('updater:download-progress', h); return () => ipcRenderer.removeListener('updater:download-progress', h) },
+    onDownloaded:      (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('updater:downloaded',      h); return () => ipcRenderer.removeListener('updater:downloaded', h) },
+    onError:           (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('updater:error',           h); return () => ipcRenderer.removeListener('updater:error', h) },
+  },
+
   // Biblioteca de fondos preset (CC0 worship videos descargables)
   bglib: {
     state:     ()    => ipcRenderer.invoke('bglib:state'),

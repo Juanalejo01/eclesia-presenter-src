@@ -77,6 +77,7 @@ const projection = require('./projection')
 const license = require('./license')
 const cloudSync = require('./cloudSync')
 const backgroundLibrary = require('./backgroundLibrary')
+const autoUpdater = require('./autoUpdater')
 
 // app.isPackaged es true cuando se ejecuta el .exe instalado, false en `npm run dev`.
 // Es más fiable que NODE_ENV porque electron-builder no setea esa variable automáticamente.
@@ -570,7 +571,15 @@ app.whenReady().then(() => {
   // Una vez la ventana existe, dar a los servicios una referencia para emitir eventos
   cloudSync.setMainWindow(mainWindow)
   backgroundLibrary.setMainWindow(mainWindow)
+  autoUpdater.setMainWindow(mainWindow)
+  autoUpdater.init()  // arranca check inicial 30s después
 })
+
+// --------- Auto-updater IPC ---------
+ipcMain.handle('updater:state',    ()  => autoUpdater.getState())
+ipcMain.handle('updater:check',    ()  => autoUpdater.checkForUpdates())
+ipcMain.handle('updater:download', ()  => autoUpdater.downloadUpdate())
+ipcMain.handle('updater:install',  ()  => autoUpdater.quitAndInstall())
 
 // Refrescar la lista de canciones del server cada vez que se cree/edite/borre.
 // Es barato: la query es ~ms y los push solo afectan a clientes móviles conectados.
