@@ -73,7 +73,8 @@
         }
       ],
       "icon": "build/icon.ico",
-      "signAndEditExecutable": false
+      "signingHashAlgorithms": null,
+      "publisherName": "EclesiaPresenter"
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
