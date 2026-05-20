@@ -23,7 +23,7 @@
 
 <div align="center">
   <img src="docs/screenshots/hero.png" alt="EclesiaPresenter — panel de Biblia con Salmos 37:25 proyectándose al monitor PGM ON AIR" width="900" />
-  <p><em>Salmos 37:25 al aire desde el panel de Biblia. El monitor PGM de la derecha muestra exactamente lo que ve la congregación.</em></p>
+  <p><em>Hebreos 1:10 al aire desde el panel de Biblia. El monitor PGM de la derecha muestra exactamente lo que ve la congregación.</em></p>
 </div>
 
 ---
