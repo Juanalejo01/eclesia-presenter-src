@@ -607,8 +607,137 @@ function SectionCanciones({ onUpdate }) {
           configuración de auto-split. Es un formato legible — puedes abrirlo en cualquier editor de texto.
         </p>
       </div>
+
+      {/* Cloud Sync (Pro) */}
+      <CloudSyncSection onUpdate={onUpdate} />
     </div>
   )
+}
+
+// ============================================================
+// Cloud Sync — sincronización de canciones entre PCs (Pro feature)
+// ============================================================
+function CloudSyncSection({ onUpdate }) {
+  const [state, setState] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [lastResult, setLastResult] = useState(null)
+
+  const refresh = async () => {
+    if (!window.electron?.cloudSync) return
+    setState(await window.electron.cloudSync.state())
+  }
+
+  useEffect(() => {
+    refresh()
+    if (!window.electron?.cloudSync) return
+    const off1 = window.electron.cloudSync.onStart(() => setSyncing(true))
+    const off2 = window.electron.cloudSync.onOk((d) => {
+      setSyncing(false)
+      setLastResult({ ok: true, ...d })
+      refresh()
+      onUpdate?.()  // refrescar lista de canciones en SongsPanel
+    })
+    const off3 = window.electron.cloudSync.onError((d) => {
+      setSyncing(false)
+      setLastResult({ ok: false, error: d.error })
+      refresh()
+    })
+    return () => { off1(); off2(); off3() }
+  }, [])
+
+  if (!state) return null
+
+  // Verificar licencia Pro
+  const license = window.__cachedLicense || null  // best-effort
+  const handleToggle = async (e) => {
+    await window.electron.cloudSync.setEnabled(e.target.checked)
+    refresh()
+  }
+  const handleSyncNow = async () => {
+    setLastResult(null)
+    await window.electron.cloudSync.syncNow()
+    // El handler de onOk/onError actualizará state
+  }
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 6px' }}>
+        Sincronización en la nube <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999,
+          background: 'linear-gradient(180deg, rgba(232,181,145,0.30), rgba(168,95,51,0.15))',
+          color: 'var(--copper-100)', fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 700,
+          border: '1px solid rgba(232,181,145,0.25)', marginLeft: 8,
+        }}>PRO</span>
+      </h2>
+      <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 18px' }}>
+        Mantén tus canciones sincronizadas entre todos tus PCs. Cuando creas o editas una canción
+        aquí, en los demás PCs aparece automáticamente al siguiente sync (cada 5 min, o pulsa
+        "Sincronizar ahora" para forzar).
+      </p>
+
+      <div className="card" style={{ padding: 18 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!state.enabled} onChange={handleToggle}
+            style={{ width: 18, height: 18, accentColor: 'var(--copper-200)' }} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
+              Activar sincronización automática
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              Sube cada cambio + descarga los de otros PCs cada 5 minutos
+            </div>
+          </div>
+        </label>
+
+        <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button className="btn btn-primary" onClick={handleSyncNow} disabled={syncing}>
+            {syncing ? 'Sincronizando…' : '↻ Sincronizar ahora'}
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            {state.lastSyncAt
+              ? `último sync: ${new Date(state.lastSyncAt).toLocaleTimeString('es-ES')}`
+              : 'sin sync todavía'}
+          </span>
+        </div>
+
+        {lastResult && (
+          <div style={{
+            marginTop: 14, padding: 12, borderRadius: 8, fontSize: 12,
+            background: lastResult.ok ? 'rgba(107, 207, 142, 0.08)' : 'rgba(255, 61, 61, 0.08)',
+            border: '1px solid ' + (lastResult.ok ? 'rgba(107, 207, 142, 0.3)' : 'rgba(255, 61, 61, 0.3)'),
+            color: lastResult.ok ? 'var(--ready)' : 'var(--live)',
+          }}>
+            {lastResult.ok
+              ? `✓ Sync OK · ${lastResult.stats?.inserted || 0} nuevas, ${lastResult.stats?.updated || 0} actualizadas, ${lastResult.stats?.deleted || 0} borradas`
+              : `✕ Error: ${translateCloudSyncError(lastResult.error)}`}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 14, marginTop: 14, fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6 }}>
+        <p style={{ margin: '0 0 6px', fontWeight: 600, color: 'var(--text-2)' }}>Cómo funciona</p>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>Las canciones se guardan en tu cuenta cloud (Supabase) cifradas en tránsito (HTTPS).</li>
+          <li>Resolución de conflictos: la versión más reciente gana (timestamp <code>updated_at</code>).</li>
+          <li>Si borras una canción en un PC, también se borra en los demás al siguiente sync.</li>
+          <li>El sync funciona en background sin interrumpir tu uso.</li>
+          <li>Requiere licencia Pro activa (Mensual, Anual o Lifetime).</li>
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function translateCloudSyncError(code) {
+  switch (code) {
+    case 'no_license':       return 'Necesitas tener una licencia Pro activa en este PC'
+    case 'requires_pro':     return 'La sincronización requiere plan Pro'
+    case 'licencia_invalida': return 'Tu licencia no se pudo validar'
+    case 'licencia_expirada': return 'Tu suscripción Pro ha expirado'
+    case 'rate_limit':       return 'Demasiadas peticiones, espera un momento'
+    case 'server_error':     return 'Error del servidor — reintenta en unos segundos'
+    default:                 return code || 'Error desconocido'
+  }
 }
 
 // ---------- API BIBLE (heredado del Settings antiguo) ----------

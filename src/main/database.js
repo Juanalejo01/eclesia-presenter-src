@@ -25,13 +25,39 @@ function init() {
       tempo INTEGER,
       tags TEXT,
       sections TEXT NOT NULL DEFAULT '[]',
+      max_lines INTEGER DEFAULT 4,
       is_favorite INTEGER NOT NULL DEFAULT 0,
+      cloud_id TEXT,                                                 -- uuid en cloud_songs si está sincronizada
+      cloud_synced_at INTEGER,                                       -- ms del último sync exitoso
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
       updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
     );
 
     CREATE INDEX IF NOT EXISTS idx_songs_title ON songs(title);
     CREATE INDEX IF NOT EXISTS idx_songs_favorite ON songs(is_favorite);
+
+    -- Tabla de tombstones: cuando borramos una canción que ya estaba en cloud,
+    -- guardamos el cloud_id para enviarlo al próximo sync (soft delete remoto).
+    CREATE TABLE IF NOT EXISTS songs_tombstones (
+      cloud_id TEXT PRIMARY KEY,
+      deleted_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+    );`)
+
+  // Migraciones de columnas en songs (para usuarios con DB anterior a v0.5).
+  // SQLite no tiene ADD COLUMN IF NOT EXISTS, así que pragma_table_info lo verificamos.
+  const songsCols = db.prepare("PRAGMA table_info(songs)").all().map(c => c.name)
+  if (!songsCols.includes('cloud_id')) {
+    try { db.exec(`ALTER TABLE songs ADD COLUMN cloud_id TEXT`) } catch (e) { console.warn('migration cloud_id:', e.message) }
+  }
+  if (!songsCols.includes('cloud_synced_at')) {
+    try { db.exec(`ALTER TABLE songs ADD COLUMN cloud_synced_at INTEGER`) } catch (e) { console.warn('migration cloud_synced_at:', e.message) }
+  }
+  if (!songsCols.includes('max_lines')) {
+    try { db.exec(`ALTER TABLE songs ADD COLUMN max_lines INTEGER DEFAULT 4`) } catch (e) { console.warn('migration max_lines:', e.message) }
+  }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_songs_cloud ON songs(cloud_id);
 
     CREATE TABLE IF NOT EXISTS media (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,13 +216,145 @@ function updateSong(id, data) {
 }
 
 function deleteSong(id) {
+  // Si la canción estaba en cloud, registrar tombstone para que el próximo
+  // sync propague el delete a todos los demás PCs del usuario.
+  const row = db.prepare('SELECT cloud_id FROM songs WHERE id = ?').get(id)
+  if (row?.cloud_id) {
+    db.prepare(`
+      INSERT OR REPLACE INTO songs_tombstones (cloud_id, deleted_at)
+      VALUES (?, ?)
+    `).run(row.cloud_id, Date.now())
+  }
   db.prepare('DELETE FROM songs WHERE id = ?').run(id)
   return { deleted: true, id }
 }
 
 function toggleFavorite(id) {
-  db.prepare('UPDATE songs SET is_favorite = 1 - is_favorite WHERE id = ?').run(id)
+  db.prepare('UPDATE songs SET is_favorite = 1 - is_favorite, updated_at = ? WHERE id = ?')
+    .run(Date.now(), id)
   return getSong(id)
+}
+
+// --------- Cloud sync helpers ---------
+
+/** Lista todas las canciones más sus tombstones para enviar al server en sync. */
+function getSyncPayload() {
+  const songs = db.prepare(`
+    SELECT id, cloud_id, title, author, tags, key_signature, tempo, sections,
+           max_lines, is_favorite, updated_at
+    FROM songs
+  `).all().map(s => ({
+    local_key: `local-${s.id}`,
+    cloud_id: s.cloud_id || null,
+    title: s.title,
+    author: s.author,
+    tags: s.tags,
+    key_signature: s.key_signature,
+    tempo: s.tempo,
+    sections: JSON.parse(s.sections || '[]'),
+    max_lines: s.max_lines || 4,
+    is_favorite: !!s.is_favorite,
+    updated_at: s.updated_at,
+    deleted: false,
+  }))
+  const tombstones = db.prepare(`
+    SELECT cloud_id, deleted_at FROM songs_tombstones
+  `).all().map(t => ({
+    cloud_id: t.cloud_id,
+    updated_at: t.deleted_at,
+    deleted: true,
+  }))
+  return [...songs, ...tombstones]
+}
+
+/** Aplica el resultado del sync al SQLite local. */
+function applySyncResult({ remote, mapping }) {
+  const stats = { inserted: 0, updated: 0, deleted: 0 }
+  const tx = db.transaction(() => {
+    // 1. Aplicar mapping: para cada local song que el server insertó, guardar su cloud_id
+    for (const [localKey, cloudId] of Object.entries(mapping || {})) {
+      const m = localKey.match(/^local-(\d+)$/)
+      if (!m) continue
+      db.prepare('UPDATE songs SET cloud_id = ?, cloud_synced_at = ? WHERE id = ?')
+        .run(cloudId, Date.now(), parseInt(m[1], 10))
+    }
+
+    // 2. Procesar remote: insertar / actualizar / borrar
+    for (const r of remote || []) {
+      if (r.deleted) {
+        // Cloud dice que esta fila está borrada. Borrar localmente si existe.
+        const local = db.prepare('SELECT id FROM songs WHERE cloud_id = ?').get(r.cloud_id)
+        if (local) {
+          db.prepare('DELETE FROM songs WHERE id = ?').run(local.id)
+          stats.deleted++
+        }
+        // Limpiar tombstone si lo teníamos (ya está sincronizado)
+        db.prepare('DELETE FROM songs_tombstones WHERE cloud_id = ?').run(r.cloud_id)
+        continue
+      }
+
+      // ¿Ya tenemos esta canción local?
+      const local = db.prepare('SELECT id, updated_at FROM songs WHERE cloud_id = ?').get(r.cloud_id)
+      if (local) {
+        // Solo actualizar si la versión del cloud es más reciente
+        if (r.updated_at > local.updated_at) {
+          db.prepare(`
+            UPDATE songs SET
+              title = @title, author = @author, tags = @tags,
+              key_signature = @key_signature, tempo = @tempo,
+              sections = @sections, max_lines = @max_lines,
+              is_favorite = @is_favorite,
+              updated_at = @updated_at,
+              cloud_synced_at = @synced
+            WHERE id = @id
+          `).run({
+            id: local.id,
+            title: r.title,
+            author: r.author || null,
+            tags: r.tags || null,
+            key_signature: r.key_signature || null,
+            tempo: r.tempo || null,
+            sections: JSON.stringify(r.sections || []),
+            max_lines: r.max_lines || 4,
+            is_favorite: r.is_favorite ? 1 : 0,
+            updated_at: r.updated_at,
+            synced: Date.now(),
+          })
+          stats.updated++
+        }
+      } else {
+        // Nueva canción de otro PC, insertar
+        db.prepare(`
+          INSERT INTO songs (
+            title, author, tags, key_signature, tempo, sections, max_lines,
+            is_favorite, cloud_id, cloud_synced_at, created_at, updated_at
+          ) VALUES (
+            @title, @author, @tags, @key_signature, @tempo, @sections, @max_lines,
+            @is_favorite, @cloud_id, @synced, @created, @updated
+          )
+        `).run({
+          title: r.title,
+          author: r.author || null,
+          tags: r.tags || null,
+          key_signature: r.key_signature || null,
+          tempo: r.tempo || null,
+          sections: JSON.stringify(r.sections || []),
+          max_lines: r.max_lines || 4,
+          is_favorite: r.is_favorite ? 1 : 0,
+          cloud_id: r.cloud_id,
+          synced: Date.now(),
+          created: r.updated_at,
+          updated: r.updated_at,
+        })
+        stats.inserted++
+      }
+    }
+
+    // 3. Limpiar tombstones que el server ya procesó (ahora aparecen en remote con deleted)
+    // Esto ya se hizo arriba dentro del loop.
+  })
+  tx()
+  return stats
 }
 
 // --------- Media ---------
@@ -229,5 +387,6 @@ function deleteMedia(id) {
 module.exports = {
   init,
   listSongs, getSong, createSong, updateSong, deleteSong, toggleFavorite,
+  getSyncPayload, applySyncResult,
   listMedia, addMedia, deleteMedia,
 }

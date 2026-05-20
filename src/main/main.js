@@ -75,6 +75,7 @@ const { startServer } = require('../server/server')
 const db = require('./database')
 const projection = require('./projection')
 const license = require('./license')
+const cloudSync = require('./cloudSync')
 
 // app.isPackaged es true cuando se ejecuta el .exe instalado, false en `npm run dev`.
 // Es más fiable que NODE_ENV porque electron-builder no setea esa variable automáticamente.
@@ -182,6 +183,11 @@ ipcMain.handle('license:state',       ()      => license.getState())
 ipcMain.handle('license:activate',    (_e, k) => license.activate(k))
 ipcMain.handle('license:deactivate',  ()      => license.deactivate())
 ipcMain.handle('license:validate',    ()      => license.validate())
+
+// IPC: cloud sync de canciones (Pro feature)
+ipcMain.handle('cloud-sync:state',     ()        => cloudSync.getState())
+ipcMain.handle('cloud-sync:setEnabled',(_e, on)  => cloudSync.setEnabled(on))
+ipcMain.handle('cloud-sync:syncNow',   ()        => cloudSync.syncOnce())
 
 // IPC: proyección externa (overlay/background sin red, capturable por OBS)
 ipcMain.handle('projection:open',  (_e, opts)   => projection.openProjection(opts))
@@ -514,6 +520,7 @@ ipcMain.handle('bibles:deleteImported', (_e, id) => {
 app.whenReady().then(() => {
   db.init()
   license.init()
+  cloudSync.init({ db, license })
 
   // Protocolo custom: media://archivo.mp4 → userData/media/archivo.mp4
   // Permite que las ventanas de proyección lean archivos locales sin file:// inseguro
@@ -540,6 +547,8 @@ app.whenReady().then(() => {
   catch (e) { console.warn('pushSongs initial failed:', e.message) }
 
   createMainWindow()
+  // Una vez la ventana existe, dar al cloudSync una referencia para emitir eventos
+  cloudSync.setMainWindow(mainWindow)
 })
 
 // Refrescar la lista de canciones del server cada vez que se cree/edite/borre.

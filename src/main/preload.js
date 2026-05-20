@@ -73,4 +73,14 @@ contextBridge.exposeInMainWorld('electron', {
     deactivate: ()    => ipcRenderer.invoke('license:deactivate'),
     validate:   ()    => ipcRenderer.invoke('license:validate'),
   },
+
+  // Cloud sync (Pro). Sincroniza canciones entre PCs vía Supabase.
+  cloudSync: {
+    state:      ()    => ipcRenderer.invoke('cloud-sync:state'),
+    setEnabled: (on)  => ipcRenderer.invoke('cloud-sync:setEnabled', on),
+    syncNow:    ()    => ipcRenderer.invoke('cloud-sync:syncNow'),
+    onStart: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:start', h); return () => ipcRenderer.removeListener('cloud-sync:start', h) },
+    onOk:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:ok',    h); return () => ipcRenderer.removeListener('cloud-sync:ok', h) },
+    onError: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:error', h); return () => ipcRenderer.removeListener('cloud-sync:error', h) },
+  },
 })
