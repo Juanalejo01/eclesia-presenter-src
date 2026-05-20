@@ -102,11 +102,18 @@ export default function DownloadPage() {
           <span className="text-copper-200 text-3xl leading-none">⚠</span>
           Si Windows bloquea la instalación
         </h3>
-        <p className="text-sm text-ink-2 leading-relaxed mb-5">
+        <p className="text-sm text-ink-2 leading-relaxed mb-3">
           EclesiaPresenter es una app nueva y todavía no tiene certificado de firma comercial.
           Windows muestra dos avisos posibles. Es totalmente seguro — el código es público en
           {' '}<a href="https://github.com/Juanalejo01/eclesia-presenter" target="_blank" rel="noreferrer"
             className="text-copper-200 hover:text-copper-100 underline">GitHub</a>.
+        </p>
+        <p className="text-sm text-ink-2 leading-relaxed mb-5">
+          La firma de código (Authenticode) de las próximas releases la proporciona{' '}
+          <a href="https://signpath.org" target="_blank" rel="noreferrer"
+            className="text-copper-200 hover:text-copper-100 underline">SignPath Foundation</a>{' '}
+          de forma gratuita para proyectos open-source verificados, lo que eliminará
+          permanentemente el aviso de SmartScreen.
         </p>
 
         <div className="space-y-5">
@@ -182,11 +189,39 @@ export default function DownloadPage() {
         </div>
       </div>
 
-      <div className="text-center">
+      <div className="text-center mb-12">
         <p className="text-sm text-ink-3 mb-2">¿Tienes problemas con la descarga o instalación?</p>
         <Link href="/docs" className="text-sm text-copper-200 hover:text-copper-100">
           Ver guía de instalación →
         </Link>
+      </div>
+
+      {/* Credits — required attribution for SignPath Foundation OSS program */}
+      <div className="border-t border-copper-300/10 pt-8">
+        <h3 className="font-mono text-xs uppercase tracking-widest text-ink-3 mb-4 text-center">
+          Agradecimientos
+        </h3>
+        <p className="text-sm text-ink-2 text-center max-w-2xl mx-auto leading-relaxed">
+          La firma de código (Authenticode) para las versiones Windows de EclesiaPresenter
+          la proporciona{' '}
+          <a
+            href="https://signpath.org"
+            target="_blank"
+            rel="noreferrer"
+            className="text-copper-200 hover:text-copper-100 underline">
+            SignPath Foundation
+          </a>{' '}
+          de forma gratuita a través de su programa para proyectos open-source.
+          Los certificados están protegidos por hardware HSM dedicado y gestionados
+          mediante{' '}
+          <a
+            href="https://signpath.io"
+            target="_blank"
+            rel="noreferrer"
+            className="text-copper-200 hover:text-copper-100 underline">
+            SignPath.io
+          </a>.
+        </p>
       </div>
     </div>
   )
