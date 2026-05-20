@@ -110,6 +110,51 @@ jobs:
         shell: bash
         continue-on-error: true
 
+      # --- WINDOWS CODE SIGNING (SignPath Foundation, free for OSS) ---
+      # Gated by repo variable: only runs when SIGNPATH_ENABLED == 'true'.
+      # Before SignPath approval, leave the variable unset and releases go unsigned.
+      # See docs/CODE_SIGNING.md for the full setup.
+      - name: Upload unsigned Windows artifacts (for SignPath)
+        id: upload-unsigned-win
+        if: matrix.platform == 'win' && vars.SIGNPATH_ENABLED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows
+          path: |
+            dist-electron/*.exe
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Submit signing request to SignPath
+        if: matrix.platform == 'win' && vars.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@v1.1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-win.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: dist-electron-signed
+
+      - name: Replace unsigned binaries with signed versions
+        if: matrix.platform == 'win' && vars.SIGNPATH_ENABLED == 'true'
+        shell: bash
+        run: |
+          echo "--- Signed artifacts received: ---"
+          ls -la dist-electron-signed/
+          echo "--- Replacing in dist-electron/ ---"
+          cp -f dist-electron-signed/*.exe dist-electron/
+          echo "--- Final dist-electron/ contents: ---"
+          ls -la dist-electron/*.exe
+          echo "--- Verifying Authenticode signatures: ---"
+          for f in dist-electron/*.exe; do
+            echo "::group::$f"
+            powershell -Command "Get-AuthenticodeSignature '$f' | Format-List Status, SignerCertificate"
+            echo "::endgroup::"
+          done
+
       - name: Upload artifacts to Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'

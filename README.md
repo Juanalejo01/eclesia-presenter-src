@@ -81,9 +81,16 @@ Tokens y componentes en `src/renderer/styles/eclesia-design.css`.
 
 ---
 
+## Documentación adicional
+
+- **[docs/CODE_SIGNING.md](docs/CODE_SIGNING.md)** — Estrategia de firma de
+  binarios Windows (SignPath Foundation + Azure Trusted Signing).
+- **[docs/SIGNPATH_APPLICATION.md](docs/SIGNPATH_APPLICATION.md)** — Texto
+  preparado para aplicar al programa OSS de SignPath Foundation.
+
 ## Licencia
 
-MIT.
+[MIT](LICENSE) — uso libre comercial y personal, con atribución.
 
 Las traducciones bíblicas incluidas mantienen sus respectivas licencias:
 - **RVR 1909** — Dominio público
