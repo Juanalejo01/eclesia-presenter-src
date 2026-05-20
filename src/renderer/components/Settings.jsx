@@ -1149,6 +1149,67 @@ function formatDate(iso) {
 // ============================================================
 // SECCIÓN — Fondos preset (biblioteca CC0 descargable)
 // ============================================================
+
+// Gradientes de fallback por categoría — usado cuando el thumbnail 404
+// (Pexels cambió el patrón del CDN para videos nuevos y bloquea el scraping).
+const CATEGORY_GRADIENTS = {
+  particulas: 'linear-gradient(135deg, #2d1b3d 0%, #8a4a9f 50%, #c98abb 100%)',
+  cielo:      'linear-gradient(135deg, #0c1a36 0%, #3d6cb0 50%, #87b8e6 100%)',
+  naturaleza: 'linear-gradient(135deg, #142a1f 0%, #3d7a4f 50%, #8ec2a0 100%)',
+  loop:       'linear-gradient(135deg, #3d1e10 0%, #c97e3e 50%, #f0b785 100%)',
+}
+
+const CATEGORY_ICONS = {
+  particulas: '✨',
+  cielo:      '☁',
+  naturaleza: '🌿',
+  loop:       '◯',
+}
+
+function BgThumbnail({ item }) {
+  const [failed, setFailed] = useState(!item.thumbnail)
+  const gradient = CATEGORY_GRADIENTS[item.category] || CATEGORY_GRADIENTS.loop
+  const icon = CATEGORY_ICONS[item.category] || '◯'
+
+  if (failed) {
+    return (
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: gradient,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        color: 'rgba(255,255,255,0.92)',
+        textAlign: 'center', padding: '0 12px',
+      }}>
+        <div style={{ fontSize: 28, opacity: 0.85, marginBottom: 4 }}>{icon}</div>
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 14, fontStyle: 'italic',
+          textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+          lineHeight: 1.2,
+        }}>
+          {item.title}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={item.thumbnail}
+      alt={item.title}
+      onError={() => setFailed(true)}
+      loading="lazy"
+      style={{
+        position: 'absolute', inset: 0,
+        width: '100%', height: '100%',
+        objectFit: 'cover',
+        display: 'block',
+      }}
+    />
+  )
+}
+
 function SectionFondos({ onUpdate }) {
   const [state, setState] = useState(null)
   const [filter, setFilter] = useState('all')
@@ -1267,11 +1328,10 @@ function SectionFondos({ onUpdate }) {
               <div style={{
                 aspectRatio: '16/9',
                 background: 'var(--bg-2)',
-                backgroundImage: `url(${item.thumbnail})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
                 position: 'relative',
+                overflow: 'hidden',
               }}>
+                <BgThumbnail item={item} />
                 {item.downloaded && (
                   <span style={{
                     position: 'absolute', top: 6, right: 6,
