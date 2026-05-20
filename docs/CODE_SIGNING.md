@@ -208,7 +208,8 @@ with:
 
 ## Referencias
 
-- SignPath Foundation OSS: https://about.signpath.io/product/open-source-code-signing
+- SignPath Foundation OSS: https://signpath.org/apply
+- SignPath comercial (NO usar para OSS): https://signpath.io
 - GitHub Action: https://github.com/SignPath/github-action-submit-signing-request
 - Azure Trusted Signing: https://learn.microsoft.com/en-us/azure/trusted-signing/
 - Electron + code signing: https://www.electron.build/code-signing

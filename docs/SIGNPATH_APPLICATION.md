@@ -19,10 +19,22 @@ Foundation para EclesiaPresenter.
 
 ## 2. URL del formulario
 
-👉 **https://about.signpath.io/product/open-source-code-signing**
+👉 **https://signpath.org/apply**
 
-Hacer click en **"Apply for a free SignPath Foundation Code Signing Project"**
-al final de la página. Te lleva a un formulario en `signpath.io/sign-up`.
+> ⚠️ **Importante — no confundir 2 servicios con nombre parecido:**
+>
+> - **`signpath.org`** = SignPath **Foundation** — la fundación sin ánimo
+>   de lucro que da certificados **GRATIS** a OSS verificado. **AQUÍ es
+>   donde tienes que aplicar.**
+> - **`signpath.io` / `app.signpath.io`** = SignPath GmbH — empresa
+>   **COMERCIAL** (~300 €/mes). Si te logueaste aquí por error y te
+>   pide crear un "self-signed certificate" en la "Guided introduction",
+>   **NO lo hagas** — ese flujo es para clientes de pago.
+>
+> Si ya creaste cuenta en el lado comercial por error, no la borres pero
+> tampoco sigas su onboarding. Cuando Foundation te apruebe te enlazan a
+> la cuenta sponsoreada (mismo dashboard `app.signpath.io`, billing
+> distinto).
 
 ---
 
