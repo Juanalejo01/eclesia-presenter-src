@@ -74,7 +74,12 @@ Dos ventanas nativas:
 - **Pantalla completa** para el proyector físico (1920×1080).
 - **Overlay transparente** capturable por OBS sin compartir pantalla.
 
-<!-- <img src="docs/screenshots/projection-obs.png" width="700" alt="Captura desde OBS" /> -->
+Configurable desde el panel **Proyección** con preview en vivo del tema
+aplicado, control de detección de monitores y ajustes de transición.
+
+<p align="center">
+  <img src="docs/screenshots/projection-panel.png" width="800" alt="Panel de Proyección con configuración de salida y preview en vivo" />
+</p>
 
 ### 🎛 Monitor PGM/PVW (broadcast pro)
 Vista lateral con tally `ON AIR`, modo Live/Preview, "Tomar al aire" estilo
