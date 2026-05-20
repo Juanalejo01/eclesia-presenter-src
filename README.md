@@ -83,10 +83,13 @@ Tokens y componentes en `src/renderer/styles/eclesia-design.css`.
 
 ## Documentación adicional
 
+- **[ROADMAP.md](ROADMAP.md)** — Roadmap público del proyecto.
 - **[docs/CODE_SIGNING.md](docs/CODE_SIGNING.md)** — Estrategia de firma de
   binarios Windows (SignPath Foundation + Azure Trusted Signing).
 - **[docs/SIGNPATH_APPLICATION.md](docs/SIGNPATH_APPLICATION.md)** — Texto
   preparado para aplicar al programa OSS de SignPath Foundation.
+- **[docs/FEATURE_ANALYSIS.md](docs/FEATURE_ANALYSIS.md)** — Análisis competitivo
+  vs ProPresenter / EasyWorship.
 
 ## Licencia
 
