@@ -52,14 +52,21 @@ export default function MobileMenu({ user }) {
 
       {/* Overlay + panel — fixed full-screen, oculto a partir de lg */}
       {open && (
-        <div className="lg:hidden fixed inset-0 z-[100]">
+        <div className="lg:hidden fixed inset-0 z-[100]" style={{ height: '100dvh' }}>
+          {/* Overlay clickable que cierra */}
           <div
             className="absolute inset-0 bg-bg-0/85 backdrop-blur-md"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute right-0 top-0 bottom-0 w-[85vw] max-w-sm
-                            bg-bg-1 border-l border-copper-300/15
-                            flex flex-col overflow-hidden">
+
+          {/* Panel lateral derecho — h-full explícito y display grid para layout robusto */}
+          <aside
+            className="absolute right-0 top-0 w-[85vw] max-w-sm
+                       bg-bg-1 border-l border-copper-300/15
+                       overflow-hidden shadow-2xl shadow-black/50"
+            style={{ height: '100dvh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}
+          >
+            {/* Header */}
             <header className="flex items-center justify-between h-16 px-5 border-b border-copper-300/10">
               <span className="text-xs font-mono uppercase tracking-widest text-ink-3">
                 Menú
@@ -77,12 +84,13 @@ export default function MobileMenu({ user }) {
               </button>
             </header>
 
-            <nav className="flex-1 overflow-y-auto py-2">
+            {/* Nav (1fr en el grid → ocupa todo el espacio restante, scroll si hay overflow) */}
+            <nav className="overflow-y-auto py-2 min-h-0">
               {links.map(l => (
                 <Link
                   key={l.href}
                   href={l.href}
-                  className="block px-6 py-4 text-lg text-ink-1 hover:bg-bg-2
+                  className="block px-6 py-4 text-base sm:text-lg text-ink-1 hover:bg-bg-2
                              hover:text-copper-200 transition-colors
                              border-b border-copper-300/5"
                 >
@@ -91,7 +99,8 @@ export default function MobileMenu({ user }) {
               ))}
             </nav>
 
-            <div className="p-5 border-t border-copper-300/10 space-y-3">
+            {/* Footer CTAs (auto height) */}
+            <div className="p-5 border-t border-copper-300/10 space-y-3 bg-bg-1">
               {user ? (
                 <Link
                   href="/cuenta"
