@@ -4,6 +4,7 @@ import {
   listAvailableBibles, getEnabledBibles, setEnabledBibles,
 } from '../services/apiBible.js'
 import { useAppSettings, setSettings, pickDirectory } from '../services/appSettingsService.js'
+import { setTheme as setStoredTheme } from '../services/themeStore.js'
 import { refreshImportedVersions } from '../services/bibleService.js'
 import { AVAILABLE_LOCALES } from '../services/i18n.js'
 import {
@@ -20,6 +21,7 @@ const SECTIONS = [
   { id: 'biblias',      label: 'Biblias',           Icon: IconBible },
   { id: 'canciones',    label: 'Canciones',         Icon: IconMusic },
   { id: 'apibible',     label: 'API Bible',         Icon: IconBible },
+  { id: 'fondos',       label: 'Fondos preset',     Icon: IconVideo },
   { id: 'licencia',     label: 'Licencia',          Icon: IconKey },
   { id: 'acerca',       label: 'Acerca de',         Icon: IconSettings },
 ]
@@ -76,6 +78,7 @@ export default function Settings({ onClose, onUpdate }) {
             {section === 'biblias'        && <SectionBiblias onUpdate={onUpdate} />}
             {section === 'canciones'      && <SectionCanciones onUpdate={onUpdate} />}
             {section === 'apibible'       && <SectionApiBible onUpdate={onUpdate} />}
+            {section === 'fondos'         && <SectionFondos onUpdate={onUpdate} />}
             {section === 'licencia'       && <SectionLicencia onUpdate={onUpdate} />}
             {section === 'acerca'         && <SectionAcerca />}
           </main>
@@ -1141,4 +1144,219 @@ function formatDate(iso) {
     const d = new Date(iso)
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
   } catch { return iso }
+}
+
+// ============================================================
+// SECCIÓN — Fondos preset (biblioteca CC0 descargable)
+// ============================================================
+function SectionFondos({ onUpdate }) {
+  const [state, setState] = useState(null)
+  const [filter, setFilter] = useState('all')
+  const [progress, setProgress] = useState({})  // id → { bytes, total }
+
+  const refresh = async () => {
+    if (!window.electron?.bglib) return
+    setState(await window.electron.bglib.state())
+  }
+
+  useEffect(() => {
+    refresh()
+    if (!window.electron?.bglib) return
+    const off1 = window.electron.bglib.onProgress(p => {
+      setProgress(prev => ({ ...prev, [p.id]: { bytes: p.bytes, total: p.total } }))
+    })
+    const off2 = window.electron.bglib.onOk(() => {
+      setProgress(prev => { const n = { ...prev }; refresh(); return n })
+      refresh()
+    })
+    const off3 = window.electron.bglib.onError(() => refresh())
+    return () => { off1(); off2(); off3() }
+  }, [])
+
+  const handleRefresh = async () => {
+    await window.electron.bglib.refresh()
+    refresh()
+  }
+
+  const handleDownload = async (id) => {
+    await window.electron.bglib.download(id)
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('¿Borrar este fondo? Lo puedes volver a descargar después.')) return
+    await window.electron.bglib.delete(id)
+    refresh()
+  }
+
+  const handleUseAsBg = async (id) => {
+    const bgUrl = `preset://${id}.mp4`
+    setStoredTheme({ bgType: 'video', bgVideo: bgUrl, videoFit: 'cover' })
+    alert('✓ Aplicado como fondo de proyección. Ve al panel Proyección para ajustar.')
+  }
+
+  if (!state) return <div style={{ color: 'var(--text-3)' }}>Cargando catálogo…</div>
+
+  const categories = [
+    { id: 'all', label: 'Todos' },
+    ...(state.categories || []),
+  ]
+
+  const items = (state.items || []).filter(i => filter === 'all' || i.category === filter)
+  const downloadedCount = (state.items || []).filter(i => i.downloaded).length
+  const totalMB = (state.items || [])
+    .filter(i => i.downloaded)
+    .reduce((acc, i) => acc + (i.local_size || 0), 0) / 1024 / 1024
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 6px' }}>
+        Fondos preset
+      </h2>
+      <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 18px' }}>
+        Videos worship CC0 (Pexels) listos para usar como fondo de tu proyección.
+        Descarga solo los que te gusten — no se incluyen en la app por defecto para que ocupe poco.
+      </p>
+
+      {/* Status bar */}
+      <div className="card" style={{ padding: 14, marginBottom: 14, fontSize: 12,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ color: 'var(--text-2)' }}>
+          <strong style={{ color: 'var(--copper-100)' }}>{downloadedCount}</strong>
+          {' '}/ {state.items.length} descargados ·
+          {' '}<strong style={{ color: 'var(--copper-100)' }}>{totalMB.toFixed(1)} MB</strong> en disco
+        </div>
+        <button className="btn btn-ghost" onClick={handleRefresh} style={{ fontSize: 11 }}>
+          ↻ Refrescar catálogo
+        </button>
+      </div>
+
+      {state.offline && (
+        <div className="card" style={{
+          padding: 12, marginBottom: 14, fontSize: 12,
+          background: 'rgba(244,184,64,0.08)', borderColor: 'rgba(244,184,64,0.3)',
+          color: 'var(--preview)',
+        }}>
+          ⚠️ Sin conexión — mostrando catálogo cacheado. Conecta a internet para ver novedades.
+        </div>
+      )}
+
+      {/* Filter chips */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        {categories.map(c => (
+          <button key={c.id} onClick={() => setFilter(c.id)}
+            className={'btn ' + (filter === c.id ? 'btn-primary' : 'btn-ghost')}
+            style={{ fontSize: 11, padding: '4px 10px', height: 26 }}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: 12,
+      }}>
+        {items.map(item => {
+          const isDownloading = !!progress[item.id]
+          const pct = isDownloading && progress[item.id].total > 0
+            ? Math.round((progress[item.id].bytes / progress[item.id].total) * 100)
+            : 0
+          return (
+            <div key={item.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{
+                aspectRatio: '16/9',
+                background: 'var(--bg-2)',
+                backgroundImage: `url(${item.thumbnail})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                position: 'relative',
+              }}>
+                {item.downloaded && (
+                  <span style={{
+                    position: 'absolute', top: 6, right: 6,
+                    background: 'rgba(107, 207, 142, 0.9)', color: '#0a1a12',
+                    fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700,
+                    padding: '2px 6px', borderRadius: 4, letterSpacing: '0.08em',
+                  }}>EN DISCO</span>
+                )}
+                <span style={{
+                  position: 'absolute', bottom: 6, right: 6,
+                  background: 'rgba(0,0,0,0.65)', color: '#fff',
+                  fontSize: 10, fontFamily: 'var(--font-mono)',
+                  padding: '2px 6px', borderRadius: 4,
+                }}>{item.duration_sec}s · {item.size_mb}MB</span>
+              </div>
+
+              <div style={{ padding: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.title}
+                </div>
+
+                {isDownloading && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', width: `${pct}%`,
+                        background: 'linear-gradient(90deg, var(--copper-200), var(--copper-300))',
+                        transition: 'width 0.2s',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4,
+                      fontFamily: 'var(--font-mono)' }}>{pct}%</div>
+                  </div>
+                )}
+
+                {!isDownloading && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    {!item.downloaded && (
+                      <button className="btn btn-primary" onClick={() => handleDownload(item.id)}
+                        style={{ flex: 1, fontSize: 11, height: 28 }}>
+                        ↓ Descargar
+                      </button>
+                    )}
+                    {item.downloaded && (
+                      <>
+                        <button className="btn btn-primary" onClick={() => handleUseAsBg(item.id)}
+                          style={{ flex: 1, fontSize: 11, height: 28 }}>
+                          Usar como fondo
+                        </button>
+                        <button className="btn btn-ghost" onClick={() => handleDelete(item.id)}
+                          style={{ fontSize: 11, height: 28, padding: '0 8px',
+                            color: 'var(--danger, #e87575)' }}
+                          title="Borrar del disco">
+                          ✕
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {items.length === 0 && (
+        <p className="empty-text" style={{ textAlign: 'center', padding: 32, fontStyle: 'italic' }}>
+          No hay fondos en esta categoría todavía.
+        </p>
+      )}
+
+      <div className="card" style={{ padding: 14, marginTop: 24, fontSize: 12,
+        color: 'var(--text-3)', lineHeight: 1.6 }}>
+        <p style={{ margin: '0 0 6px', fontWeight: 600, color: 'var(--text-2)' }}>
+          Cómo funciona
+        </p>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>El catálogo se actualiza desde nuestra web (puedes añadir más sin actualizar la app).</li>
+          <li>Cada video se descarga UNA VEZ a tu PC ({state.dir}).</li>
+          <li>Todos son CC0 / Pexels License — uso comercial gratuito, sin atribución requerida.</li>
+          <li>Al borrar, se libera el espacio en disco. Lo puedes volver a descargar cuando quieras.</li>
+          <li>Para aplicar a la proyección haz click en "Usar como fondo" y luego abre el proyector.</li>
+        </ul>
+      </div>
+    </div>
+  )
 }

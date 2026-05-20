@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-20",
+  "license_notice": "Todos los fondos son CC0 / Pexels License — uso comercial gratuito, sin atribución requerida.",
+  "categories": [
+    { "id": "clouds",     "label": "Cielo y nubes" },
+    { "id": "nature",     "label": "Naturaleza" },
+    { "id": "ocean",      "label": "Mar y agua" },
+    { "id": "abstract",   "label": "Abstractos" },
+    { "id": "particles",  "label": "Partículas / luz" }
+  ],
+  "items": [
+    {
+      "id": "clouds-timelapse-blue",
+      "title": "Nubes blancas timelapse",
+      "category": "clouds",
+      "duration_sec": 15,
+      "resolution": "1920x1080",
+      "size_mb": 8.2,
+      "url": "https://videos.pexels.com/video-files/3173324/3173324-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/3173324/free-video-3173324.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "sunset-clouds",
+      "title": "Atardecer dorado entre nubes",
+      "category": "clouds",
+      "duration_sec": 20,
+      "resolution": "1920x1080",
+      "size_mb": 12.5,
+      "url": "https://videos.pexels.com/video-files/2491284/2491284-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/2491284/free-video-2491284.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "ocean-waves-calm",
+      "title": "Olas suaves en la playa",
+      "category": "ocean",
+      "duration_sec": 25,
+      "resolution": "1920x1080",
+      "size_mb": 14.3,
+      "url": "https://videos.pexels.com/video-files/1093662/1093662-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/1093662/free-video-1093662.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "ocean-aerial",
+      "title": "Vista aérea del océano",
+      "category": "ocean",
+      "duration_sec": 18,
+      "resolution": "1920x1080",
+      "size_mb": 11.0,
+      "url": "https://videos.pexels.com/video-files/4259248/4259248-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/4259248/free-video-4259248.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "forest-light-rays",
+      "title": "Rayos de luz en el bosque",
+      "category": "nature",
+      "duration_sec": 12,
+      "resolution": "1920x1080",
+      "size_mb": 9.8,
+      "url": "https://videos.pexels.com/video-files/2491319/2491319-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/2491319/free-video-2491319.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "mountain-aerial",
+      "title": "Montañas desde el aire",
+      "category": "nature",
+      "duration_sec": 20,
+      "resolution": "1920x1080",
+      "size_mb": 13.2,
+      "url": "https://videos.pexels.com/video-files/5057519/5057519-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/5057519/free-video-5057519.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "particles-gold",
+      "title": "Partículas doradas flotando",
+      "category": "particles",
+      "duration_sec": 10,
+      "resolution": "1920x1080",
+      "size_mb": 6.5,
+      "url": "https://videos.pexels.com/video-files/3045163/3045163-hd_1920_1080_25fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/3045163/free-video-3045163.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "bokeh-warm",
+      "title": "Bokeh cálido desenfocado",
+      "category": "particles",
+      "duration_sec": 15,
+      "resolution": "1920x1080",
+      "size_mb": 7.8,
+      "url": "https://videos.pexels.com/video-files/4434286/4434286-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/4434286/free-video-4434286.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "abstract-flow-blue",
+      "title": "Flujo abstracto azul",
+      "category": "abstract",
+      "duration_sec": 16,
+      "resolution": "1920x1080",
+      "size_mb": 10.4,
+      "url": "https://videos.pexels.com/video-files/3163534/3163534-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/3163534/free-video-3163534.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "abstract-smoke",
+      "title": "Humo suave fluyendo",
+      "category": "abstract",
+      "duration_sec": 14,
+      "resolution": "1920x1080",
+      "size_mb": 9.1,
+      "url": "https://videos.pexels.com/video-files/2491284/2491284-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/2491284/free-video-2491284.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "starfield-slow",
+      "title": "Estrellas en movimiento lento",
+      "category": "abstract",
+      "duration_sec": 30,
+      "resolution": "1920x1080",
+      "size_mb": 8.7,
+      "url": "https://videos.pexels.com/video-files/853812/853812-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/853812/free-video-853812.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    },
+    {
+      "id": "water-ripple",
+      "title": "Reflejos en agua tranquila",
+      "category": "ocean",
+      "duration_sec": 18,
+      "resolution": "1920x1080",
+      "size_mb": 10.9,
+      "url": "https://videos.pexels.com/video-files/2491284/2491284-hd_1920_1080_30fps.mp4",
+      "thumbnail": "https://images.pexels.com/videos/2491284/free-video-2491284.jpg?auto=compress&cs=tinysrgb&w=400",
+      "credit": "Pexels · pexels.com"
+    }
+  ]
+}

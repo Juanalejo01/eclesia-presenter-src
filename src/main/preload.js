@@ -83,4 +83,18 @@ contextBridge.exposeInMainWorld('electron', {
     onOk:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:ok',    h); return () => ipcRenderer.removeListener('cloud-sync:ok', h) },
     onError: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:error', h); return () => ipcRenderer.removeListener('cloud-sync:error', h) },
   },
+
+  // Biblioteca de fondos preset (CC0 worship videos descargables)
+  bglib: {
+    state:     ()    => ipcRenderer.invoke('bglib:state'),
+    refresh:   ()    => ipcRenderer.invoke('bglib:refresh'),
+    download:  (id)  => ipcRenderer.invoke('bglib:download', id),
+    cancel:    (id)  => ipcRenderer.invoke('bglib:cancel', id),
+    delete:    (id)  => ipcRenderer.invoke('bglib:delete', id),
+    localPath: (id)  => ipcRenderer.invoke('bglib:localPath', id),
+    onStart:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-start',    h); return () => ipcRenderer.removeListener('bglib:download-start', h) },
+    onProgress: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-progress', h); return () => ipcRenderer.removeListener('bglib:download-progress', h) },
+    onOk:       (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-ok',       h); return () => ipcRenderer.removeListener('bglib:download-ok', h) },
+    onError:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-error',    h); return () => ipcRenderer.removeListener('bglib:download-error', h) },
+  },
 })

@@ -76,6 +76,7 @@ const db = require('./database')
 const projection = require('./projection')
 const license = require('./license')
 const cloudSync = require('./cloudSync')
+const backgroundLibrary = require('./backgroundLibrary')
 
 // app.isPackaged es true cuando se ejecuta el .exe instalado, false en `npm run dev`.
 // Es más fiable que NODE_ENV porque electron-builder no setea esa variable automáticamente.
@@ -188,6 +189,14 @@ ipcMain.handle('license:validate',    ()      => license.validate())
 ipcMain.handle('cloud-sync:state',     ()        => cloudSync.getState())
 ipcMain.handle('cloud-sync:setEnabled',(_e, on)  => cloudSync.setEnabled(on))
 ipcMain.handle('cloud-sync:syncNow',   ()        => cloudSync.syncOnce())
+
+// IPC: biblioteca de fondos preset (catálogo + descargas)
+ipcMain.handle('bglib:state',          ()        => backgroundLibrary.getState())
+ipcMain.handle('bglib:refresh',        ()        => backgroundLibrary.fetchCatalog({ force: true }))
+ipcMain.handle('bglib:download',       (_e, id)  => backgroundLibrary.downloadItem(id))
+ipcMain.handle('bglib:cancel',         (_e, id)  => backgroundLibrary.cancelDownload(id))
+ipcMain.handle('bglib:delete',         (_e, id)  => backgroundLibrary.deleteLocal(id))
+ipcMain.handle('bglib:localPath',      (_e, id)  => backgroundLibrary.localPath(id))
 
 // IPC: proyección externa (overlay/background sin red, capturable por OBS)
 ipcMain.handle('projection:open',  (_e, opts)   => projection.openProjection(opts))
@@ -530,6 +539,14 @@ app.whenReady().then(() => {
     callback({ path: fullPath })
   })
 
+  // Protocolo preset://<id>.mp4 → userData/preset-backgrounds/<id>.mp4
+  // Para servir los fondos preset descargados a las ventanas de proyección.
+  protocol.registerFileProtocol('preset', (request, callback) => {
+    const fileName = decodeURI(request.url.replace(/^preset:\/\//, ''))
+    const fullPath = path.join(app.getPath('userData'), 'preset-backgrounds', fileName)
+    callback({ path: fullPath })
+  })
+
   serverHandle = startServer()
   // Bridge: cuando el móvil dispara un comando, lo reenviamos a la mainWindow
   // como evento IPC. App.jsx lo escucha y dispara la acción correspondiente.
@@ -547,8 +564,9 @@ app.whenReady().then(() => {
   catch (e) { console.warn('pushSongs initial failed:', e.message) }
 
   createMainWindow()
-  // Una vez la ventana existe, dar al cloudSync una referencia para emitir eventos
+  // Una vez la ventana existe, dar a los servicios una referencia para emitir eventos
   cloudSync.setMainWindow(mainWindow)
+  backgroundLibrary.setMainWindow(mainWindow)
 })
 
 // Refrescar la lista de canciones del server cada vez que se cree/edite/borre.
