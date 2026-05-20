@@ -26,11 +26,12 @@ export default function MobileMenu({ user }) {
   }, [open])
 
   const links = [
-    { href: '/#features',  label: 'Funciones' },
-    { href: '/pricing',    label: 'Precios' },
-    { href: '/docs',       label: 'Documentación' },
-    { href: '/download',   label: 'Descargar' },
-    { href: '/contacto',   label: 'Contacto' },
+    { href: '/#features',     label: 'Funciones' },
+    { href: '/pricing',       label: 'Precios' },
+    { href: '/casos-de-uso',  label: 'Casos de uso' },
+    { href: '/docs',          label: 'Documentación' },
+    { href: '/download',      label: 'Descargar' },
+    { href: '/contacto',      label: 'Contacto' },
   ]
 
   return (

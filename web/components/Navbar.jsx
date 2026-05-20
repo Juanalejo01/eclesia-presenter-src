@@ -40,6 +40,9 @@ export default async function Navbar() {
           <Link href="/pricing" className="text-ink-2 hover:text-ink-1 transition-colors">
             Precios
           </Link>
+          <Link href="/casos-de-uso" className="text-ink-2 hover:text-ink-1 transition-colors">
+            Casos de uso
+          </Link>
           <Link href="/docs" className="text-ink-2 hover:text-ink-1 transition-colors">
             Documentación
           </Link>
