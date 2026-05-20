@@ -589,7 +589,7 @@ export const DOCS = [
 
       { type: 'h2', text: '¿Falta tu idioma?' },
       { type: 'p', text: 'Si traduces voluntariamente y quieres aportar tu traducción, escríbenos a:' },
-      { type: 'code', text: 'hola@eclesiapresenter.com', lang: 'text' },
+      { type: 'code', text: 'juanlpz.dev@gmail.com', lang: 'text' },
     ],
   },
 
@@ -713,7 +713,7 @@ export const DOCS = [
       { type: 'p', text: 'Actualmente no se puede cambiar el email asociado a la cuenta. Escribe a soporte y lo gestionamos manualmente.' },
 
       { type: 'h2', text: 'Borrar tu cuenta' },
-      { type: 'p', text: 'Para borrar tu cuenta y todos los datos asociados (perfil, licencia, historial de pagos), escribe a hola@eclesiapresenter.com solicitándolo. La eliminación es definitiva e irreversible (cumplimiento GDPR).' },
+      { type: 'p', text: 'Para borrar tu cuenta y todos los datos asociados (perfil, licencia, historial de pagos), escribe a juanlpz.dev@gmail.com solicitándolo. La eliminación es definitiva e irreversible (cumplimiento GDPR).' },
     ],
   },
 
@@ -808,7 +808,7 @@ export const DOCS = [
 
       { type: 'h2', text: 'Refund / devolución' },
       { type: 'p', text: 'Ofrecemos 30 días de garantía: si la app no es lo que esperabas, escríbenos en los primeros 30 días desde la compra y te devolvemos el dinero sin preguntas.' },
-      { type: 'code', text: 'hola@eclesiapresenter.com', lang: 'text' },
+      { type: 'code', text: 'juanlpz.dev@gmail.com', lang: 'text' },
 
       { type: 'h2', text: 'Cambiar de Mensual a Anual (o viceversa)' },
       { type: 'p', text: 'Desde el Customer Portal puedes cambiar entre planes. Stripe prorratea el cobro: te devuelve la parte no usada del plan viejo y cobra solo la diferencia del plan nuevo.' },

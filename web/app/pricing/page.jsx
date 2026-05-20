@@ -254,7 +254,7 @@ export default function PricingPage() {
             30 días. Si la app no es lo que esperabas, te devolvemos el dinero sin preguntas.
           </FaqItem>
           <FaqItem q="¿Hay descuentos para iglesias pequeñas / misiones?">
-            Sí. Escríbenos a <a href="mailto:hola@eclesiapresenter.com" className="text-copper-200 hover:text-copper-100">hola@eclesiapresenter.com</a>
+            Sí. Escríbenos a <a href="mailto:juanlpz.dev@gmail.com" className="text-copper-200 hover:text-copper-100">juanlpz.dev@gmail.com</a>
             {' '}con tu caso y vemos qué podemos hacer.
           </FaqItem>
         </div>

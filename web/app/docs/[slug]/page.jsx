@@ -94,7 +94,7 @@ export default function DocPage({ params }) {
               ¿Esta guía te resolvió la duda?
             </div>
             <a
-              href="mailto:hola@eclesiapresenter.com"
+              href="mailto:juanlpz.dev@gmail.com"
               className="text-sm text-copper-200 hover:text-copper-100 transition-colors font-medium"
             >
               Escribir a soporte →

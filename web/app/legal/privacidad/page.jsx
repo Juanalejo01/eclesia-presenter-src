@@ -49,7 +49,7 @@ export default function Privacy() {
             <li>Eliminación total de tu cuenta y datos</li>
             <li>Exportación en formato portable</li>
           </ul>
-          Escribe a <a href="mailto:privacidad@eclesiapresenter.com" className="text-copper-200 hover:text-copper-100">privacidad@eclesiapresenter.com</a>.
+          Escribe a <a href="mailto:juanlpz.dev@gmail.com" className="text-copper-200 hover:text-copper-100">juanlpz.dev@gmail.com</a>.
         </Section>
 
         <Section title="Retención">
@@ -59,8 +59,8 @@ export default function Privacy() {
         </Section>
 
         <Section title="Contacto del DPO">
-          <a href="mailto:privacidad@eclesiapresenter.com" className="text-copper-200 hover:text-copper-100">
-            privacidad@eclesiapresenter.com
+          <a href="mailto:juanlpz.dev@gmail.com" className="text-copper-200 hover:text-copper-100">
+            juanlpz.dev@gmail.com
           </a>
         </Section>
       </div>

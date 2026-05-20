@@ -87,12 +87,12 @@ export default function DocsPage() {
           Escríbenos directamente y te ayudamos en menos de 24h.
         </p>
         <a
-          href="mailto:hola@eclesiapresenter.com"
+          href="mailto:juanlpz.dev@gmail.com"
           className="inline-flex items-center justify-center h-10 px-5 rounded-lg
                      border border-copper-300/30 bg-bg-3 text-ink-1 text-sm font-medium
                      hover:bg-bg-4 hover:text-copper-100 transition-all"
         >
-          hola@eclesiapresenter.com
+          juanlpz.dev@gmail.com
         </a>
       </div>
     </div>

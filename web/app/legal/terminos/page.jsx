@@ -63,8 +63,8 @@ export default function Terms() {
         </Section>
 
         <Section title="10. Contacto">
-          <a href="mailto:hola@eclesiapresenter.com" className="text-copper-200 hover:text-copper-100">
-            hola@eclesiapresenter.com
+          <a href="mailto:juanlpz.dev@gmail.com" className="text-copper-200 hover:text-copper-100">
+            juanlpz.dev@gmail.com
           </a>
         </Section>
       </div>

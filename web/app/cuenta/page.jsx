@@ -157,7 +157,7 @@ export default async function CuentaPage() {
           <div className="font-semibold text-ink-1 mb-1">Documentación</div>
           <div className="text-xs text-ink-3">Guías y tutoriales</div>
         </Link>
-        <a href="mailto:hola@eclesiapresenter.com" className="rounded-xl border border-copper-300/15 bg-bg-2 p-5 hover:border-copper-300/30 transition-colors">
+        <a href="mailto:juanlpz.dev@gmail.com" className="rounded-xl border border-copper-300/15 bg-bg-2 p-5 hover:border-copper-300/30 transition-colors">
           <div className="text-2xl mb-2">💬</div>
           <div className="font-semibold text-ink-1 mb-1">Soporte</div>
           <div className="text-xs text-ink-3">Escríbenos para cualquier duda</div>
