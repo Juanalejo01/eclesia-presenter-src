@@ -283,13 +283,16 @@ ipcMain.handle('media:addFiles', async (_e, sourcePaths = []) => {
   return added
 })
 
-// IPC: songs CRUD — los handlers que MUTAN también sincronizan al server móvil.
+// IPC: songs CRUD — las mutaciones disparan 2 cosas:
+//   1. syncSongsToServer() → push inmediato a clientes móviles LAN
+//   2. cloudSync.triggerSync() → push a Supabase debounced 2s
+//      (no-op silencioso si no hay licencia Pro o auto-sync está apagado)
 ipcMain.handle('songs:list',     (_e, opts)    => db.listSongs(opts))
 ipcMain.handle('songs:get',      (_e, id)      => db.getSong(id))
-ipcMain.handle('songs:create',   (_e, data)    => { const r = db.createSong(data); syncSongsToServer(); return r })
-ipcMain.handle('songs:update',   (_e, id, data)=> { const r = db.updateSong(id, data); syncSongsToServer(); return r })
-ipcMain.handle('songs:delete',   (_e, id)      => { const r = db.deleteSong(id); syncSongsToServer(); return r })
-ipcMain.handle('songs:favorite', (_e, id)      => db.toggleFavorite(id))
+ipcMain.handle('songs:create',   (_e, data)    => { const r = db.createSong(data); syncSongsToServer(); cloudSync.triggerSync(); return r })
+ipcMain.handle('songs:update',   (_e, id, data)=> { const r = db.updateSong(id, data); syncSongsToServer(); cloudSync.triggerSync(); return r })
+ipcMain.handle('songs:delete',   (_e, id)      => { const r = db.deleteSong(id); syncSongsToServer(); cloudSync.triggerSync(); return r })
+ipcMain.handle('songs:favorite', (_e, id)      => { const r = db.toggleFavorite(id); cloudSync.triggerSync(); return r })
 
 // --------- App utilities (settings) ---------
 

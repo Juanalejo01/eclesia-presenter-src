@@ -32,6 +32,11 @@ let _db = null
 let _license = null
 let _mainWindow = null
 let _autoTimer = null
+let _debounceTimer = null
+
+// Cuánto esperamos tras la última mutación antes de sincronizar.
+// Si el usuario crea/edita 5 canciones seguidas, agrupamos en 1 solo sync.
+const DEBOUNCE_MS = 2000
 
 function loadState() {
   try {
@@ -128,6 +133,18 @@ function stopAutoSync() {
   if (_autoTimer) { clearInterval(_autoTimer); _autoTimer = null }
 }
 
+// Trigger debounced — se llama desde los IPC handlers de songs:create/update/delete.
+// Si auto-sync está deshabilitado o no hay licencia Pro, es no-op silencioso.
+// Si hay múltiples mutaciones seguidas, agrupamos en 1 sync (DEBOUNCE_MS).
+function triggerSync() {
+  if (!state.enabled) return
+  if (_debounceTimer) clearTimeout(_debounceTimer)
+  _debounceTimer = setTimeout(() => {
+    _debounceTimer = null
+    syncOnce().catch(() => {})
+  }, DEBOUNCE_MS)
+}
+
 function setEnabled(enabled) {
   state.enabled = !!enabled
   saveState()
@@ -156,5 +173,6 @@ module.exports = {
   setMainWindow,
   setEnabled,
   syncOnce,
+  triggerSync,
   getState,
 }
