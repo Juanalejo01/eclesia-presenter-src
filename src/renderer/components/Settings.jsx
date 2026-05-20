@@ -707,9 +707,24 @@ function CloudSyncSection({ onUpdate }) {
             border: '1px solid ' + (lastResult.ok ? 'rgba(107, 207, 142, 0.3)' : 'rgba(255, 61, 61, 0.3)'),
             color: lastResult.ok ? 'var(--ready)' : 'var(--live)',
           }}>
-            {lastResult.ok
-              ? `✓ Sync OK · ${lastResult.stats?.inserted || 0} nuevas, ${lastResult.stats?.updated || 0} actualizadas, ${lastResult.stats?.deleted || 0} borradas`
-              : `✕ Error: ${translateCloudSyncError(lastResult.error)}`}
+            {!lastResult.ok && `✕ Error: ${translateCloudSyncError(lastResult.error)}`}
+            {lastResult.ok && (() => {
+              const pushed = lastResult.stats?.pushed || {}
+              const pulled = lastResult.stats?.pulled || {}
+              const totalPush = (pushed.uploaded || 0) + (pushed.updated || 0) + (pushed.deleted || 0)
+              const totalPull = (pulled.inserted || 0) + (pulled.updated || 0) + (pulled.deleted || 0)
+              if (totalPush === 0 && totalPull === 0) {
+                return '✓ Sync OK · todo está al día'
+              }
+              const parts = []
+              if (pushed.uploaded)  parts.push(`↑ ${pushed.uploaded} subida${pushed.uploaded > 1 ? 's' : ''}`)
+              if (pushed.updated)   parts.push(`↑ ${pushed.updated} actualizada${pushed.updated > 1 ? 's' : ''} en cloud`)
+              if (pushed.deleted)   parts.push(`↑ ${pushed.deleted} borrada${pushed.deleted > 1 ? 's' : ''} en cloud`)
+              if (pulled.inserted)  parts.push(`↓ ${pulled.inserted} nueva${pulled.inserted > 1 ? 's' : ''} desde cloud`)
+              if (pulled.updated)   parts.push(`↓ ${pulled.updated} actualizada${pulled.updated > 1 ? 's' : ''} desde cloud`)
+              if (pulled.deleted)   parts.push(`↓ ${pulled.deleted} borrada${pulled.deleted > 1 ? 's' : ''} desde cloud`)
+              return '✓ Sync OK · ' + parts.join(' · ')
+            })()}
           </div>
         )}
       </div>

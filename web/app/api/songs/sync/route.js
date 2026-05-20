@@ -98,6 +98,8 @@ export async function POST(request) {
 
     const userId = license.user_id
     const mapping = {}
+    // Contadores de lo que el SERVER aplicó (push del cliente al cloud)
+    const pushed = { uploaded: 0, updated: 0, deleted: 0 }
 
     // === PUSH: subir cambios locales al cloud ===
     for (const song of local) {
@@ -109,11 +111,12 @@ export async function POST(request) {
 
       if (isDelete) {
         // Soft delete en cloud
-        await admin
+        const { error } = await admin
           .from('cloud_songs')
           .update({ deleted_at: localUpdatedAt, updated_at: localUpdatedAt })
           .eq('id', song.cloud_id)
           .eq('user_id', userId)
+        if (!error) pushed.deleted++
         continue
       }
 
@@ -139,7 +142,7 @@ export async function POST(request) {
           console.error('[songs/sync] insert error')
           continue
         }
-        // Devolver el mapping para que el cliente guarde el cloud_id
+        pushed.uploaded++
         if (song.local_key) mapping[song.local_key] = inserted.id
       } else {
         // Actualizar — solo si local es más reciente que cloud
@@ -150,8 +153,6 @@ export async function POST(request) {
           .eq('user_id', userId)
           .maybeSingle()
         if (!cloudRow) {
-          // Cloud no la tiene (raro: cliente decía tener cloud_id pero no existe).
-          // Por defensa, insertar de nuevo.
           const { data: inserted } = await admin
             .from('cloud_songs')
             .insert({
@@ -161,14 +162,16 @@ export async function POST(request) {
               updated_at: localUpdatedAt,
             })
             .select('id').single()
-          if (inserted && song.local_key) mapping[song.local_key] = inserted.id
+          if (inserted) {
+            pushed.uploaded++
+            if (song.local_key) mapping[song.local_key] = inserted.id
+          }
         } else if (cloudRow.deleted_at) {
-          // Cloud tiene esta fila marcada como borrada → respetar, no resucitar
           continue
         } else {
           const cloudUpdatedMs = new Date(cloudRow.updated_at).getTime()
           if (localUpdatedMs > cloudUpdatedMs) {
-            await admin
+            const { error } = await admin
               .from('cloud_songs')
               .update({
                 title: String(song.title || '').slice(0, 500),
@@ -183,9 +186,8 @@ export async function POST(request) {
               })
               .eq('id', song.cloud_id)
               .eq('user_id', userId)
+            if (!error) pushed.updated++
           }
-          // Si cloudUpdatedMs >= localUpdatedMs, no escribimos. El cliente
-          // recibirá la versión de cloud en el PULL de abajo.
         }
       }
     }
@@ -218,6 +220,7 @@ export async function POST(request) {
       ok: true,
       remote,
       mapping,
+      pushed,           // {uploaded, updated, deleted} — lo que el server escribió en cloud
       server_time: Date.now(),
     })
   } catch (e) {

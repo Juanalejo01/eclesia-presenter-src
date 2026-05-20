@@ -89,16 +89,22 @@ async function syncOnce() {
       return { ok: false, error: err }
     }
 
-    const stats = _db.applySyncResult({ remote: data.remote, mapping: data.mapping })
+    const pullStats = _db.applySyncResult({ remote: data.remote, mapping: data.mapping })
     state.lastSyncAt = data.server_time || Date.now()
     state.syncing = false
     saveState()
+    // Stats completos: lo que SUBIMOS al cloud (pushed del server) +
+    // lo que BAJAMOS del cloud (pullStats del cliente)
+    const combinedStats = {
+      pushed: data.pushed || { uploaded: 0, updated: 0, deleted: 0 },
+      pulled: pullStats,
+    }
     emit('cloud-sync:ok', {
       time: state.lastSyncAt,
-      stats,
+      stats: combinedStats,
       remoteCount: data.remote?.length || 0,
     })
-    return { ok: true, stats }
+    return { ok: true, stats: combinedStats }
   } catch (e) {
     state.lastSyncError = e?.message || String(e)
     state.syncing = false
