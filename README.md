@@ -21,14 +21,9 @@
 
 ---
 
-<!-- HERO SCREENSHOT -->
-<!-- Captura sugerida: pantalla completa con un slide proyectándose,
-     panel de Biblia abierto a la izquierda, monitor PGM/PVW a la derecha.
-     Tamaño recomendado: 1600x900. Guardar en docs/screenshots/hero.png -->
-
 <div align="center">
-  <img src="docs/screenshots/hero.png" alt="EclesiaPresenter en acción" width="900" />
-  <p><em>↑ Reemplazar con screenshot real cuando esté disponible (ver <code>docs/screenshots/README.md</code>)</em></p>
+  <img src="docs/screenshots/hero.png" alt="EclesiaPresenter — panel de Biblia con Salmos 37:25 proyectándose al monitor PGM ON AIR" width="900" />
+  <p><em>Salmos 37:25 al aire desde el panel de Biblia. El monitor PGM de la derecha muestra exactamente lo que ve la congregación.</em></p>
 </div>
 
 ---
@@ -65,7 +60,9 @@ Búsqueda por libro/capítulo/versículo, selección múltiple estilo Finder.
 Plantillas de estructura (verso/coro/puente), auto-split por longitud,
 vista previa con tema aplicado. Persistencia en SQLite.
 
-<!-- <img src="docs/screenshots/songs-editor.png" width="700" alt="Editor de canciones" /> -->
+<p align="center">
+  <img src="docs/screenshots/songs-editor.png" width="800" alt="Editor de canciones con sidebar de favoritos y editor estructurado" />
+</p>
 
 ### 📋 Lista del día con drag & drop
 Reordena con el ratón, navega con `←/→` durante el servicio en vivo.
@@ -83,12 +80,17 @@ Dos ventanas nativas:
 Vista lateral con tally `ON AIR`, modo Live/Preview, "Tomar al aire" estilo
 mesa de TV. Útil para iglesias que streamean a YouTube/Facebook.
 
-### 🎨 Tema personalizable
+### 🎨 Tema personalizable + biblioteca de fondos CC0
 Fondo (color sólido, gradiente, imagen, video, transparente), tipografía,
 transiciones (fade, slide, zoom), posición vertical, sombras.
 
-**+ Biblioteca incluida** de 56 videos worship CC0 curados de Pexels
-(descarga bajo demanda — no inflan el .exe).
+**+ Biblioteca incluida** de 56 videos worship CC0 curados de Pexels en 4
+categorías (partículas, cielo, naturaleza, loops abstractos). Descarga
+bajo demanda — no inflan el .exe.
+
+<p align="center">
+  <img src="docs/screenshots/settings-fondos.png" width="800" alt="Catálogo de 56 fondos preset CC0 con placeholders de gradiente por categoría" />
+</p>
 
 ### 📺 Stage Display v2
 Monitor para el predicador / vocalistas con:
@@ -110,6 +112,18 @@ navegador con PIN — sin instalar nada. 3 pestañas: Slides / Biblia / Lista.
 Detecta nueva versión en startup, descarga en background, instala al
 reiniciar. Funciona con NSIS installer. Portables reciben aviso para
 descarga manual.
+
+### 🧰 Panel de Herramientas
+Widgets útiles durante el servicio que **no** existen en ProPresenter ni EasyWorship:
+
+- **Countdown / cuenta atrás** proyectable ("El servicio empieza en 1:26:43")
+- **Cronómetro** para dinámicas de tiempo limitado
+- **Verso aleatorio** filtrable por testamento, libro o "mis favoritos"
+- **Ruleta** con animación SVG para sorteos (lista editable + "no repetir ganador")
+
+<p align="center">
+  <img src="docs/screenshots/tools-countdown.png" width="800" alt="Panel de Herramientas con countdown configurado para el inicio del servicio" />
+</p>
 
 ### ⌨ Atajos globales
 `Ctrl+1..4` cambia panel · `←/→` navega slides · `B` blanco · `.` blackout
