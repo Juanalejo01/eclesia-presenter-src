@@ -8,6 +8,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/Juanalejo01/eclesia-presenter?style=flat-square&color=db9f75)](https://github.com/Juanalejo01/eclesia-presenter/releases/latest)
 [![Build & Release](https://img.shields.io/github/actions/workflow/status/Juanalejo01/eclesia-presenter/release.yml?style=flat-square&label=build&color=6bcf8e)](https://github.com/Juanalejo01/eclesia-presenter/actions/workflows/release.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/Juanalejo01/eclesia-presenter/test.yml?style=flat-square&label=tests&color=6bcf8e)](https://github.com/Juanalejo01/eclesia-presenter/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/Juanalejo01/eclesia-presenter?style=flat-square&color=c9b29c)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/Juanalejo01/eclesia-presenter/total?style=flat-square&color=db9f75)](https://github.com/Juanalejo01/eclesia-presenter/releases)
 [![Stars](https://img.shields.io/github/stars/Juanalejo01/eclesia-presenter?style=flat-square&color=f4b840)](https://github.com/Juanalejo01/eclesia-presenter/stargazers)
@@ -160,6 +161,20 @@ npm run dist:all    # Windows: portable + NSIS setup + iconos embedded
 npm run dist:mac    # macOS arm64 zip
 npm run dist:linux  # Linux AppImage
 ```
+
+### Para testers
+
+```bash
+npm test            # Jest — unit tests de módulos puros (textUtils, songSplit, i18n)
+npm run test:watch  # modo watch durante desarrollo
+npm run test:cov    # con coverage report → coverage/index.html
+npm run e2e         # Playwright — E2E web (lanza next dev automáticamente)
+npm run e2e:ui      # interfaz visual de Playwright para debug
+```
+
+Coverage actual: **35 unit tests** (100% líneas en `textUtils` + `songSplit`,
+70% en `i18n`) y **19 E2E tests** cubriendo landing, descarga, precios,
+casos de uso y navegación mobile.
 
 ---
 

@@ -46,3 +46,9 @@ design-reference/
 # Electron user data (if generated locally)
 *.sqlite
 *.db
+
+# Test outputs
+coverage/
+playwright-report/
+test-results/
+playwright-results.xml
