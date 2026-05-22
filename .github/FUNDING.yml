@@ -1,0 +1,16 @@
+# GitHub Sponsors button config — aparece como botón "Sponsor" en el top
+# del repo cuando GitHub Sponsors esté activado para la cuenta.
+#
+# Activación pendiente (requiere KYC del maintainer):
+#   1. https://github.com/sponsors/dashboard
+#   2. Crear perfil de sponsor
+#   3. Verificar identidad (1099 / fiscal info)
+#
+# Mientras tanto este archivo señala intención y muestra otras vías de apoyo.
+
+github: [Juanalejo01]
+# Otras plataformas (activar cuando aplique):
+# patreon: eclesia-presenter
+# open_collective: eclesia-presenter
+# ko_fi: juanalejo01
+# custom: ["https://eclesia-presenter.vercel.app/pricing"]

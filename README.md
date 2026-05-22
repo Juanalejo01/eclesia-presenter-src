@@ -12,6 +12,8 @@
 [![License](https://img.shields.io/github/license/Juanalejo01/eclesia-presenter?style=flat-square&color=c9b29c)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/Juanalejo01/eclesia-presenter/total?style=flat-square&color=db9f75)](https://github.com/Juanalejo01/eclesia-presenter/releases)
 [![Stars](https://img.shields.io/github/stars/Juanalejo01/eclesia-presenter?style=flat-square&color=f4b840)](https://github.com/Juanalejo01/eclesia-presenter/stargazers)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-c9b29c.svg?style=flat-square)](CODE_OF_CONDUCT.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-6bcf8e.svg?style=flat-square)](CONTRIBUTING.md)
 
 [🌐 **Web oficial**](https://eclesia-presenter.vercel.app) ·
 [📥 **Descargar**](https://eclesia-presenter.vercel.app/download) ·
@@ -313,16 +315,30 @@ Web oficial con docs detalladas: [eclesia-presenter.vercel.app/docs](https://ecl
 
 ---
 
-## 🤝 Contribuir
+## 🤝 Comunidad y contribución
 
-¿Encontraste un bug o quieres pedir una feature?
+Este es un proyecto abierto y vivo. Hay 4 formas de participar, ninguna
+requiere ser developer:
 
-- **Issues**: usa los templates en [Issues](https://github.com/Juanalejo01/eclesia-presenter/issues).
-- **Pull Requests**: abre un Issue primero para discutir el alcance.
-- **Votar features**: reacciona con 👍 a los Issues del [roadmap](ROADMAP.md).
+| Canal | Para qué |
+|---|---|
+| 💬 [**GitHub Discussions**](https://github.com/Juanalejo01/eclesia-presenter/discussions) | Preguntas, ideas tempranas, mostrar cómo usas la app, conectar con otros pastores / operadores |
+| 🐛 [**Issues**](https://github.com/Juanalejo01/eclesia-presenter/issues/new/choose) | Bugs y feature requests (con templates pre-rellenados) |
+| 🔀 [**Pull Requests**](https://github.com/Juanalejo01/eclesia-presenter/pulls) | Contribuciones de código — leer [CONTRIBUTING.md](CONTRIBUTING.md) primero |
+| 📖 [**Comparte tu historia**](https://eclesia-presenter.vercel.app/casos-de-uso) | Si tu iglesia usa EclesiaPresenter — aparece en /casos-de-uso |
 
-Si usas EclesiaPresenter en tu iglesia, **comparte tu historia** —
-contacta vía la web para que aparezca en [/casos-de-uso](https://eclesia-presenter.vercel.app/casos-de-uso).
+### Recursos para contribuidores
+
+- 📋 [CONTRIBUTING.md](CONTRIBUTING.md) — guía completa de contribución
+- 📜 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1
+- 🔐 [SECURITY.md](SECURITY.md) — reportar vulnerabilidades
+- 📝 [CHANGELOG.md](CHANGELOG.md) — historial de cambios por versión
+
+### Reconocimientos
+
+Cualquier PR mergeado acredita al autor en la lista pública de
+contribuidores. Para colaboraciones grandes, mención en la sección de
+agradecimientos de este README.
 
 ---
 

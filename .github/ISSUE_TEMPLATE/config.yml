@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions (preguntas generales)
+    url: https://github.com/Juanalejo01/eclesia-presenter/discussions
+    about: Para preguntas, ideas tempranas o discusión general. Issues debe quedar para bugs y features concretas.
+  - name: 📖 Documentación
+    url: https://eclesia-presenter.vercel.app/docs
+    about: Tutoriales y guías. Si la doc te resolvió la duda, no necesitas abrir Issue.
+  - name: 🔐 Reportar vulnerabilidad de seguridad
+    url: https://github.com/Juanalejo01/eclesia-presenter/security/advisories/new
+    about: Vulnerabilidades por canal privado (ver SECURITY.md).
+  - name: 📧 Contacto directo
+    url: https://eclesia-presenter.vercel.app/contacto
+    about: Email o WhatsApp para asuntos comerciales (iglesia grande, alianza).

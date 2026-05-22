@@ -1,0 +1,82 @@
+# Dependabot config — actualiza dependencias semanalmente con PRs separados
+# para evitar conflictos masivos. Agrupa minor + patch para reducir ruido.
+#
+# Más info: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+
+version: 2
+
+updates:
+  # ─────────────────────────────────────────────────────────────
+  # NPM — root (Electron desktop app)
+  # ─────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      # Patch + minor en un solo PR — son seguros normalmente
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Electron major bump requiere testing manual exhaustivo de la app
+      - dependency-name: "electron"
+        update-types: ["version-update:semver-major"]
+      # better-sqlite3 major puede romper APIs internas
+      - dependency-name: "better-sqlite3"
+        update-types: ["version-update:semver-major"]
+
+  # ─────────────────────────────────────────────────────────────
+  # NPM — web (Next.js)
+  # ─────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "npm"
+      - "web"
+    commit-message:
+      prefix: "chore(web)"
+      include: "scope"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Next.js major bump puede requerir migración de App Router
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+
+  # ─────────────────────────────────────────────────────────────
+  # GitHub Actions
+  # ─────────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    labels:
+      - "ci"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"

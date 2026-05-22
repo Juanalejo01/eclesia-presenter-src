@@ -1,0 +1,82 @@
+name: 💡 Feature request
+description: Proponer una funcionalidad nueva o mejora
+title: "[feat] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por proponer una mejora. Antes de codear nada por nuestra parte,
+        valoramos el alcance y encaje con la filosofía del proyecto.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Antes de abrir el issue
+      options:
+        - label: He buscado en [issues existentes](https://github.com/Juanalejo01/eclesia-presenter/issues) y [el roadmap](https://github.com/Juanalejo01/eclesia-presenter/blob/main/ROADMAP.md) y no está ya planeado
+          required: true
+        - label: Esta feature **alinea** con la filosofía del proyecto (ver ROADMAP.md → Filosofía)
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: ¿Qué problema resuelve?
+      description: |
+        Cuenta la **necesidad** primero, no la solución. Esto nos ayuda a pensar
+        alternativas que quizás encajen mejor.
+      placeholder: |
+        Como pastor de una iglesia pequeña, tengo problemas para...
+        Hoy resuelvo esto haciendo... pero es incómodo porque...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solución propuesta
+      description: Tu idea de cómo resolverlo en EclesiaPresenter.
+      placeholder: |
+        Añadir un botón "X" en el panel Y que haga Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+      description: ¿Has pensado otras formas de resolver lo mismo? ¿Por qué descartadas?
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: ¿Para qué tier?
+      description: |
+        Las features pueden ir en Free (todos) o Pro (suscriptores).
+        En general: features de productividad → Free. Features de cloud /
+        producción avanzada → Pro.
+      options:
+        - "Free (todos los usuarios)"
+        - "Pro (suscriptores)"
+        - "No estoy seguro"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioridad subjetiva
+      description: ¿Cuánto te frustraría no tenerla?
+      options:
+        - "Nice to have"
+        - "Lo usaría a menudo"
+        - "Lo necesito ya — sin esto no puedo usar la app"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: Mockups, links a cómo lo hacen otros (ProPresenter, EasyWorship), referencias bíblicas si aplica, etc.

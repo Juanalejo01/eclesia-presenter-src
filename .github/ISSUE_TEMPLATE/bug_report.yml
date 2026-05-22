@@ -1,0 +1,112 @@
+name: 🐛 Bug report
+description: Reportar un comportamiento incorrecto de la app
+title: "[bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar un bug. Por favor rellena la info de abajo para que
+        podamos reproducirlo y arreglarlo lo antes posible.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Antes de abrir el issue
+      options:
+        - label: He buscado en [issues existentes](https://github.com/Juanalejo01/eclesia-presenter/issues?q=is%3Aissue) y no encontré uno duplicado
+          required: true
+        - label: He revisado la [documentación](https://eclesia-presenter.vercel.app/docs) por si era un problema de uso
+          required: true
+        - label: Estoy en la última versión disponible
+          required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción del bug
+      description: Qué está pasando y qué esperabas que pasara.
+      placeholder: |
+        Cuando hago X, ocurre Y, pero esperaba Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      description: Lista numerada de pasos exactos para reproducir el bug.
+      placeholder: |
+        1. Abrir la app
+        2. Ir a Ajustes → Aspecto
+        3. Hacer click en "Tema visual"
+        4. La app se cierra inesperadamente
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamiento esperado
+      placeholder: |
+        Debería mostrarse el selector de temas sin cerrar la app.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistema operativo
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS 14+ (Sonoma+)
+        - macOS 13 (Ventura)
+        - macOS anterior
+        - Linux (especificar en "Otros")
+        - Otro
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión de EclesiaPresenter
+      description: Ajustes → Acerca de
+      placeholder: "0.2.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-type
+    attributes:
+      label: Tipo de instalación
+      options:
+        - Setup (NSIS installer)
+        - Portable
+        - Desde código fuente (npm run dev)
+        - macOS zip
+        - Otro
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / consola
+      description: |
+        Si tienes logs (Ajustes → Acerca de → mostrar logs, o consola DevTools
+        con Ctrl+Shift+I), pégalos aquí.
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Capturas o video
+      description: Arrastra archivos directamente al campo.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: Cualquier otra info relevante (¿es la primera vez que pasa? ¿pasó tras actualizar? ¿solo en cierta canción?).

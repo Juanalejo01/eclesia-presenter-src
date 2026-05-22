@@ -1,0 +1,41 @@
+name: ❓ Pregunta
+description: Una pregunta sobre uso o configuración (prefiere Discussions cuando sea posible)
+title: "[question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 💡 **Tip**: para preguntas abiertas prefiere [Discussions](https://github.com/Juanalejo01/eclesia-presenter/discussions),
+        > así otros usuarios pueden beneficiarse de la respuesta sin saturar el tracker de Issues.
+        >
+        > Usa este formulario solo si tu pregunta está **directamente ligada a
+        > un comportamiento específico** que crees que podría ser bug o needs-fix.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Antes de preguntar
+      options:
+        - label: He revisado la [documentación](https://eclesia-presenter.vercel.app/docs)
+          required: true
+        - label: He buscado en Issues y Discussions anteriores
+          required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Tu pregunta
+      placeholder: |
+        ¿Cómo configuro X para que Y?
+        ¿Es posible Z?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto
+      description: |
+        ¿Qué has intentado? ¿Qué hardware / OS / versión usas?
+        Cuanto más contexto, más rápida y precisa la respuesta.
