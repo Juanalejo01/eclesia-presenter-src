@@ -9,15 +9,84 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-### Added
-- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) y
-  `SECURITY.md` para subir el Community Standards score de GitHub a 100%.
-- Templates de Issues (bug, feature, question) y de Pull Requests en
-  `.github/`.
-- `FUNDING.yml` placeholder para activar el botón Sponsor cuando KYC esté listo.
-- `CHANGELOG.md` (este archivo).
-- Dependabot config (`.github/dependabot.yml`) para PRs semanales de
-  actualizaciones de seguridad.
+---
+
+## [0.2.2] — 2026-05-23
+
+Release de iteración rápida basada en feedback de uso real. **Primera
+release que prueba el auto-updater desde una versión anterior instalada
+(v0.2.1 → v0.2.2)**.
+
+### Added — Biblia
+- 🔄 **Re-trigger de búsqueda** desde cualquier vista — escribir letras
+  estando en capítulos/versículos vuelve a la lista de libros con esa
+  letra como filtro.
+- 🔢 **Navegación numérica directa** — en step capítulos/versículos,
+  teclear "12" + Enter entra al cap/vers 12 directo. Buffer multi-dígito
+  con auto-commit a 900 ms.
+- ⌨️ **Ctrl/Cmd + F** vuelve a la selección de libros con buscador
+  enfocado.
+- 🎨 **Botones de libros rediseñados** — cards cuadrados-rectangulares
+  color-coded por testamento (AT en cobre, NT en dorado).
+- 📜 **Historial de versículos** — chips horizontales con los últimos
+  24 versículos proyectados. Click → restaura.
+
+### Added — Canciones
+- 🔤 **Orden alfabético** estricto (`title COLLATE NOCASE ASC`).
+- 🎵 **Layout 2 columnas**: Biblioteca (alfabético, fijo) +
+  Servicio del día (drag&drop reordenable). Orden persistido en
+  `localStorage`.
+- ✂️ **Auto-split al pegar** — pegar una canción larga se divide en
+  secciones según `maxLines`. Detección por líneas vacías.
+- ↩️ **Auto-overflow a nueva sección** — pulsar Enter en línea N+1
+  con maxLines=N crea una sección nueva con la línea sobrante.
+- 📌 **Barra de ajustes sticky** — `AA MAYÚS / aa minús / + Sección`
+  fija arriba al hacer scroll por secciones largas.
+- 📥 **Botón Importar / Exportar** → abre Ajustes → Canciones (antes
+  era un botón fake sin lógica).
+
+### Added — Proyección
+- 📏 **Tamaño configurable de la referencia** bíblica — 4 niveles
+  (Pequeño 1/5, Medio 1/4, Grande 1/3, Muy grande 1/2). Nunca supera
+  el tamaño del texto principal.
+
+### Added — Transmisión
+- 🔄 **Botón Refrescar** en el bloque del QR — re-detecta IP local y
+  regenera el QR (útil al cambiar de WiFi a LAN).
+
+### Changed
+- **QR del remoto** generado LOCALMENTE con `qrcode` (npm) en vez de la
+  API externa `api.qrserver.com`. Colores negro/blanco puro para máxima
+  compatibilidad con cámaras móviles.
+- Email de contacto unificado a `juanlpz.dev@gmail.com` en toda la web
+  (antes había `hola@eclesiapresenter.com` placeholder).
+- Web `/contacto` rediseñada con email + WhatsApp deep link como
+  canales primarios.
+
+### Removed
+- ❌ **Watermark "Esperando contenido…"** en proyección vacía — los
+  operadores dejan pantalla vacía intencionalmente durante el servicio
+  y el texto fantasma rompía la atmósfera.
+
+### Fixed
+- 🐛 Thumbnails 404 de Pexels: UI ahora muestra placeholder con gradiente
+  por categoría + icono + título (52 de 56 videos del catálogo se ven
+  ahora con un fallback elegante en vez de un div gris vacío).
+
+### CI / Infrastructure
+- 🧪 **Suite de tests automatizados** — Jest (35 unit tests, 89%
+  coverage en módulos cubiertos) + Playwright (19 E2E tests). Workflow
+  CI `test.yml` independiente de release.
+- 📋 **Community Standards 100%** — `CONTRIBUTING.md`,
+  `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `SECURITY.md`,
+  templates de Issues (bug, feature, question) y PRs, `FUNDING.yml`,
+  `dependabot.yml`.
+
+### Notes
+- ⚠️ **SignPath**: aún esperando aprobación del programa OSS. Los
+  binarios v0.2.2 siguen sin firmar — SmartScreen seguirá avisando.
+- 💰 **Azure Trusted Signing**: planeado para próxima sprint cuando
+  llegue el salario del maintainer (~10€/mes).
 
 ---
 
@@ -135,6 +204,7 @@ Cimientos iniciales (pre-beta).
 - **Fixed**: bug fixes
 - **Security**: cambios relacionados con seguridad
 
-[Unreleased]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.1.0...v0.2.0
