@@ -260,6 +260,25 @@ export default function BiblePanel({ onSendSlide }) {
     })
   }, [books, versionId])
 
+  // ════════════════════════════════════════════════════════════
+  // HISTORIAL DE VERSÍCULOS PROYECTADOS — máx 24 entradas, solo memoria
+  // (se borra al cerrar la app). Útil para volver a un versículo que
+  // ya mostraste durante el servicio sin reescribir la búsqueda.
+  // ════════════════════════════════════════════════════════════
+  const [verseHistory, setVerseHistory] = useState([])
+
+  const restoreFromHistory = (entry) => {
+    if (!entry) return
+    goToReference(
+      entry.bookIndex,
+      entry.chapterNum,
+      entry.verses[0],
+      entry.verses.length > 1 ? entry.verses[entry.verses.length - 1] : null
+    )
+  }
+
+  const clearHistory = () => setVerseHistory([])
+
   // Envío al live cuando cambian versículos seleccionados.
   // Si el texto excede ~280 caracteres, se divide en N sub-slides
   // navegables con ←/→ antes de saltar al siguiente versículo.
@@ -276,6 +295,32 @@ export default function BiblePanel({ onSendSlide }) {
     setVerseSlides(splits)
     setVerseSlideIdx(0)
     onSendSlide({ ...splits[0], type: 'bible' })
+
+    // Añadir al historial. Dedup: si la entrada anterior es la misma
+    // referencia, no la repetimos (evita ruido al reabrir el mismo verso).
+    setVerseHistory(prev => {
+      const sortedV = [...selectedVerses].sort((a, b) => a - b)
+      const ref = sortedV.length === 1
+        ? `${chapter.bookName} ${chapter.chapterNum}:${sortedV[0]}`
+        : `${chapter.bookName} ${chapter.chapterNum}:${sortedV[0]}-${sortedV[sortedV.length - 1]}`
+      if (prev[0]?.reference === ref) return prev
+      // Quitar duplicados previos de la misma ref si existieran
+      const deduped = prev.filter(e => e.reference !== ref)
+      const firstVerseText = chapter.verses.find(v => v.verseNum === sortedV[0])?.text || ''
+      const preview = firstVerseText.length > 60
+        ? firstVerseText.slice(0, 58) + '…'
+        : firstVerseText
+      const entry = {
+        reference: ref,
+        bookIndex: selectedBookIndex,
+        bookName: chapter.bookName,
+        chapterNum: chapter.chapterNum,
+        verses: sortedV,
+        preview,
+        timestamp: Date.now(),
+      }
+      return [entry, ...deduped].slice(0, 24)
+    })
   }, [selectedVerses, chapter])
 
   // ════════════════════════════════════════════════════════════
@@ -579,6 +624,16 @@ export default function BiblePanel({ onSendSlide }) {
                 onGoChapters={goToChapters}
               />
 
+              {/* Historial de versículos proyectados durante esta sesión.
+                  Se muestra siempre que haya entradas, independiente del step. */}
+              {verseHistory.length > 0 && (
+                <VerseHistory
+                  entries={verseHistory}
+                  onPick={restoreFromHistory}
+                  onClear={clearHistory}
+                />
+              )}
+
               {/* STEP: BOOKS */}
               {step === 'book' && (
                 <div>
@@ -784,6 +839,90 @@ function Breadcrumb({ step, bookName, chapterNum, onBack, onGoBooks, onGoChapter
           ← Atrás <span className="kbd" style={{ marginLeft: 4 }}>ESC</span>
         </button>
       )}
+    </div>
+  )
+}
+
+// ============================================================
+// VerseHistory — chips horizontales con los últimos versículos
+// proyectados. Click para volver a uno anterior.
+// ============================================================
+function VerseHistory({ entries, onPick, onClear }) {
+  const [expanded, setExpanded] = useState(false)
+  // Mostrar 6 visibles, los demás bajo expand
+  const VISIBLE = 6
+  const visible = expanded ? entries : entries.slice(0, VISIBLE)
+  const hidden  = entries.length - visible.length
+
+  return (
+    <div className="card" style={{ padding: '8px 10px' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 6,
+      }}>
+        <span style={{
+          fontSize: 10, color: 'var(--text-3)',
+          fontFamily: 'var(--font-mono)', letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+        }}>
+          Historial · {entries.length}
+        </span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {entries.length > VISIBLE && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => setExpanded(v => !v)}
+              style={{ fontSize: 10, height: 22, padding: '0 8px' }}>
+              {expanded ? 'Colapsar' : `+ ${hidden}`}
+            </button>
+          )}
+          <button
+            className="btn btn-ghost"
+            onClick={onClear}
+            title="Limpiar historial"
+            style={{ fontSize: 10, height: 22, padding: '0 8px', color: 'var(--text-3)' }}>
+            Limpiar
+          </button>
+        </div>
+      </div>
+      <div style={{
+        display: 'flex', gap: 6, flexWrap: expanded ? 'wrap' : 'nowrap',
+        overflowX: expanded ? 'visible' : 'auto',
+        paddingBottom: 4,
+      }}>
+        {visible.map((entry, i) => (
+          <button
+            key={entry.timestamp}
+            onClick={() => onPick(entry)}
+            title={entry.preview}
+            style={{
+              all: 'unset',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '5px 10px',
+              borderRadius: 6,
+              background: i === 0 ? 'rgba(168, 95, 51, 0.16)' : 'var(--bg-3)',
+              border: '1px solid ' + (i === 0 ? 'rgba(232, 181, 145, 0.30)' : 'var(--line-1)'),
+              fontSize: 11, fontFamily: 'var(--font-mono)',
+              color: i === 0 ? 'var(--copper-100)' : 'var(--text-2)',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(168, 95, 51, 0.22)'
+              e.currentTarget.style.borderColor = 'rgba(232, 181, 145, 0.35)'
+              e.currentTarget.style.color = 'var(--copper-100)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = i === 0 ? 'rgba(168, 95, 51, 0.16)' : 'var(--bg-3)'
+              e.currentTarget.style.borderColor = i === 0 ? 'rgba(232, 181, 145, 0.30)' : 'var(--line-1)'
+              e.currentTarget.style.color = i === 0 ? 'var(--copper-100)' : 'var(--text-2)'
+            }}>
+            {entry.reference}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

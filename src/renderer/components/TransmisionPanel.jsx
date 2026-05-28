@@ -211,11 +211,25 @@ function RemoteSection() {
   const [copied, setCopied] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState(null)
   const [qrError, setQrError] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
+  // Carga inicial + handler de refresh manual. La IP cambia cuando el usuario
+  // alterna entre WiFi/LAN/hotspot y necesitamos re-detectarla para regenerar
+  // el QR sin reiniciar la app.
+  const loadInfo = async () => {
     if (!window.electron?.server) return
-    window.electron.server.info().then(setInfo).catch(() => {})
-  }, [])
+    setRefreshing(true)
+    try {
+      const fresh = await window.electron.server.info()
+      setInfo(fresh)
+      setQrError(false)
+      setQrDataUrl(null)  // forzará la re-generación del QR via useEffect
+    } catch {} finally {
+      setTimeout(() => setRefreshing(false), 350)  // mínimo visible
+    }
+  }
+
+  useEffect(() => { loadInfo() }, [])
 
   // Generar QR LOCALMENTE (sin depender de API externa). Negro sobre blanco
   // para máximo contraste — algunas cámaras móviles fallan con colores
@@ -249,9 +263,23 @@ function RemoteSection() {
 
   return (
     <div className="card" style={{ padding: 18 }}>
-      <div className="section-h" style={{ marginBottom: 14 }}>
-        <h3>Control remoto desde el móvil</h3>
-        <span className="sub">beta · vía WiFi local</span>
+      <div className="section-h" style={{ marginBottom: 14, justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <h3>Control remoto desde el móvil</h3>
+          <span className="sub">beta · vía WiFi local</span>
+        </div>
+        <button
+          className="btn btn-ghost"
+          onClick={loadInfo}
+          disabled={refreshing}
+          title="Re-detectar IP local y regenerar QR (útil si cambias de WiFi/LAN)"
+          style={{ fontSize: 12, gap: 6, display: 'inline-flex', alignItems: 'center' }}>
+          <IconRefresh size={13} style={{
+            transition: 'transform 0.6s ease',
+            transform: refreshing ? 'rotate(360deg)' : 'rotate(0)',
+          }} />
+          {refreshing ? 'Refrescando…' : 'Refrescar'}
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
