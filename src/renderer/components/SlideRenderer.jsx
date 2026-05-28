@@ -45,7 +45,12 @@ export default function SlideRenderer({ slide, theme, isBlackout: forceBlackout 
               : eff.textAlign === 'bottom' ? 'flex-end' : 'center'
 
   const fontSize   = `${(eff.fontSize / 1920) * 100}cqw`
-  const refSize    = `${((eff.fontSize / 4) / 1920) * 100}cqw`
+  // Tamaño de la referencia bíblica relativo al texto principal.
+  // Garantizamos que NUNCA supere el tamaño del texto principal:
+  //   sm → 1/5 (20%) · md → 1/4 (25%, default) · lg → 1/3 (33%) · xl → 1/2 (50%)
+  const REF_RATIOS = { sm: 1 / 5, md: 1 / 4, lg: 1 / 3, xl: 1 / 2 }
+  const refRatio   = REF_RATIOS[eff.referenceSize] ?? REF_RATIOS.md
+  const refSize    = `${((eff.fontSize * refRatio) / 1920) * 100}cqw`
   const paddingPct = `${(40 / 1920) * 100}cqw`
 
   const renderContent = (s) => (
@@ -145,7 +150,7 @@ function mergeThemeWithSlide(theme, slide) {
   const keys = ['bgType', 'bgColor', 'bgGradient', 'bgImage', 'bgVideo',
                 'imageFit', 'videoFit', 'bgImageBlur',
                 'fontColor', 'fontFamily', 'fontSize', 'fontWeight',
-                'textAlign', 'textShadow', 'referenceVisible']
+                'textAlign', 'textShadow', 'referenceVisible', 'referenceSize']
   for (const k of keys) {
     if (slide[k] !== undefined) out[k] = slide[k]
   }

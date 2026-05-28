@@ -374,6 +374,51 @@ function CustomizationGrid({ theme, updateTheme }) {
             Mostrar referencia bíblica
           </CheckboxLabel>
         </div>
+
+        {/* Selector de tamaño de la referencia — solo visible si la referencia
+            está activada. 4 niveles, garantizados ≤ tamaño del texto principal. */}
+        {theme.referenceVisible && (
+          <div className="field" style={{ gridColumn: 'span 2' }}>
+            <span className="label">
+              Tamaño de la referencia
+              <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                · nunca supera el texto
+              </span>
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 6 }}>
+              {[
+                { id: 'sm', label: 'Pequeño',    ratio: '1/5' },
+                { id: 'md', label: 'Medio',      ratio: '1/4' },
+                { id: 'lg', label: 'Grande',     ratio: '1/3' },
+                { id: 'xl', label: 'Muy grande', ratio: '1/2' },
+              ].map(opt => {
+                const active = (theme.referenceSize || 'md') === opt.id
+                return (
+                  <button key={opt.id}
+                    onClick={() => updateTheme({ referenceSize: opt.id })}
+                    style={{
+                      padding: '10px 8px',
+                      borderRadius: 'var(--r-md)',
+                      cursor: 'pointer',
+                      background: active
+                        ? 'linear-gradient(180deg, rgba(168,95,51,0.22), rgba(128,64,18,0.12))'
+                        : 'var(--bg-2)',
+                      border: '1px solid ' + (active ? 'rgba(232,181,145,0.40)' : 'var(--line-1)'),
+                      color: active ? 'var(--copper-100)' : 'var(--text-2)',
+                      transition: 'all 0.15s',
+                      textAlign: 'center',
+                      boxShadow: active ? 'var(--shadow-glow-copper)' : 'none',
+                    }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{opt.label}</div>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', opacity: 0.7, letterSpacing: '0.06em' }}>
+                      {opt.ratio} del texto
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

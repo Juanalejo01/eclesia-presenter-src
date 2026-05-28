@@ -63,6 +63,10 @@ const DEFAULT_THEME = {
   textShadow: true,
   textAlign: 'center',
   referenceVisible: true,
+  // Tamaño de la referencia bíblica relativo al texto principal.
+  // 4 niveles: 'sm' (1/5), 'md' (1/4 — default original), 'lg' (1/3), 'xl' (1/2).
+  // Nunca debe superar el tamaño del texto principal (= máximo 'xl' = 50%).
+  referenceSize: 'md',
   transitionType: 'fade',
   transitionDuration: 500,
   transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',

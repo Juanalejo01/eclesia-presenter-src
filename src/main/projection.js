@@ -76,6 +76,8 @@ function defaultTheme() {
     textShadow: true,
     textAlign: 'center',
     referenceVisible: true,
+    // Tamaño de la referencia: 'sm' | 'md' | 'lg' | 'xl' (1/5, 1/4, 1/3, 1/2 del fontSize).
+    referenceSize: 'md',
     transitionType: 'fade',
     transitionDuration: 500,
     transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
