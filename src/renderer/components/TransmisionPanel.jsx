@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import {
   IconBroadcast, IconExternal, IconMonitor, IconLayers, IconClock, IconRefresh,
   IconKey, IconX,
@@ -208,11 +209,33 @@ export default function TransmisionPanel() {
 function RemoteSection() {
   const [info, setInfo] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState(null)
+  const [qrError, setQrError] = useState(false)
 
   useEffect(() => {
     if (!window.electron?.server) return
     window.electron.server.info().then(setInfo).catch(() => {})
   }, [])
+
+  // Generar QR LOCALMENTE (sin depender de API externa). Negro sobre blanco
+  // para máximo contraste — algunas cámaras móviles fallan con colores
+  // personalizados aunque tengan contraste suficiente.
+  useEffect(() => {
+    if (!info?.remoteUrl) return
+    let cancelled = false
+    QRCode.toDataURL(info.remoteUrl, {
+      width: 320,             // 2x para retinas (display: 160)
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#000000', light: '#ffffff' },
+    })
+      .then(url => { if (!cancelled) setQrDataUrl(url) })
+      .catch(e => {
+        console.warn('[QR] generación local falló:', e?.message)
+        if (!cancelled) setQrError(true)
+      })
+    return () => { cancelled = true }
+  }, [info?.remoteUrl])
 
   if (!info) return null
 
@@ -224,9 +247,6 @@ function RemoteSection() {
     } catch {}
   }
 
-  // QR generado via API pública (offline fallback: solo URL en texto)
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&color=f4e6d7&bgcolor=14100d&data=${encodeURIComponent(info.remoteUrl)}`
-
   return (
     <div className="card" style={{ padding: 18 }}>
       <div className="section-h" style={{ marginBottom: 14 }}>
@@ -237,16 +257,31 @@ function RemoteSection() {
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{
           width: 180, height: 180, flexShrink: 0,
-          background: 'var(--bg-2)', borderRadius: 12,
+          background: '#ffffff', borderRadius: 12,
           border: '1px solid var(--line-1)', padding: 8,
           display: 'grid', placeItems: 'center',
         }}>
-          <img
-            src={qrUrl}
-            width="160" height="160"
-            alt="QR code para control remoto"
-            onError={e => { e.currentTarget.style.display = 'none' }}
-          />
+          {qrDataUrl && !qrError ? (
+            <img
+              src={qrDataUrl}
+              width="160" height="160"
+              alt="QR code para control remoto"
+              style={{ imageRendering: 'pixelated' }}
+            />
+          ) : qrError ? (
+            <div style={{
+              fontSize: 11, color: '#666', textAlign: 'center', padding: 8,
+              fontFamily: 'var(--font-mono)',
+            }}>
+              QR no disponible.<br />Introduce la URL manualmente ↓
+            </div>
+          ) : (
+            <div style={{
+              fontSize: 10, color: '#999', fontFamily: 'var(--font-mono)',
+            }}>
+              generando QR…
+            </div>
+          )}
         </div>
 
         <div style={{ flex: 1, minWidth: 260 }}>

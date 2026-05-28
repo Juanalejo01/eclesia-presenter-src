@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   getAllVersions, getVisibleVersions, getActiveVersion, setActiveVersion,
   getBooks, getChapter, getChapterCount, searchText, combineVerses, splitLongVerse,
@@ -278,18 +278,117 @@ export default function BiblePanel({ onSendSlide }) {
     onSendSlide({ ...splits[0], type: 'bible' })
   }, [selectedVerses, chapter])
 
-  // Atajos: navegación + ESC retrocede + ←/→ entre versículos
+  // ════════════════════════════════════════════════════════════
+  // BUFFER NUMÉRICO — escribir un número en capítulos/versículos
+  // entra directo. Ej: en step='chapter' escribir "12" → cap 12.
+  // Multi-dígito: agrupa pulsaciones rápidas (timeout 900 ms) o Enter.
+  // ════════════════════════════════════════════════════════════
+  const [numericBuffer, setNumericBuffer] = useState('')
+  const numericTimerRef = useRef(null)
+
+  // Limpia el buffer si el step cambia (ya no aplica)
+  useEffect(() => { setNumericBuffer('') }, [step, selectedBookIndex])
+
+  const commitNumericBuffer = useCallback(() => {
+    const n = parseInt(numericBuffer, 10)
+    setNumericBuffer('')
+    if (!n || n < 1) return
+    if (step === 'chapter' && maxChapters && n <= maxChapters) {
+      pickChapter(n)
+    } else if (step === 'verse' && chapter && n <= chapter.verses.length) {
+      setSelectedVerses([n])
+    }
+    // Si el número excede el rango, simplemente se descarta sin error
+  }, [numericBuffer, step, maxChapters, chapter, selectedBookIndex, versionId])
+
+  // Auto-commit del buffer tras 900 ms de inactividad
+  useEffect(() => {
+    if (!numericBuffer) return
+    if (numericTimerRef.current) clearTimeout(numericTimerRef.current)
+    numericTimerRef.current = setTimeout(commitNumericBuffer, 900)
+    return () => { if (numericTimerRef.current) clearTimeout(numericTimerRef.current) }
+  }, [numericBuffer, commitNumericBuffer])
+
+  // ════════════════════════════════════════════════════════════
+  // ATAJOS GLOBALES DEL PANEL BIBLIA
+  //   • Esc → goBack
+  //   • Ctrl/Cmd+F → volver a libros + foco buscador + limpiar
+  //   • Letras (sin modificador) → buscador de libros se re-abre y
+  //     la letra se añade. Si ya estás en libros, simplemente append.
+  //   • Dígitos en chapter/verse → buffer numérico (ver más arriba)
+  //   • Enter → commit del buffer (si hay)
+  // ════════════════════════════════════════════════════════════
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      // Ignorar si el usuario está escribiendo en otro input/textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        // Excepción: Ctrl+F debe funcionar incluso desde dentro del input
+        // (recarga el foco y permite empezar nueva búsqueda).
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+          e.preventDefault()
+          goToBooks()
+          setBookSearch('')
+          requestAnimationFrame(() => bookSearchRef.current?.focus())
+        }
+        return
+      }
+
+      // Esc — retroceder un nivel
       if (e.key === 'Escape') {
         e.preventDefault()
-        goBack()
+        if (numericBuffer) {
+          setNumericBuffer('')
+        } else {
+          goBack()
+        }
+        return
+      }
+
+      // Ctrl/Cmd + F → vuelve a la selección de libros
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        goToBooks()
+        setBookSearch('')
+        requestAnimationFrame(() => bookSearchRef.current?.focus())
+        return
+      }
+
+      // Enter mientras hay buffer numérico → commit inmediato
+      if (e.key === 'Enter' && numericBuffer) {
+        e.preventDefault()
+        if (numericTimerRef.current) clearTimeout(numericTimerRef.current)
+        commitNumericBuffer()
+        return
+      }
+
+      // Dígitos sólo cuando estamos viendo capítulos o versículos
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && /^\d$/.test(e.key)) {
+        if (step === 'chapter' || step === 'verse') {
+          e.preventDefault()
+          setNumericBuffer(prev => (prev + e.key).slice(0, 4))
+        }
+        return
+      }
+
+      // Letras (a-z + ñ + acentos + espacio) → re-trigger búsqueda
+      if (!e.ctrlKey && !e.metaKey && !e.altKey &&
+          e.key.length === 1 && /[a-zñáéíóú ]/i.test(e.key)) {
+        e.preventDefault()
+        if (step !== 'book') {
+          // Volvemos a libros con esa letra como inicio de búsqueda
+          setBookSearch(e.key)
+          goToBooks()
+        } else {
+          // Ya estamos en libros — añade al filtro existente
+          setBookSearch(prev => prev + e.key)
+        }
+        requestAnimationFrame(() => bookSearchRef.current?.focus())
+        return
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [step, selectedBookIndex])
+  }, [step, selectedBookIndex, numericBuffer, commitNumericBuffer])
 
   useEffect(() => {
     if (step !== 'verse' || !chapter) return
@@ -357,6 +456,45 @@ export default function BiblePanel({ onSendSlide }) {
 
   return (
     <div className="workspace">
+      {/* Indicador flotante del buffer numérico — visible al teclear dígitos
+          en step='chapter' o 'verse'. Desaparece tras commit (Enter o 900ms). */}
+      {numericBuffer && (step === 'chapter' || step === 'verse') && (
+        <div style={{
+          position: 'fixed',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(20, 16, 13, 0.96)',
+          border: '2px solid var(--copper-200)',
+          borderRadius: 16,
+          padding: '20px 32px',
+          minWidth: 200,
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--copper-100)',
+          textAlign: 'center',
+          letterSpacing: '0.08em',
+          zIndex: 1000,
+          pointerEvents: 'none',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(232, 181, 145, 0.25)',
+        }}>
+          <div style={{
+            fontSize: 10, opacity: 0.65,
+            textTransform: 'uppercase', letterSpacing: '0.18em',
+            marginBottom: 6,
+          }}>
+            {step === 'chapter' ? 'Ir a capítulo' : 'Ir a versículo'}
+          </div>
+          <div style={{ fontSize: 48, fontWeight: 600, lineHeight: 1 }}>
+            {numericBuffer}
+          </div>
+          <div style={{
+            fontSize: 10, opacity: 0.5,
+            marginTop: 8, letterSpacing: '0.06em',
+          }}>
+            Enter para confirmar · Esc para cancelar
+          </div>
+        </div>
+      )}
+
       <div className="ws-header">
         <div className="ws-title">
           <h1 className="ws-h1">{t('nav.bible')}</h1>
@@ -472,17 +610,23 @@ export default function BiblePanel({ onSendSlide }) {
                     )}
                   </div>
                   <div className="book-grid" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}>
-                    {filteredBooks.map((book, i) => (
-                      <div key={book.index}
-                        className={'book-item' + (i === 0 && bookSearch ? ' book-item-suggested' : '')}
-                        onClick={() => pickBook(book.index)}
-                        style={i === 0 && bookSearch ? {
-                          border: '1px solid var(--copper-200)',
-                          background: 'linear-gradient(180deg, rgba(168, 95, 51, 0.18), rgba(128, 64, 18, 0.08))',
-                        } : undefined}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.name}</span>
-                      </div>
-                    ))}
+                    {filteredBooks.map((book, i) => {
+                      // Antiguo Testamento: index 0-38. Nuevo: 39-65.
+                      const isOT = book.index < 39
+                      const isSuggested = i === 0 && bookSearch
+                      return (
+                        <div key={book.index}
+                          className={
+                            'book-item ' + (isOT ? 'book-ot' : 'book-nt') +
+                            (isSuggested ? ' book-item-suggested active' : '')
+                          }
+                          onClick={() => pickBook(book.index)}
+                          title={isOT ? 'Antiguo Testamento' : 'Nuevo Testamento'}>
+                          <span className="book-item-tag">{isOT ? 'AT' : 'NT'}</span>
+                          <span className="book-item-name">{book.name}</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

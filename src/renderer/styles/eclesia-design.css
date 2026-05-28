@@ -438,19 +438,82 @@ textarea.field-input {
 .tally.off     { background: var(--bg-3);    color: var(--text-3); border: 1px solid var(--line-1); }
 .tally .led { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
 
-/* Bible book grid */
-.book-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.book-item {
-  display: flex; align-items: center; justify-content: space-between;
-  height: 36px; padding: 0 12px;
-  background: var(--bg-2); border: 1px solid var(--line-1);
-  border-radius: var(--r-sm); font-size: 12px;
-  color: var(--text-2); cursor: pointer; transition: all 0.15s ease;
+/* Bible book grid — cards cuadrados-rectangulares color-coded por testamento
+   (Antiguo = cobre / Nuevo = dorado). Tamaño táctil aumentado para tablets. */
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
 }
-.book-item:hover { background: var(--bg-3); color: var(--text-1); border-color: var(--line-2); transform: translateY(-1px); }
+.book-item {
+  position: relative;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 64px; padding: 14px 8px 10px;
+  background: var(--bg-2); border: 1px solid var(--line-1);
+  border-radius: var(--r-md); font-size: 13px;
+  font-weight: 500; line-height: 1.2;
+  color: var(--text-2); cursor: pointer; transition: all 0.18s ease;
+  text-align: center;
+  overflow: hidden;
+}
+.book-item:hover {
+  background: var(--bg-3); color: var(--text-1);
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* Antiguo Testamento — tono cobre / tierra */
+.book-item.book-ot {
+  background: linear-gradient(180deg,
+    rgba(168, 95, 51, 0.06),
+    rgba(120, 70, 45, 0.04));
+  border-color: rgba(168, 95, 51, 0.22);
+}
+.book-item.book-ot:hover {
+  background: linear-gradient(180deg,
+    rgba(168, 95, 51, 0.14),
+    rgba(120, 70, 45, 0.10));
+  border-color: rgba(168, 95, 51, 0.40);
+  color: var(--copper-100);
+}
+
+/* Nuevo Testamento — tono dorado / cálido */
+.book-item.book-nt {
+  background: linear-gradient(180deg,
+    rgba(244, 184, 64, 0.08),
+    rgba(200, 130, 30, 0.04));
+  border-color: rgba(244, 184, 64, 0.24);
+}
+.book-item.book-nt:hover {
+  background: linear-gradient(180deg,
+    rgba(244, 184, 64, 0.16),
+    rgba(200, 130, 30, 0.10));
+  border-color: rgba(244, 184, 64, 0.45);
+  color: #fde6b0;
+}
+
+/* Tag pequeño AT/NT en la esquina */
+.book-item-tag {
+  position: absolute; top: 4px; right: 6px;
+  font-family: var(--font-mono); font-size: 8px;
+  font-weight: 600; letter-spacing: 0.08em;
+  opacity: 0.5;
+}
+.book-item.book-ot .book-item-tag { color: var(--copper-200); }
+.book-item.book-nt .book-item-tag { color: #f4b840; }
+
+.book-item-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .book-item.active {
-  background: linear-gradient(180deg, rgba(168, 95, 51, 0.22), rgba(128, 64, 18, 0.16));
-  border-color: rgba(232, 181, 145, 0.35); color: var(--copper-100);
+  background: linear-gradient(180deg, rgba(168, 95, 51, 0.32), rgba(128, 64, 18, 0.22));
+  border-color: rgba(232, 181, 145, 0.50); color: var(--copper-100);
   box-shadow: var(--shadow-glow-copper);
 }
 .book-num { font-family: var(--font-mono); font-size: 10px; color: var(--text-4); }
