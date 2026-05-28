@@ -170,7 +170,9 @@ function listSongs({ search = '', onlyFavorites = false } = {}) {
   }
   if (onlyFavorites) sql += ' AND is_favorite = 1'
 
-  sql += ' ORDER BY is_favorite DESC, title ASC'
+  // Orden alfabético estricto (case-insensitive). El "Servicio del día"
+  // se gestiona en el renderer con un array de orden persistente, no aquí.
+  sql += ' ORDER BY title COLLATE NOCASE ASC'
   return db.prepare(sql).all(params).map(parseRow)
 }
 

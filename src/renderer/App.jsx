@@ -39,6 +39,7 @@ export default function App() {
   const [settingsRev, setSettingsRev] = useState(0)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsInitialSection, setSettingsInitialSection] = useState(null)
   const [splashDone, setSplashDone] = useState(false)
   const { live } = useSlideStore()
 
@@ -49,7 +50,13 @@ export default function App() {
 
   // Eventos globales emitidos desde shortcuts
   useEffect(() => {
-    const offSettings = subscribe('settings:open', () => setSettingsOpen(true))
+    const offSettings = subscribe('settings:open', (payload) => {
+      setSettingsOpen(true)
+      // El emisor puede pasar { section: 'canciones' } para abrir directo
+      // en una sección específica (ej. el botón "Importar/Exportar" en Canciones).
+      if (payload?.section) setSettingsInitialSection(payload.section)
+      else setSettingsInitialSection(null)
+    })
     const offFullscreen = subscribe('projection:toggle-fullscreen', async () => {
       if (!window.electron?.projection) return
       const state = await window.electron.projection.state()
@@ -122,6 +129,7 @@ export default function App() {
         <Settings
           onClose={() => setSettingsOpen(false)}
           onUpdate={() => setSettingsRev(r => r + 1)}
+          initialSection={settingsInitialSection}
         />
       )}
     </>

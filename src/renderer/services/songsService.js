@@ -72,10 +72,9 @@ export async function listSongs({ search = '', onlyFavorites = false } = {}) {
   }
   if (onlyFavorites) songs = songs.filter(s => s.is_favorite)
 
-  return songs.sort((a, b) => {
-    if (a.is_favorite !== b.is_favorite) return b.is_favorite - a.is_favorite
-    return a.title.localeCompare(b.title)
-  })
+  // Orden alfabético estricto. El "Servicio del día" se gestiona
+  // con un orden separado en localStorage en el componente.
+  return songs.sort((a, b) => a.title.localeCompare(b.title, 'es', { sensitivity: 'base' }))
 }
 
 export async function createSong(data) {

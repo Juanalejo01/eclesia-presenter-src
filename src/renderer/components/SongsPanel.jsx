@@ -1,35 +1,84 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   listSongs, createSong, updateSong, deleteSong, toggleFavorite, isUsingSQLite,
 } from '../services/songsService.js'
 import SongEditor from './SongEditor.jsx'
-import { subscribe } from '../hooks/useShortcuts.js'
+import { subscribe, emit } from '../hooks/useShortcuts.js'
 import { addItem as addToSchedule } from '../services/scheduleService.js'
 import { songToSlides } from '../services/songSplit.js'
 import {
   IconSearch, IconPlus, IconEdit, IconTrash, IconArrowRight,
-  IconStar, IconStarFill, IconMusic, IconRefresh,
+  IconStar, IconStarFill, IconMusic, IconRefresh, IconX, IconUpload,
 } from './Icons.jsx'
 import { useT } from '../services/i18n.js'
 
+// ============================================================
+// Persistencia del ORDEN del Servicio del día.
+// Se almacena solo IDs en localStorage. La pertenencia (favorito)
+// sigue persistiendo en SQLite vía is_favorite — esto solo guarda
+// EL ORDEN custom dado por drag&drop dentro de la columna.
+// ============================================================
+const SERVICE_ORDER_KEY = 'eclesia.service.order'
+const loadServiceOrder = () => {
+  try { return JSON.parse(localStorage.getItem(SERVICE_ORDER_KEY) || '[]') }
+  catch { return [] }
+}
+const saveServiceOrder = (ids) => {
+  try { localStorage.setItem(SERVICE_ORDER_KEY, JSON.stringify(ids)) } catch {}
+}
+
 export default function SongsPanel({ onSendSlide }) {
   const t = useT()
-  const [songs, setSongs]           = useState([])
-  const [search, setSearch]         = useState('')
-  const [onlyFavorites, setFavOnly] = useState(false)  // 'Servicio del día' = canciones marcadas para hoy
-  const [selected, setSelected]     = useState(null)
+  const [songs, setSongs]         = useState([])     // todas, alfabético
+  const [search, setSearch]       = useState('')
+  const [selected, setSelected]   = useState(null)
   const [sectionIndex, setSectionIndex] = useState(0)
-  const [editing, setEditing]       = useState(null)
+  const [editing, setEditing]     = useState(null)
+  const [serviceOrderIds, setServiceOrderIds] = useState(loadServiceOrder())
+  // Drag&drop visual feedback
+  const [dragOverId, setDragOverId] = useState(null)  // id sobre el que está hovering
+  const [dropZone, setDropZone]     = useState(null)  // 'service-empty' | 'service-end' | null
 
   const refresh = async () => {
-    const data = await listSongs({ search, onlyFavorites })
+    const data = await listSongs({ search: '' })  // siempre TODAS (filtro en cliente)
     setSongs(data)
   }
 
+  useEffect(() => { refresh() }, [])
+
+  // Cuando cambian las canciones, mantén el orden del servicio sincronizado:
+  // - quita IDs que ya no son favoritos
+  // - añade favoritos nuevos al final
   useEffect(() => {
-    const t = setTimeout(refresh, 200)
-    return () => clearTimeout(t)
-  }, [search, onlyFavorites])
+    if (songs.length === 0) return
+    const favIds = new Set(songs.filter(s => s.is_favorite).map(s => s.id))
+    const existing = serviceOrderIds.filter(id => favIds.has(id))
+    const toAdd = [...favIds].filter(id => !existing.includes(id))
+    const next = [...existing, ...toAdd]
+    if (next.length !== serviceOrderIds.length || next.some((id, i) => id !== serviceOrderIds[i])) {
+      setServiceOrderIds(next)
+      saveServiceOrder(next)
+    }
+  }, [songs])
+
+  // Cancion filtrada por búsqueda (col 1)
+  const allSongsFiltered = useMemo(() => {
+    if (!search) return songs
+    const q = search.trim().toLowerCase()
+    return songs.filter(s =>
+      (s.title || '').toLowerCase().includes(q) ||
+      (s.author || '').toLowerCase().includes(q) ||
+      (s.tags || '').toLowerCase().includes(q)
+    )
+  }, [songs, search])
+
+  // Canciones del servicio (col 2) en el orden del servicio
+  const serviceSongs = useMemo(() => {
+    const byId = new Map(songs.map(s => [s.id, s]))
+    return serviceOrderIds.map(id => byId.get(id)).filter(Boolean)
+  }, [songs, serviceOrderIds])
+
+  // === ACCIONES CRUD ===
 
   const handleSave = async (data) => {
     if (editing === 'new') await createSong(data)
@@ -42,13 +91,92 @@ export default function SongsPanel({ onSendSlide }) {
     if (!confirm(t('songs.deleteConfirm'))) return
     await deleteSong(id)
     if (selected?.id === id) setSelected(null)
+    // Quitar del orden del servicio si estaba
+    if (serviceOrderIds.includes(id)) {
+      const next = serviceOrderIds.filter(x => x !== id)
+      setServiceOrderIds(next); saveServiceOrder(next)
+    }
     refresh()
   }
 
-  const handleFavorite = async (id) => {
+  const handleToggleFavorite = async (id) => {
     await toggleFavorite(id)
     refresh()
   }
+
+  // === DRAG & DROP ===
+
+  // Inicia drag — guarda el ID y la columna de origen.
+  const onDragStart = (e, song, source) => {
+    e.dataTransfer.effectAllowed = source === 'col2' ? 'move' : 'copy'
+    e.dataTransfer.setData('text/song-id', String(song.id))
+    e.dataTransfer.setData('text/song-source', source)
+  }
+
+  // Mueve un song dentro del servicio a la posición de targetId
+  const reorderService = (draggedId, targetId) => {
+    if (draggedId === targetId) return
+    const without = serviceOrderIds.filter(id => id !== draggedId)
+    const targetIdx = without.indexOf(targetId)
+    if (targetIdx === -1) return
+    const next = [...without.slice(0, targetIdx), draggedId, ...without.slice(targetIdx)]
+    setServiceOrderIds(next); saveServiceOrder(next)
+  }
+
+  // Añade song al final del servicio (toggle favorite ON si no lo era)
+  const addToService = async (songId) => {
+    const song = songs.find(s => s.id === songId)
+    if (!song) return
+    if (!song.is_favorite) {
+      await toggleFavorite(songId)
+    }
+    // Asegurar que esté en el orden y al final
+    setServiceOrderIds(prev => {
+      if (prev.includes(songId)) return prev
+      const next = [...prev, songId]
+      saveServiceOrder(next)
+      return next
+    })
+    refresh()
+  }
+
+  // Quita del servicio (toggle favorite OFF)
+  const removeFromService = async (songId) => {
+    const song = songs.find(s => s.id === songId)
+    if (!song) return
+    if (song.is_favorite) await toggleFavorite(songId)
+    setServiceOrderIds(prev => {
+      const next = prev.filter(id => id !== songId)
+      saveServiceOrder(next)
+      return next
+    })
+    refresh()
+  }
+
+  // Drop handlers para col 2
+  const onServiceDragOver = (e, targetId = null, zone = null) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (targetId) setDragOverId(targetId)
+    if (zone) setDropZone(zone)
+  }
+  const onServiceDragLeave = () => {
+    setDragOverId(null); setDropZone(null)
+  }
+  const onServiceDrop = async (e, targetId = null) => {
+    e.preventDefault()
+    setDragOverId(null); setDropZone(null)
+    const draggedId = +e.dataTransfer.getData('text/song-id')
+    const source = e.dataTransfer.getData('text/song-source')
+    if (!draggedId) return
+    if (source === 'col1') {
+      await addToService(draggedId)
+    } else if (source === 'col2' && targetId) {
+      reorderService(draggedId, targetId)
+    }
+  }
+
+  // === PROYECCIÓN ===
 
   const flatSlides = selected
     ? songToSlides(selected, { maxLines: selected.maxLines ?? 4 })
@@ -92,13 +220,10 @@ export default function SongsPanel({ onSendSlide }) {
     return () => { offNext(); offPrev() }
   }, [selected, slideIndex, flatSlides.length])
 
-  // Cuando el móvil pide proyectar una canción por id, la seleccionamos y
-  // proyectamos la primera diapositiva (intro/estrofa 1) automáticamente.
   useEffect(() => {
     return subscribe('songs:remote-project', (payload) => {
       const id = payload?.id
       if (!id) return
-      // Si ya está cargada en `songs`, úsala; si no, refresca primero
       const found = songs.find(s => s.id === id)
       const doProject = (song) => {
         if (!song) return
@@ -122,6 +247,16 @@ export default function SongsPanel({ onSendSlide }) {
     })
   }, [songs])
 
+  const clearService = async () => {
+    if (!confirm(t('songs.clearListConfirm'))) return
+    for (const id of serviceOrderIds) {
+      const s = songs.find(x => x.id === id)
+      if (s?.is_favorite) await toggleFavorite(id)
+    }
+    setServiceOrderIds([]); saveServiceOrder([])
+    refresh()
+  }
+
   return (
     <div className="workspace">
       <div className="ws-header">
@@ -132,7 +267,12 @@ export default function SongsPanel({ onSendSlide }) {
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn"><IconRefresh size={14} /> {t('songs.import')}</button>
+          <button
+            className="btn"
+            onClick={() => emit('settings:open', { section: 'canciones' })}
+            title="Importar o exportar canciones desde Ajustes">
+            <IconUpload size={14} /> Importar / Exportar
+          </button>
           <button className="btn btn-primary" onClick={() => setEditing('new')}>
             <IconPlus size={14} /> {t('songs.new')}
           </button>
@@ -140,142 +280,165 @@ export default function SongsPanel({ onSendSlide }) {
       </div>
 
       <div className="ws-body">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div className="input-wrap" style={{ flex: 1 }}>
+        {/* ═══════════════════════════════════════════════════
+             LAYOUT 2 COLUMNAS:
+              col 1 → todas las canciones (alfabético, fijo)
+              col 2 → servicio del día (drag&drop reordenable)
+            ═══════════════════════════════════════════════════ */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+          gap: 14,
+          height: '100%',
+          minHeight: 0,
+        }}>
+
+          {/* ─── COLUMNA 1: Biblioteca ─── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
+            <div className="section-h">
+              <h3 style={{ fontSize: 14 }}>Biblioteca</h3>
+              <span className="sub">{allSongsFiltered.length} · alfabético</span>
+            </div>
+            <div className="input-wrap">
               <IconSearch size={15} className="input-icon" />
-              <input value={search} onChange={e => setSearch(e.target.value)}
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
                 placeholder={t('songs.searchPlaceholder')} />
               <span className="input-kbd"><span className="kbd">/</span></span>
             </div>
-            <button
-              className={'btn' + (onlyFavorites ? ' btn-primary' : '')}
-              onClick={() => setFavOnly(v => !v)}
-              title={t('songs.serviceTitle')}>
-              {onlyFavorites ? <IconStarFill size={14} /> : <IconStar size={14} />} {t('songs.serviceDay')}
-            </button>
-            {onlyFavorites && songs.some(s => s.is_favorite) && (
-              <button className="btn btn-ghost btn-danger"
-                onClick={async () => {
-                  if (!confirm(t('songs.clearListConfirm'))) return
-                  for (const s of songs.filter(x => x.is_favorite)) {
-                    await toggleFavorite(s.id)
-                  }
-                  refresh()
-                }}
-                title={t('songs.clearListTitle')}>
-                {t('songs.clearList')}
-              </button>
+
+            {allSongsFiltered.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+                <p className="empty-text">
+                  {search ? t('songs.emptySearch') : t('songs.empty')}
+                </p>
+              </div>
+            ) : (
+              <div style={{ overflowY: 'auto', flex: 1, paddingRight: 4 }}>
+                {allSongsFiltered.map(song => (
+                  <SongCard
+                    key={song.id}
+                    song={song}
+                    expanded={selected?.id === song.id}
+                    column="col1"
+                    inService={serviceOrderIds.includes(song.id)}
+                    sectionIndex={sectionIndex}
+                    onSelect={() => setSelected(s => s?.id === song.id ? null : song)}
+                    onFavorite={() => handleToggleFavorite(song.id)}
+                    onAddToList={() => addToSchedule({
+                      type: 'song', title: song.title,
+                      text: song.sections?.[0]?.text || song.title,
+                      reference: song.author || '',
+                      meta: { songId: song.id, sections: song.sections },
+                    })}
+                    onEdit={() => setEditing(song)}
+                    onDelete={() => handleDelete(song.id)}
+                    onSendSection={(sec, i) => handleSendSection(song, sec, i)}
+                    onDragStart={(e) => onDragStart(e, song, 'col1')}
+                    t={t}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
-          {songs.length === 0 && (
-            <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-              <p className="empty-text">
-                {search || onlyFavorites ? t('songs.emptySearch') : t('songs.empty')}
-              </p>
+          {/* ─── COLUMNA 2: Servicio del día ─── */}
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}
+            onDragOver={(e) => {
+              // Drop sobre la columna en general (no sobre un item) → añade al final
+              e.preventDefault()
+              if (serviceSongs.length === 0) setDropZone('service-empty')
+              else setDropZone('service-end')
+            }}
+            onDragLeave={() => setDropZone(null)}
+            onDrop={(e) => onServiceDrop(e)}
+          >
+            <div className="section-h">
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <h3 style={{ fontSize: 14, color: 'var(--copper-100)' }}>
+                  Servicio del día
+                </h3>
+                <span className="sub">{serviceSongs.length}</span>
+              </div>
+              {serviceSongs.length > 0 && (
+                <button className="btn btn-ghost btn-danger" onClick={clearService}
+                  style={{ fontSize: 11 }}
+                  title="Vaciar el servicio del día (no borra las canciones, solo las quita de aquí)">
+                  Vaciar servicio
+                </button>
+              )}
             </div>
-          )}
 
-          <div>
-            {songs.map(song => {
-              const expanded = selected?.id === song.id
-              return (
-                <div key={song.id}>
-                  <div className="song-row" style={expanded ? { borderColor: 'rgba(232, 181, 145, 0.4)' } : {}}>
-                    <span className="drag-handle">
-                      <span className="dot" /><span className="dot" />
-                      <span className="dot" /><span className="dot" />
-                      <span className="dot" /><span className="dot" />
-                    </span>
-                    <span className="song-icon"><IconMusic size={16} /></span>
-                    <div className="song-info" onClick={() => setSelected(expanded ? null : song)}>
-                      <div className="song-title">
-                        {song.title}
-                        {song.is_favorite && <span style={{ color: 'var(--copper-200)' }}><IconStarFill size={11} /></span>}
-                        {song.tags && song.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 3).map(t => (
-                          <span key={t} className="song-tag">{t}</span>
-                        ))}
-                      </div>
-                      <div className="song-meta">
-                        <span className="author">{song.author || t('songs.noAuthor')}</span>
-                        {song.sections?.length > 0 && (
-                          <>
-                            <span style={{ margin: '0 8px', color: 'var(--text-4)' }}>·</span>
-                            {t('songs.sectionsCount', { n: song.sections.length })}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <span className="song-actions">
-                      <button className="btn btn-ghost" onClick={() => handleFavorite(song.id)}
-                        title={song.is_favorite ? 'Quitar favorito' : 'Marcar favorito'}>
-                        {song.is_favorite
-                          ? <span style={{ color: 'var(--copper-200)' }}><IconStarFill size={13} /></span>
-                          : <IconStar size={13} />}
-                      </button>
-                      <button className="btn btn-ghost"
-                        onClick={() => addToSchedule({
-                          type: 'song', title: song.title,
-                          text: song.sections?.[0]?.text || song.title,
-                          reference: song.author || '',
-                          meta: { songId: song.id, sections: song.sections },
-                        })}
-                        title={t('songs.addToList')}>
-                        <IconPlus size={13} /> {t('songs.list')}
-                      </button>
-                      <button className="btn btn-ghost" onClick={() => setEditing(song)} title="Editar">
-                        <IconEdit size={13} />
-                      </button>
-                      <button className="btn btn-ghost btn-danger" onClick={() => handleDelete(song.id)} title="Eliminar">
-                        <IconTrash size={13} />
-                      </button>
-                    </span>
-                  </div>
-
-                  {/* Expanded sections */}
-                  {expanded && song.sections?.length > 0 && (
-                    <div style={{
-                      margin: '4px 0 8px 36px', paddingLeft: 14,
-                      borderLeft: '2px solid var(--line-2)',
-                      display: 'flex', flexDirection: 'column', gap: 4,
-                    }}>
-                      {song.sections.map((section, i) => {
-                        const active = sectionIndex === i
-                        return (
-                          <button key={i}
-                            onClick={() => handleSendSection(song, section, i)}
-                            style={{
-                              textAlign: 'left', padding: '8px 12px',
-                              borderRadius: 'var(--r-sm)', cursor: 'pointer',
-                              background: active
-                                ? 'linear-gradient(180deg, rgba(168,95,51,0.22), rgba(128,64,18,0.14))'
-                                : 'transparent',
-                              border: '1px solid ' + (active ? 'rgba(232,181,145,0.35)' : 'transparent'),
-                              transition: 'all 0.15s ease',
-                            }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                              <span style={{
-                                fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
-                                color: active ? 'var(--copper-100)' : 'var(--copper-200)', fontWeight: 600,
-                              }}>{section.label}</span>
-                              <span style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                                · {section.type}
-                              </span>
-                            </div>
-                            <p style={{
-                              fontSize: 12, color: 'var(--text-2)', margin: 0,
-                              whiteSpace: 'pre-line',
-                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                            }}>{section.text}</p>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
+            {serviceSongs.length === 0 ? (
+              <div
+                className="card"
+                style={{
+                  flex: 1,
+                  display: 'grid', placeItems: 'center',
+                  textAlign: 'center',
+                  padding: 40,
+                  border: dropZone === 'service-empty'
+                    ? '2px dashed var(--copper-200)'
+                    : '2px dashed var(--line-1)',
+                  background: dropZone === 'service-empty'
+                    ? 'rgba(168, 95, 51, 0.08)'
+                    : 'var(--bg-2)',
+                  transition: 'all 0.15s',
+                }}>
+                <div style={{ opacity: 0.7 }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>🎶</div>
+                  <p className="empty-text" style={{ marginBottom: 4 }}>
+                    Sin canciones para hoy
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                    Arrastra canciones desde la biblioteca →
+                  </p>
                 </div>
-              )
-            })}
+              </div>
+            ) : (
+              <div style={{ overflowY: 'auto', flex: 1, paddingRight: 4 }}>
+                {serviceSongs.map((song, idx) => (
+                  <div
+                    key={song.id}
+                    onDragOver={(e) => { e.stopPropagation(); onServiceDragOver(e, song.id) }}
+                    onDragLeave={onServiceDragLeave}
+                    onDrop={(e) => { e.stopPropagation(); onServiceDrop(e, song.id) }}
+                    style={{
+                      borderTop: dragOverId === song.id ? '2px solid var(--copper-200)' : '2px solid transparent',
+                      transition: 'border-color 0.12s',
+                    }}>
+                    <SongCard
+                      song={song}
+                      expanded={selected?.id === song.id}
+                      column="col2"
+                      inService={true}
+                      serviceIndex={idx + 1}
+                      sectionIndex={sectionIndex}
+                      onSelect={() => setSelected(s => s?.id === song.id ? null : song)}
+                      onRemove={() => removeFromService(song.id)}
+                      onEdit={() => setEditing(song)}
+                      onSendSection={(sec, i) => handleSendSection(song, sec, i)}
+                      onDragStart={(e) => onDragStart(e, song, 'col2')}
+                      t={t}
+                    />
+                  </div>
+                ))}
+                {/* Drop zone al final de la lista */}
+                <div
+                  onDragOver={(e) => { e.stopPropagation(); onServiceDragOver(e, null, 'service-end') }}
+                  onDrop={(e) => { e.stopPropagation(); onServiceDrop(e) }}
+                  style={{
+                    height: dropZone === 'service-end' ? 40 : 12,
+                    border: dropZone === 'service-end' ? '2px dashed var(--copper-200)' : 'none',
+                    borderRadius: 8,
+                    transition: 'all 0.15s',
+                    marginTop: 6,
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -286,6 +449,148 @@ export default function SongsPanel({ onSendSlide }) {
           onSave={handleSave}
           onCancel={() => setEditing(null)}
         />
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// SongCard — tarjeta de canción común a ambas columnas.
+// La columna ('col1' | 'col2') decide qué acciones se muestran:
+//   col1 → favorito (estrella), añadir lista, editar, borrar
+//   col2 → número de orden, quitar del servicio, editar
+// ============================================================
+function SongCard({
+  song, expanded, column, inService, serviceIndex, sectionIndex,
+  onSelect, onFavorite, onAddToList, onEdit, onDelete, onRemove,
+  onSendSection, onDragStart, t,
+}) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div
+        className="song-row"
+        draggable
+        onDragStart={onDragStart}
+        style={{
+          ...(expanded ? { borderColor: 'rgba(232, 181, 145, 0.4)' } : {}),
+          cursor: 'grab',
+          ...(column === 'col2' ? { background: 'linear-gradient(180deg, rgba(168,95,51,0.04), transparent)' } : {}),
+        }}
+        onMouseDown={e => e.currentTarget.style.cursor = 'grabbing'}
+        onMouseUp={e => e.currentTarget.style.cursor = 'grab'}>
+
+        {column === 'col2' ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            minWidth: 26, height: 26, borderRadius: '50%',
+            background: 'rgba(168, 95, 51, 0.18)',
+            border: '1px solid rgba(232, 181, 145, 0.3)',
+            color: 'var(--copper-100)',
+            fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700,
+          }}>{serviceIndex}</span>
+        ) : (
+          <span className="drag-handle">
+            <span className="dot" /><span className="dot" />
+            <span className="dot" /><span className="dot" />
+            <span className="dot" /><span className="dot" />
+          </span>
+        )}
+
+        <span className="song-icon"><IconMusic size={16} /></span>
+
+        <div className="song-info" onClick={onSelect}>
+          <div className="song-title">
+            {song.title}
+            {column === 'col1' && song.is_favorite && (
+              <span style={{ color: 'var(--copper-200)' }}><IconStarFill size={11} /></span>
+            )}
+            {song.tags && song.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 3).map(t => (
+              <span key={t} className="song-tag">{t}</span>
+            ))}
+          </div>
+          <div className="song-meta">
+            <span className="author">{song.author || t('songs.noAuthor')}</span>
+            {song.sections?.length > 0 && (
+              <>
+                <span style={{ margin: '0 8px', color: 'var(--text-4)' }}>·</span>
+                {t('songs.sectionsCount', { n: song.sections.length })}
+              </>
+            )}
+          </div>
+        </div>
+
+        <span className="song-actions">
+          {column === 'col1' && (
+            <>
+              <button className="btn btn-ghost" onClick={onFavorite}
+                title={song.is_favorite ? 'Quitar del servicio' : 'Añadir al servicio del día'}>
+                {song.is_favorite
+                  ? <span style={{ color: 'var(--copper-200)' }}><IconStarFill size={13} /></span>
+                  : <IconStar size={13} />}
+              </button>
+              <button className="btn btn-ghost" onClick={onAddToList} title={t('songs.addToList')}>
+                <IconPlus size={13} /> {t('songs.list')}
+              </button>
+              <button className="btn btn-ghost" onClick={onEdit} title="Editar">
+                <IconEdit size={13} />
+              </button>
+              <button className="btn btn-ghost btn-danger" onClick={onDelete} title="Eliminar">
+                <IconTrash size={13} />
+              </button>
+            </>
+          )}
+          {column === 'col2' && (
+            <>
+              <button className="btn btn-ghost" onClick={onEdit} title="Editar">
+                <IconEdit size={13} />
+              </button>
+              <button className="btn btn-ghost btn-danger" onClick={onRemove}
+                title="Quitar del servicio del día (la canción no se borra)">
+                <IconX size={13} />
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+
+      {expanded && song.sections?.length > 0 && (
+        <div style={{
+          margin: '4px 0 8px 36px', paddingLeft: 14,
+          borderLeft: '2px solid var(--line-2)',
+          display: 'flex', flexDirection: 'column', gap: 4,
+        }}>
+          {song.sections.map((section, i) => {
+            const active = sectionIndex === i
+            return (
+              <button key={i}
+                onClick={() => onSendSection(section, i)}
+                style={{
+                  textAlign: 'left', padding: '8px 12px',
+                  borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                  background: active
+                    ? 'linear-gradient(180deg, rgba(168,95,51,0.22), rgba(128,64,18,0.14))'
+                    : 'transparent',
+                  border: '1px solid ' + (active ? 'rgba(232,181,145,0.35)' : 'transparent'),
+                  transition: 'all 0.15s ease',
+                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{
+                    fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
+                    color: active ? 'var(--copper-100)' : 'var(--copper-200)', fontWeight: 600,
+                  }}>{section.label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    · {section.type}
+                  </span>
+                </div>
+                <p style={{
+                  fontSize: 12, color: 'var(--text-2)', margin: 0,
+                  whiteSpace: 'pre-line',
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}>{section.text}</p>
+              </button>
+            )
+          })}
+        </div>
       )}
     </div>
   )

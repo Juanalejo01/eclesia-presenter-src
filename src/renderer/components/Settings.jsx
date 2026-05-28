@@ -26,8 +26,8 @@ const SECTIONS = [
   { id: 'acerca',       label: 'Acerca de',         Icon: IconSettings },
 ]
 
-export default function Settings({ onClose, onUpdate }) {
-  const [section, setSection] = useState('aspecto')
+export default function Settings({ onClose, onUpdate, initialSection }) {
+  const [section, setSection] = useState(initialSection || 'aspecto')
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
