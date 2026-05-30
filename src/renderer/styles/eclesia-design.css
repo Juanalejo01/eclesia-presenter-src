@@ -238,8 +238,24 @@ input, textarea, select { font-family: inherit; color: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 12px; padding-right: 16px; border-right: 1px solid var(--line-1); height: 100%; }
 .brand-mark { height: 32px; width: 32px; display: grid; place-items: center; }
-.brand-name { font-size: 14px; font-weight: 600; letter-spacing: -0.005em; color: var(--text-1); display: flex; align-items: baseline; gap: 6px; }
-.brand-name em { font-style: normal; font-weight: 400; color: var(--text-3); }
+/* Tipografía del brand en el topbar — mismo estilo que el SplashScreen:
+   Cormorant Garamond para ambas palabras, 'Presenter' en italic + cobre. */
+.brand-name {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: #f5ebe0;
+  display: flex; align-items: baseline; gap: 0;
+  line-height: 1;
+}
+.brand-name em {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  color: #db9f75;
+  margin-left: 2px;
+}
 .brand-version {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
   color: var(--text-3); text-transform: uppercase; padding: 2px 6px;

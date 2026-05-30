@@ -53,19 +53,7 @@ export default function Topbar({ onSettingsChange, onOpenSettings }) {
       <header className="header" style={{ ...dragStyle, paddingRight: 152 }}>
         <div className="brand" style={noDragStyle}>
           <div className="brand-mark"><LogoMonogram size={28} /></div>
-          <div className="brand-name">
-            Eclesia
-            <em style={{
-              fontFamily: '"Cormorant Garamond", Georgia, serif',
-              fontStyle: 'italic',
-              fontWeight: 500,
-              color: 'var(--copper-200)',
-              marginLeft: 2,
-              letterSpacing: '0.005em',
-            }}>
-              Presenter
-            </em>
-          </div>
+          <div className="brand-name">Eclesia<em>Presenter</em></div>
           <span className="brand-version">v {version || '0.2.x'}</span>
         </div>
 
