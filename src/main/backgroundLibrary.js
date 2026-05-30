@@ -20,16 +20,35 @@ const http = require('http')
 const API_BASE = process.env.ECLESIA_API_BASE || 'https://eclesia-presenter.vercel.app'
 const CATALOG_URL = `${API_BASE}/backgrounds-catalog.json`
 
-const DIR = () => {
+// El usuario puede configurar una carpeta de videos custom en Ajustes →
+// Almacenamiento → Videos. Si lo hace, los presets se descargan ahí dentro
+// de una sub-carpeta 'preset-backgrounds'. Si no, fallback a userData.
+let _customBaseDir = null   // viene del renderer vía setStorageDir()
+
+const LEGACY_DIR = () => {
   const d = path.join(app.getPath('userData'), 'preset-backgrounds')
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true })
   return d
 }
-const CATALOG_CACHE = () => path.join(DIR(), 'catalog.json')
+const DIR = () => {
+  if (_customBaseDir) {
+    const d = path.join(_customBaseDir, 'preset-backgrounds')
+    try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); return d }
+    catch { /* permission denied → fallback */ }
+  }
+  return LEGACY_DIR()
+}
+
+// Catálogo siempre en userData para que sobreviva cambios de carpeta de videos
+const CATALOG_CACHE = () => path.join(LEGACY_DIR(), 'catalog.json')
 
 let _mainWindow = null
 let _catalog = null
 const _downloading = new Map()  // id → { aborted, bytes, total }
+
+function setStorageDir(dir) {
+  _customBaseDir = dir && typeof dir === 'string' ? dir : null
+}
 
 function emit(channel, payload) {
   if (_mainWindow && !_mainWindow.isDestroyed()) {
@@ -69,7 +88,13 @@ async function fetchCatalog({ force = false } = {}) {
 // Estado local (qué hay descargado)
 // ============================================================
 function localPath(id) {
-  return path.join(DIR(), `${id}.mp4`)
+  // Buscar primero en la carpeta nueva, después en la legacy. Esto da
+  // backward-compat para usuarios que tenían descargas antes del cambio.
+  const newPath = path.join(DIR(), `${id}.mp4`)
+  if (fs.existsSync(newPath)) return newPath
+  const legacyPath = path.join(LEGACY_DIR(), `${id}.mp4`)
+  if (fs.existsSync(legacyPath)) return legacyPath
+  return newPath  // path donde irá si se descarga ahora
 }
 
 function isDownloaded(id) {
@@ -85,15 +110,20 @@ function getLocalSize(id) {
 
 function listLocal() {
   const out = []
-  try {
-    for (const f of fs.readdirSync(DIR())) {
-      if (f.endsWith('.mp4')) {
+  const seen = new Set()
+  // Buscar en ambas carpetas (nueva + legacy) para que aparezcan todos
+  for (const dir of [DIR(), LEGACY_DIR()]) {
+    try {
+      for (const f of fs.readdirSync(dir)) {
+        if (!f.endsWith('.mp4')) continue
         const id = f.replace(/\.mp4$/, '')
-        const stat = fs.statSync(path.join(DIR(), f))
+        if (seen.has(id)) continue
+        seen.add(id)
+        const stat = fs.statSync(path.join(dir, f))
         out.push({ id, size: stat.size, modified: stat.mtimeMs })
       }
-    }
-  } catch {}
+    } catch {}
+  }
   return out
 }
 
@@ -219,6 +249,7 @@ async function getState() {
 
 module.exports = {
   setMainWindow,
+  setStorageDir,
   fetchCatalog,
   getState,
   downloadItem,

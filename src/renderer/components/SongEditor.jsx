@@ -88,8 +88,21 @@ export default function SongEditor({ song, onSave, onCancel }) {
   const [sections, setSections] = useState(
     song?.sections?.length ? song.sections : [{ type: 'verse', label: 'Estrofa 1', text: '' }]
   )
-  const [maxLines, setMaxLines] = useState(song?.maxLines ?? 4)
+  const [maxLines, setMaxLines] = useState(song?.maxLines ?? song?.max_lines ?? 4)
   const [tab, setTab] = useState('edit')
+
+  // Theme override por canción. null = usa el theme global de proyección
+  // (caso "Igual que en proyección"). Si el usuario configura algo aquí,
+  // SOLO afecta a esta canción y no toca el theme global. Cuando se proyecta
+  // la canción, SlideRenderer hace merge: override > global theme.
+  const [themeOverride, setThemeOverride] = useState(song?.theme_override || null)
+  const [styleOpen, setStyleOpen] = useState(false)
+
+  const updateOverride = (patch) => {
+    setThemeOverride(prev => ({ ...(prev || {}), ...patch }))
+  }
+  const clearOverride = () => setThemeOverride(null)
+  const hasOverride = themeOverride !== null && Object.keys(themeOverride || {}).length > 0
 
   const presentationSlides = useMemo(
     () => songToSlides({ title, sections }, { maxLines }),
@@ -122,7 +135,14 @@ export default function SongEditor({ song, onSave, onCancel }) {
 
   const handleSave = () => {
     if (!title.trim()) return
-    onSave({ title: title.trim(), author: author.trim(), tags: tags.trim(), sections, maxLines })
+    onSave({
+      title: title.trim(),
+      author: author.trim(),
+      tags: tags.trim(),
+      sections,
+      maxLines,
+      theme_override: hasOverride ? themeOverride : null,
+    })
   }
 
   const sliderVal = ((maxLines - 2) / 6 * 100) + '%'
@@ -162,8 +182,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
                 </div>
                 <div className="field">
                   <span className="label">Etiquetas</span>
-                  <input className="field-input" placeholder="adoración, clásica…"
-                    value={tags} onChange={e => setTags(e.target.value)} />
+                  <TagSelector value={tags} onChange={setTags} />
                 </div>
               </div>
 
@@ -190,7 +209,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
               <div>
                 {/* Barra de ajustes STICKY — siempre accesible mientras se
                     hace scroll por las secciones. */}
-                <div className="section-h" style={{
+                <div style={{
                   marginBottom: 10,
                   position: 'sticky',
                   top: 0,
@@ -201,18 +220,34 @@ export default function SongEditor({ song, onSave, onCancel }) {
                   paddingInline: 4,
                   backdropFilter: 'blur(6px)',
                 }}>
-                  <h3 style={{ fontSize: 14 }}>Letra por secciones</h3>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn btn-ghost" onClick={upperAll}
-                      title="Convertir toda la letra a mayúsculas">
-                      AA · MAYÚS
-                    </button>
-                    <button className="btn btn-ghost" onClick={lowerAll}
-                      title="Convertir toda la letra a minúsculas">
-                      aa · minús
-                    </button>
-                    <button className="btn btn-ghost" onClick={addSection}><IconPlus size={13} /> Sección</button>
+                  <div className="section-h">
+                    <h3 style={{ fontSize: 14 }}>Letra por secciones</h3>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button className="btn btn-ghost" onClick={upperAll}
+                        title="Convertir toda la letra a mayúsculas">
+                        AA · MAYÚS
+                      </button>
+                      <button className="btn btn-ghost" onClick={lowerAll}
+                        title="Convertir toda la letra a minúsculas">
+                        aa · minús
+                      </button>
+                      <button
+                        className={'btn ' + (hasOverride ? 'btn-primary' : 'btn-ghost')}
+                        onClick={() => setStyleOpen(v => !v)}
+                        title="Asignar fondo y tipografía propios a esta canción">
+                        🎨 Estilo {hasOverride && '·●'}
+                      </button>
+                      <button className="btn btn-ghost" onClick={addSection}><IconPlus size={13} /> Sección</button>
+                    </div>
                   </div>
+                  {styleOpen && (
+                    <ThemeOverrideBox
+                      override={themeOverride}
+                      onUpdate={updateOverride}
+                      onClear={clearOverride}
+                      onClose={() => setStyleOpen(false)}
+                    />
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {sections.map((section, i) => (
@@ -365,6 +400,314 @@ function SectionRow({
       <div style={{ padding: '6px 12px', fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
         {lineCount} línea{lineCount !== 1 ? 's' : ''} · max {maxLines}
       </div>
+    </div>
+  )
+}
+
+// ============================================================
+// ThemeOverrideBox — panel para asignar fondo + tipografía propios
+// a la canción. Solo guarda las claves que el usuario realmente
+// modifica (los unset siguen heredando del theme global).
+// ============================================================
+const FONT_PRESETS = [
+  { id: 'cormorant', label: 'Cormorant (clásica)', value: '"Cormorant Garamond", serif' },
+  { id: 'geist',     label: 'Geist (moderna)',    value: '"Geist", system-ui, sans-serif' },
+  { id: 'georgia',   label: 'Georgia (sobria)',   value: 'Georgia, serif' },
+  { id: 'serif',     label: 'Serif del sistema',  value: 'serif' },
+  { id: 'sans',      label: 'Sans del sistema',   value: 'sans-serif' },
+  { id: 'mono',      label: 'Mono (display)',     value: '"Geist Mono", monospace' },
+]
+const BG_PRESETS = [
+  { id: 'azul-noche',   label: 'Azul noche',  gradient: ['#0a1620', '#1e3a5f'] },
+  { id: 'cobre-tierra', label: 'Cobre tierra',gradient: ['#3e2411', '#804012'] },
+  { id: 'verde-bosque', label: 'Verde bosque',gradient: ['#0a1a12', '#1c4029'] },
+  { id: 'negro-puro',   label: 'Negro puro',  solid: '#000000' },
+  { id: 'cobre-luz',    label: 'Cobre luz',   gradient: ['#db9f75', '#1a0e08'] },
+]
+
+function ThemeOverrideBox({ override, onUpdate, onClear, onClose }) {
+  const ov = override || {}
+  const fontVal = ov.fontFamily || ''
+  const bgKind  = ov.bgType || 'inherit'  // 'inherit' = igual que proyección
+
+  return (
+    <div style={{
+      marginTop: 10, padding: 14,
+      background: 'var(--bg-2)',
+      border: '1px solid var(--copper-300)',
+      borderRadius: 'var(--r-md)',
+      display: 'flex', flexDirection: 'column', gap: 12,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--copper-100)' }}>
+            Estilo de esta canción
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+            Override individual del tema global. Solo afecta a esta canción al proyectarla.
+          </div>
+        </div>
+        <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: 11, padding: '2px 8px' }}>
+          ▴ Cerrar
+        </button>
+      </div>
+
+      {/* TIPOGRAFÍA */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="label">Tipografía</span>
+        <select
+          className="select"
+          value={fontVal}
+          onChange={e => {
+            const v = e.target.value
+            if (!v) {
+              // 'inherit' — quitar override de fontFamily
+              const next = { ...ov }; delete next.fontFamily
+              if (Object.keys(next).length === 0) onClear()
+              else onUpdate({ fontFamily: undefined })
+            } else {
+              onUpdate({ fontFamily: v })
+            }
+          }}>
+          <option value="">— Igual que en proyección —</option>
+          {FONT_PRESETS.map(f => (
+            <option key={f.id} value={f.value}>{f.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* TAMAÑO DE FUENTE */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="label">
+          Tamaño · {ov.fontSize ? `${ov.fontSize}px` : 'igual que proyección'}
+        </span>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input
+            type="range" min="32" max="120"
+            value={ov.fontSize || 64}
+            onChange={e => onUpdate({ fontSize: +e.target.value })}
+            className="slider"
+            style={{ flex: 1, '--val': (((ov.fontSize || 64) - 32) / 88 * 100) + '%' }} />
+          {ov.fontSize !== undefined && (
+            <button className="btn btn-ghost" onClick={() => onUpdate({ fontSize: undefined })}
+              style={{ fontSize: 10, padding: '2px 8px' }}
+              title="Quitar override del tamaño">
+              ✕ heredar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* FONDO */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span className="label">Fondo</span>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              // Limpiar todas las claves de fondo
+              const next = { ...ov }
+              delete next.bgType; delete next.bgColor; delete next.bgGradient; delete next.bgImage; delete next.bgVideo
+              if (Object.keys(next).length === 0) onClear()
+              else onUpdate({
+                bgType: undefined, bgColor: undefined, bgGradient: undefined,
+                bgImage: undefined, bgVideo: undefined,
+              })
+            }}
+            style={{
+              all: 'unset', cursor: 'pointer',
+              padding: '6px 12px', borderRadius: 8, fontSize: 11,
+              background: bgKind === 'inherit' ? 'rgba(168,95,51,0.25)' : 'var(--bg-3)',
+              border: '1px solid ' + (bgKind === 'inherit' ? 'rgba(232,181,145,0.4)' : 'var(--line-1)'),
+              color: bgKind === 'inherit' ? 'var(--copper-100)' : 'var(--text-2)',
+            }}>
+            Igual que en proyección
+          </button>
+          {BG_PRESETS.map(p => {
+            const active = p.solid
+              ? (ov.bgType === 'solid' && ov.bgColor === p.solid)
+              : (ov.bgType === 'gradient' && JSON.stringify(ov.bgGradient) === JSON.stringify(p.gradient))
+            return (
+              <button key={p.id}
+                onClick={() => p.solid
+                  ? onUpdate({ bgType: 'solid', bgColor: p.solid, bgGradient: undefined, bgImage: undefined, bgVideo: undefined })
+                  : onUpdate({ bgType: 'gradient', bgGradient: p.gradient, bgColor: undefined, bgImage: undefined, bgVideo: undefined })
+                }
+                style={{
+                  all: 'unset', cursor: 'pointer',
+                  padding: '6px 12px', borderRadius: 8, fontSize: 11,
+                  background: active
+                    ? 'rgba(168,95,51,0.30)'
+                    : (p.solid ? p.solid : `linear-gradient(135deg, ${p.gradient[0]}, ${p.gradient[1]})`),
+                  border: '1px solid ' + (active ? 'rgba(232,181,145,0.45)' : 'rgba(255,255,255,0.1)'),
+                  color: '#fff',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.7)',
+                }}>
+                {active && '✓ '}{p.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Acciones */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
+        <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+          {Object.keys(ov).length === 0
+            ? 'Sin overrides — usa el theme global'
+            : `${Object.keys(ov).length} override(s) activos`}
+        </span>
+        {Object.keys(ov).length > 0 && (
+          <button className="btn btn-ghost btn-danger" onClick={onClear}
+            style={{ fontSize: 11 }}>
+            Resetear · Igual que en proyección
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// TagSelector — multi-select de etiquetas con 3 presets fijos
+// (Alabanza, Adoración, Himno) + opción de crear etiqueta custom.
+// Las etiquetas se persisten como string CSV en song.tags para
+// compatibilidad con el storage existente.
+// ============================================================
+const PRESET_TAGS = ['Alabanza', 'Adoración', 'Himno']
+
+function TagSelector({ value, onChange }) {
+  // value (string CSV) → array
+  const tagsArr = (value || '')
+    .split(',').map(s => s.trim()).filter(Boolean)
+
+  const [customInput, setCustomInput] = useState('')
+  const [showCustom, setShowCustom]   = useState(false)
+
+  const isSelected = (tag) =>
+    tagsArr.some(t => t.toLowerCase() === tag.toLowerCase())
+
+  const toggle = (tag) => {
+    if (isSelected(tag)) {
+      onChange(tagsArr.filter(t => t.toLowerCase() !== tag.toLowerCase()).join(', '))
+    } else {
+      onChange([...tagsArr, tag].join(', '))
+    }
+  }
+
+  const addCustom = () => {
+    const t = customInput.trim()
+    if (!t) return
+    // Evitar duplicados case-insensitive
+    if (isSelected(t)) { setCustomInput(''); setShowCustom(false); return }
+    onChange([...tagsArr, t].join(', '))
+    setCustomInput('')
+    setShowCustom(false)
+  }
+
+  // Custom tags = las que NO están en los presets
+  const customTags = tagsArr.filter(t =>
+    !PRESET_TAGS.some(p => p.toLowerCase() === t.toLowerCase())
+  )
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 8,
+      padding: '8px 10px',
+      background: 'var(--bg-2)',
+      border: '1px solid var(--line-1)',
+      borderRadius: 'var(--r-md)',
+    }}>
+      {/* Presets */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {PRESET_TAGS.map(tag => {
+          const sel = isSelected(tag)
+          return (
+            <button key={tag} onClick={() => toggle(tag)}
+              style={{
+                all: 'unset',
+                cursor: 'pointer',
+                padding: '5px 12px',
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 500,
+                background: sel
+                  ? 'linear-gradient(180deg, rgba(168,95,51,0.30), rgba(128,64,18,0.18))'
+                  : 'var(--bg-3)',
+                border: '1px solid ' + (sel ? 'rgba(232,181,145,0.45)' : 'var(--line-1)'),
+                color: sel ? 'var(--copper-100)' : 'var(--text-2)',
+                transition: 'all 0.15s',
+              }}>
+              {sel && '✓ '}{tag}
+            </button>
+          )
+        })}
+        {!showCustom && (
+          <button onClick={() => setShowCustom(true)}
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              padding: '5px 12px',
+              borderRadius: 999,
+              fontSize: 12, fontWeight: 500,
+              background: 'transparent',
+              border: '1px dashed var(--copper-300)',
+              color: 'var(--copper-200)',
+            }}>
+            + Crear nueva
+          </button>
+        )}
+      </div>
+
+      {/* Tags custom ya añadidas */}
+      {customTags.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap',
+          paddingTop: 8, borderTop: '1px dashed var(--line-1)' }}>
+          {customTags.map(tag => (
+            <span key={tag} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 8px 4px 10px',
+              borderRadius: 999, fontSize: 11,
+              background: 'var(--bg-3)',
+              border: '1px solid var(--line-2)',
+              color: 'var(--text-1)',
+            }}>
+              {tag}
+              <button onClick={() => toggle(tag)}
+                title="Quitar etiqueta"
+                style={{
+                  all: 'unset', cursor: 'pointer',
+                  fontSize: 14, lineHeight: 1,
+                  color: 'var(--text-3)',
+                  padding: '0 2px',
+                }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Input para crear nueva */}
+      {showCustom && (
+        <div style={{ display: 'flex', gap: 6, paddingTop: 4 }}>
+          <input className="field-input"
+            autoFocus
+            value={customInput}
+            onChange={e => setCustomInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); addCustom() }
+              if (e.key === 'Escape') { setShowCustom(false); setCustomInput('') }
+            }}
+            placeholder="Ej: Navidad, Resurrección, Juvenil..."
+            style={{ height: 28, flex: 1, fontSize: 12 }} />
+          <button className="btn btn-primary" onClick={addCustom}
+            style={{ fontSize: 11, padding: '0 12px' }}>
+            Añadir
+          </button>
+          <button className="btn btn-ghost" onClick={() => { setShowCustom(false); setCustomInput('') }}
+            style={{ fontSize: 11, padding: '0 10px' }}>
+            Cancelar
+          </button>
+        </div>
+      )}
     </div>
   )
 }

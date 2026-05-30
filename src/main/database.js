@@ -55,6 +55,12 @@ function init() {
   if (!songsCols.includes('max_lines')) {
     try { db.exec(`ALTER TABLE songs ADD COLUMN max_lines INTEGER DEFAULT 4`) } catch (e) { console.warn('migration max_lines:', e.message) }
   }
+  // theme_override: JSON con fondo/tipografía propios. NULL = usa tema global.
+  // Permite que una canción tenga su estilo visual propio (fondo + fuente) que
+  // se aplica solo al proyectarla, sin afectar al theme global ni a otras.
+  if (!songsCols.includes('theme_override')) {
+    try { db.exec(`ALTER TABLE songs ADD COLUMN theme_override TEXT`) } catch (e) { console.warn('migration theme_override:', e.message) }
+  }
 
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_songs_cloud ON songs(cloud_id);
@@ -153,10 +159,15 @@ function seedIfEmpty() {
 // Parsear filas desde SQLite (sections viene como string JSON)
 function parseRow(row) {
   if (!row) return null
+  let themeOverride = null
+  if (row.theme_override) {
+    try { themeOverride = JSON.parse(row.theme_override) } catch {}
+  }
   return {
     ...row,
     sections: JSON.parse(row.sections || '[]'),
     is_favorite: !!row.is_favorite,
+    theme_override: themeOverride,
   }
 }
 
@@ -183,8 +194,8 @@ function getSong(id) {
 function createSong(data) {
   const now = Date.now()
   const result = db.prepare(`
-    INSERT INTO songs (title, author, key_signature, tempo, tags, sections, created_at, updated_at)
-    VALUES (@title, @author, @key_signature, @tempo, @tags, @sections, @created_at, @updated_at)
+    INSERT INTO songs (title, author, key_signature, tempo, tags, sections, max_lines, theme_override, created_at, updated_at)
+    VALUES (@title, @author, @key_signature, @tempo, @tags, @sections, @max_lines, @theme_override, @created_at, @updated_at)
   `).run({
     title: data.title,
     author: data.author || null,
@@ -192,6 +203,8 @@ function createSong(data) {
     tempo: data.tempo || null,
     tags: data.tags || null,
     sections: JSON.stringify(data.sections || []),
+    max_lines: data.maxLines || 4,
+    theme_override: data.theme_override ? JSON.stringify(data.theme_override) : null,
     created_at: now,
     updated_at: now,
   })
@@ -202,7 +215,9 @@ function updateSong(id, data) {
   db.prepare(`
     UPDATE songs
     SET title = @title, author = @author, key_signature = @key_signature,
-        tempo = @tempo, tags = @tags, sections = @sections, updated_at = @updated_at
+        tempo = @tempo, tags = @tags, sections = @sections,
+        max_lines = @max_lines, theme_override = @theme_override,
+        updated_at = @updated_at
     WHERE id = @id
   `).run({
     id,
@@ -212,6 +227,8 @@ function updateSong(id, data) {
     tempo: data.tempo || null,
     tags: data.tags || null,
     sections: JSON.stringify(data.sections || []),
+    max_lines: data.maxLines || 4,
+    theme_override: data.theme_override ? JSON.stringify(data.theme_override) : null,
     updated_at: Date.now(),
   })
   return getSong(id)

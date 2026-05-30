@@ -3,6 +3,7 @@ import {
   listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
 import { addItem as addToSchedule } from '../services/scheduleService.js'
+import { emit } from '../hooks/useShortcuts.js'
 import {
   IconUpload, IconVideo, IconTrash, IconArrowRight, IconPlus, IconPlay, IconPause,
 } from './Icons.jsx'
@@ -117,6 +118,12 @@ export default function VideoPanel({ onSendSlide }) {
           <span className="ws-sub">{t('video.subtitle', { n: items.length })}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn"
+            onClick={() => emit('settings:open', { section: 'fondos' })}
+            title="Abre el banco de 56 videos worship CC0 (Ajustes → Fondos preset)">
+            🎬 Banco de presets
+          </button>
           <button className="btn btn-primary" onClick={handleUpload}>
             <IconUpload size={14} /> {t('video.upload')}
           </button>

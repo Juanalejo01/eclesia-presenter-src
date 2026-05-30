@@ -106,6 +106,7 @@ contextBridge.exposeInMainWorld('electron', {
     cancel:    (id)  => ipcRenderer.invoke('bglib:cancel', id),
     delete:    (id)  => ipcRenderer.invoke('bglib:delete', id),
     localPath: (id)  => ipcRenderer.invoke('bglib:localPath', id),
+    setStorageDir: (dir) => ipcRenderer.invoke('bglib:setStorageDir', dir),
     onStart:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-start',    h); return () => ipcRenderer.removeListener('bglib:download-start', h) },
     onProgress: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-progress', h); return () => ipcRenderer.removeListener('bglib:download-progress', h) },
     onOk:       (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-ok',       h); return () => ipcRenderer.removeListener('bglib:download-ok', h) },

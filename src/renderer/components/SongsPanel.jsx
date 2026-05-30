@@ -185,15 +185,22 @@ export default function SongsPanel({ onSendSlide }) {
 
   useEffect(() => { setSlideIndex(0) }, [selected?.id])
 
+  // Helper: añade las claves del theme_override de la canción al slide.
+  // SlideRenderer.mergeThemeWithSlide las aplicará automáticamente.
+  const slideWithOverride = (slide, song) => ({
+    ...slide,
+    type: 'song',
+    ...(song?.theme_override || {}),
+  })
+
   const sendSlide = (idx) => {
     if (!flatSlides[idx]) return
     setSlideIndex(idx)
     setSectionIndex(flatSlides[idx].sectionIndex)
-    onSendSlide({
+    onSendSlide(slideWithOverride({
       text: flatSlides[idx].text,
       reference: flatSlides[idx].reference,
-      type: 'song',
-    })
+    }, selected))
   }
 
   const handleSendSection = (song, section, idx) => {
@@ -203,11 +210,10 @@ export default function SongsPanel({ onSendSlide }) {
     const firstSlideOfSection = slides.findIndex(s => s.sectionIndex === idx)
     if (firstSlideOfSection !== -1) {
       setSlideIndex(firstSlideOfSection)
-      onSendSlide({
+      onSendSlide(slideWithOverride({
         text: slides[firstSlideOfSection].text,
         reference: slides[firstSlideOfSection].reference,
-        type: 'song',
-      })
+      }, song))
     }
   }
 
@@ -232,11 +238,10 @@ export default function SongsPanel({ onSendSlide }) {
         if (slides.length > 0) {
           setSlideIndex(0)
           setSectionIndex(slides[0].sectionIndex)
-          onSendSlide({
+          onSendSlide(slideWithOverride({
             text: slides[0].text,
             reference: slides[0].reference,
-            type: 'song',
-          })
+          }, song))
         }
       }
       if (found) doProject(found)

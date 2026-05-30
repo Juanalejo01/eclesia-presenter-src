@@ -81,10 +81,24 @@ jobs:
       - name: Build renderer
         run: npm run build
 
-      # --- WINDOWS: portable + NSIS installer ---
-      - name: Build (Windows)
+      # --- WINDOWS: build de 3 fases con embedding del icono ---
+      # Reproducimos `npm run dist:all` paso a paso porque hacer todo en una
+      # sola llamada a electron-builder NO embebe el icono en el .exe (Windows
+      # acaba mostrando el icono de Electron). El rcedit DEBE correr entre
+      # --dir y el packaging final.
+      - name: Build (Windows) — Phase 1 · win-unpacked
         if: matrix.platform == 'win'
-        run: npx electron-builder --win portable nsis --publish never
+        run: npx electron-builder --win --dir --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (Windows) — Phase 2 · embed icon con rcedit
+        if: matrix.platform == 'win'
+        run: node build/embed-icon.mjs
+
+      - name: Build (Windows) — Phase 3 · portable + NSIS desde prepackaged
+        if: matrix.platform == 'win'
+        run: npx electron-builder --win portable nsis --prepackaged dist-electron/win-unpacked --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

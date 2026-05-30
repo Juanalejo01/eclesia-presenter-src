@@ -198,6 +198,7 @@ ipcMain.handle('bglib:download',       (_e, id)  => backgroundLibrary.downloadIt
 ipcMain.handle('bglib:cancel',         (_e, id)  => backgroundLibrary.cancelDownload(id))
 ipcMain.handle('bglib:delete',         (_e, id)  => backgroundLibrary.deleteLocal(id))
 ipcMain.handle('bglib:localPath',      (_e, id)  => backgroundLibrary.localPath(id))
+ipcMain.handle('bglib:setStorageDir',  (_e, dir) => { backgroundLibrary.setStorageDir(dir); return { ok: true } })
 
 // IPC: proyección externa (overlay/background sin red, capturable por OBS)
 ipcMain.handle('projection:open',  (_e, opts)   => projection.openProjection(opts))
@@ -543,11 +544,13 @@ app.whenReady().then(() => {
     callback({ path: fullPath })
   })
 
-  // Protocolo preset://<id>.mp4 → userData/preset-backgrounds/<id>.mp4
-  // Para servir los fondos preset descargados a las ventanas de proyección.
+  // Protocolo preset://<id>.mp4 → resuelve via backgroundLibrary.localPath()
+  // que busca primero en la carpeta del usuario (configurada en Ajustes →
+  // Almacenamiento → Videos) y después en la legacy de userData.
   protocol.registerFileProtocol('preset', (request, callback) => {
     const fileName = decodeURI(request.url.replace(/^preset:\/\//, ''))
-    const fullPath = path.join(app.getPath('userData'), 'preset-backgrounds', fileName)
+    const id = fileName.replace(/\.mp4$/, '')
+    const fullPath = backgroundLibrary.localPath(id)
     callback({ path: fullPath })
   })
 

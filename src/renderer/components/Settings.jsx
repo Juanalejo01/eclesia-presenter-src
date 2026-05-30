@@ -952,7 +952,7 @@ function SectionAcerca() {
         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
           <span style={{ color: 'var(--text-3)' }}>Versión</span>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-1)' }}>
-            {info?.version || upd?.currentVersion || '0.2.2'}
+            {info?.version || upd?.currentVersion || '0.2.3'}
             {isPortable && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)' }}>(portable)</span>}
           </span>
           <span style={{ color: 'var(--text-3)' }}>Datos del usuario</span>
@@ -1367,11 +1367,22 @@ function SectionFondos({ onUpdate }) {
   const [state, setState] = useState(null)
   const [filter, setFilter] = useState('all')
   const [progress, setProgress] = useState({})  // id → { bytes, total }
+  const appSettings = useAppSettings()
 
   const refresh = async () => {
     if (!window.electron?.bglib) return
     setState(await window.electron.bglib.state())
   }
+
+  // Cada vez que cambie el videosPath, le decimos al main que use esa
+  // carpeta como base para los preset-backgrounds. Si está vacío, vuelve
+  // al fallback de userData.
+  useEffect(() => {
+    if (!window.electron?.bglib?.setStorageDir) return
+    window.electron.bglib.setStorageDir(appSettings.videosPath || null)
+      .then(() => refresh())
+      .catch(() => {})
+  }, [appSettings.videosPath])
 
   useEffect(() => {
     refresh()
