@@ -10,7 +10,7 @@ export default function DownloadPage() {
     <div className="container mx-auto px-6 py-20 max-w-4xl">
       <div className="text-center mb-12">
         <div className="text-xs font-mono uppercase tracking-widest text-copper-200 mb-3">
-          v 0.2.4 — Beta
+          v 0.2.5 — Beta
         </div>
         <h1 className="font-display text-5xl md:text-6xl text-ink-1 mb-4">
           Descarga <em className="italic text-copper-200">EclesiaPresenter</em>

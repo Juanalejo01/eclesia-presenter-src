@@ -51,6 +51,12 @@ export default function BiblePanel({ onSendSlide }) {
   const [verseSlides, setVerseSlides] = useState([])
   const [verseSlideIdx, setVerseSlideIdx] = useState(0)
 
+  // Historial de versículos proyectados — se persiste con el resto del
+  // estado en el cache de sesión. Declarado AQUÍ ARRIBA (no más abajo)
+  // porque el useEffect de persistencia lo usa antes — moverlo evita
+  // un ReferenceError TDZ.
+  const [verseHistory, setVerseHistory] = useState(_restore.verseHistory || [])
+
   // Cambio de versión
   useEffect(() => {
     setVersions(getVisibleVersions(pro))
@@ -318,11 +324,12 @@ export default function BiblePanel({ onSendSlide }) {
   }, [books, versionId])
 
   // ════════════════════════════════════════════════════════════
-  // HISTORIAL DE VERSÍCULOS PROYECTADOS — máx 24 entradas, solo memoria
-  // (se borra al cerrar la app). Útil para volver a un versículo que
-  // ya mostraste durante el servicio sin reescribir la búsqueda.
+  // HISTORIAL DE VERSÍCULOS PROYECTADOS — el state vive arriba (necesario
+  // por orden de declaración para el effect de persistencia). Aquí solo
+  // los helpers que lo manipulan. Persistido en cache de sesión: se
+  // mantiene mientras la app esté abierta, solo se borra con "Limpiar"
+  // o al cerrar la app.
   // ════════════════════════════════════════════════════════════
-  const [verseHistory, setVerseHistory] = useState(_restore.verseHistory || [])
 
   const restoreFromHistory = (entry) => {
     if (!entry) return
