@@ -108,16 +108,21 @@ $$;
 -- ---------- 7. Auditoría: vista de qué policies hay activas ----------
 -- Util para que el dev/maintainer pueda inspeccionar estado de RLS.
 -- No es accesible al usuario normal.
+--
+-- IMPORTANTE: pg_tables NO expone forcerowsecurity (solo rowsecurity).
+-- Para FORCE RLS hay que ir a pg_class.relforcerowsecurity.
 
 create or replace view public.v_security_audit as
   select
-    schemaname,
-    tablename,
-    rowsecurity as rls_enabled,
-    forcerowsecurity as rls_forced
-  from pg_tables
-  where schemaname = 'public'
-  order by tablename;
+    n.nspname as schemaname,
+    c.relname as tablename,
+    c.relrowsecurity      as rls_enabled,
+    c.relforcerowsecurity as rls_forced
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relkind = 'r'  -- solo tablas regulares
+  order by c.relname;
 
 -- ---------- 8. Índices adicionales para perf ----------
 -- El schema-v3 ya tiene idx_cloud_songs_user e idx_cloud_songs_user_updated.
@@ -150,23 +155,28 @@ begin
 end $$;
 
 -- ---------- 9. Verificación final ----------
+-- Como pg_tables NO expone forcerowsecurity, vamos a pg_class para ambos checks.
 do $$
 declare
   rls_off_count int;
   force_off_count int;
+  target_tables text[] := ARRAY['profiles', 'licenses', 'activations', 'cloud_songs', 'stripe_events_processed'];
 begin
-  -- Contar tablas sin RLS o sin FORCE
   select count(*) into rls_off_count
-    from pg_tables
-    where schemaname = 'public'
-      and tablename in ('profiles', 'licenses', 'activations', 'cloud_songs', 'stripe_events_processed')
-      and rowsecurity = false;
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = ANY(target_tables)
+      and c.relkind = 'r'
+      and c.relrowsecurity = false;
 
   select count(*) into force_off_count
-    from pg_tables
-    where schemaname = 'public'
-      and tablename in ('profiles', 'licenses', 'activations', 'cloud_songs', 'stripe_events_processed')
-      and forcerowsecurity = false;
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = ANY(target_tables)
+      and c.relkind = 'r'
+      and c.relforcerowsecurity = false;
 
   if rls_off_count > 0 then
     raise warning '% tablas no tienen RLS habilitada', rls_off_count;
