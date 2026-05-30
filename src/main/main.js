@@ -511,13 +511,30 @@ ipcMain.handle('bibles:listImported', () => {
   try { return JSON.parse(fs.readFileSync(registryPath, 'utf8')) } catch { return [] }
 })
 
+// Validador: id de biblia importada debe ser seguro (no permite ../, no
+// permite caracteres exóticos). Sin esto, un atacante puede leer/borrar
+// cualquier archivo del FS pasando id='../../../passwords'.
+function isValidBibleId(id) {
+  if (typeof id !== 'string' || !id) return false
+  if (id.length > 64) return false
+  return /^[a-zA-Z0-9._-]+$/.test(id)
+}
+
 ipcMain.handle('bibles:readImported', (_e, id) => {
+  if (!isValidBibleId(id)) {
+    console.warn('[security] bibles:readImported id inválido:', id)
+    return null
+  }
   const filePath = path.join(BIBLES_DIR, `${id}.json`)
   if (!fs.existsSync(filePath)) return null
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
 })
 
 ipcMain.handle('bibles:deleteImported', (_e, id) => {
+  if (!isValidBibleId(id)) {
+    console.warn('[security] bibles:deleteImported id inválido:', id)
+    return { ok: false, error: 'invalid_id' }
+  }
   ensureBiblesDir()
   const filePath = path.join(BIBLES_DIR, `${id}.json`)
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
@@ -536,20 +553,46 @@ app.whenReady().then(() => {
   license.init()
   cloudSync.init({ db, license })
 
+  // Helper: previene path traversal asegurando que el path resuelto
+  // está DENTRO del directorio base esperado. Sin esto, un atacante
+  // (XSS en renderer, video remoto manipulado) podría hacer
+  // media://../../../Windows/win.ini para leer archivos arbitrarios.
+  function safeResolveWithin(baseDir, untrustedName) {
+    try {
+      const normalized = path.normalize(untrustedName).replace(/^(\.\.[\/\\])+/, '')
+      const resolved = path.resolve(baseDir, normalized)
+      const baseResolved = path.resolve(baseDir) + path.sep
+      if (!resolved.startsWith(baseResolved) && resolved !== path.resolve(baseDir)) {
+        console.warn('[security] path traversal bloqueado:', untrustedName)
+        return null
+      }
+      return resolved
+    } catch (e) {
+      console.warn('[security] resolve falló:', e?.message)
+      return null
+    }
+  }
+
   // Protocolo custom: media://archivo.mp4 → userData/media/archivo.mp4
-  // Permite que las ventanas de proyección lean archivos locales sin file:// inseguro
+  // VALIDACIÓN: el path resultante debe estar dentro de getMediaDir().
   protocol.registerFileProtocol('media', (request, callback) => {
     const fileName = decodeURI(request.url.replace(/^media:\/\//, ''))
-    const fullPath = path.join(getMediaDir(), fileName)
-    callback({ path: fullPath })
+    const safePath = safeResolveWithin(getMediaDir(), fileName)
+    if (!safePath) return callback({ error: -10 /* ACCESS_DENIED */ })
+    callback({ path: safePath })
   })
 
-  // Protocolo preset://<id>.mp4 → resuelve via backgroundLibrary.localPath()
-  // que busca primero en la carpeta del usuario (configurada en Ajustes →
-  // Almacenamiento → Videos) y después en la legacy de userData.
+  // Protocolo preset://<id>.mp4 → resuelve via backgroundLibrary.localPath().
+  // VALIDACIÓN: el id solo puede contener caracteres seguros (alfanuméricos,
+  // guiones, underscores). Cualquier otro carácter → reject.
   protocol.registerFileProtocol('preset', (request, callback) => {
     const fileName = decodeURI(request.url.replace(/^preset:\/\//, ''))
     const id = fileName.replace(/\.mp4$/, '')
+    // ID debe ser seguro — sin / ni .. ni caracteres exóticos
+    if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+      console.warn('[security] preset id inválido:', id)
+      return callback({ error: -10 })
+    }
     const fullPath = backgroundLibrary.localPath(id)
     callback({ path: fullPath })
   })

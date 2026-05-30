@@ -133,15 +133,33 @@ function stopAutoSync() {
   if (_autoTimer) { clearInterval(_autoTimer); _autoTimer = null }
 }
 
+// Flag: hay cambios pendientes que se hicieron MIENTRAS un sync estaba en curso.
+// Sin esto, si triggerSync se llama durante state.syncing, syncOnce devuelve
+// 'already_syncing' inmediatamente y los cambios se pierden hasta la próxima
+// mutación. Con el flag, al terminar el sync, se re-programa un debounce.
+let _pendingTrigger = false
+
 // Trigger debounced — se llama desde los IPC handlers de songs:create/update/delete.
 // Si auto-sync está deshabilitado o no hay licencia Pro, es no-op silencioso.
 // Si hay múltiples mutaciones seguidas, agrupamos en 1 sync (DEBOUNCE_MS).
 function triggerSync() {
   if (!state.enabled) return
+  // Si hay un sync corriendo, marca trigger pendiente
+  if (state.syncing) {
+    _pendingTrigger = true
+    return
+  }
   if (_debounceTimer) clearTimeout(_debounceTimer)
-  _debounceTimer = setTimeout(() => {
+  _debounceTimer = setTimeout(async () => {
     _debounceTimer = null
-    syncOnce().catch(() => {})
+    try {
+      await syncOnce()
+    } catch {}
+    // Si hubo otra mutación durante el sync, re-disparar
+    if (_pendingTrigger) {
+      _pendingTrigger = false
+      triggerSync()
+    }
   }, DEBOUNCE_MS)
 }
 

@@ -62,6 +62,25 @@ function init() {
     try { db.exec(`ALTER TABLE songs ADD COLUMN theme_override TEXT`) } catch (e) { console.warn('migration theme_override:', e.message) }
   }
 
+  // Migración perf v0.2.6: índices adicionales para queries comunes
+  // que el optimizer NO podía resolver con los índices anteriores:
+  //
+  // 1. idx_songs_title_nocase — la query es ORDER BY title COLLATE NOCASE
+  //    pero el índice original era sobre title sin collation. SQLite no usa
+  //    un índice con collation diferente. Este lo arregla.
+  // 2. idx_songs_updated_at — el cloud sync hace WHERE updated_at > since
+  //    para incremental. Sin índice, escanea la tabla entera.
+  try {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_songs_title_nocase
+        ON songs(title COLLATE NOCASE);
+      CREATE INDEX IF NOT EXISTS idx_songs_updated_at
+        ON songs(updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_songs_tombstones_deleted_at
+        ON songs_tombstones(deleted_at DESC);
+    `)
+  } catch (e) { console.warn('migration perf indexes:', e.message) }
+
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_songs_cloud ON songs(cloud_id);
 
@@ -176,8 +195,12 @@ function listSongs({ search = '', onlyFavorites = false } = {}) {
   const params = {}
 
   if (search) {
-    sql += ' AND (title LIKE @q OR author LIKE @q OR tags LIKE @q)'
-    params.q = `%${search}%`
+    // Escape de wildcards LIKE para prevenir ReDoS-equivalent: un user
+    // malicioso podría enviar '%%%%' y forzar escaneo exhaustivo de la
+    // tabla. ESCAPE '\' interpreta \% y \_ como literales.
+    const safeSearch = String(search).replace(/[\\%_]/g, '\\$&')
+    sql += " AND (title LIKE @q ESCAPE '\\' OR author LIKE @q ESCAPE '\\' OR tags LIKE @q ESCAPE '\\')"
+    params.q = `%${safeSearch}%`
   }
   if (onlyFavorites) sql += ' AND is_favorite = 1'
 

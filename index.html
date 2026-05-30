@@ -3,6 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Content Security Policy para el renderer de Electron.
+         Apaga el warning "Electron Security Warning (Insecure CSP)".
+
+         Permite:
+         - default-src 'self': solo recursos del propio bundle (file:// o vite dev)
+         - script-src 'self': scripts JS embebidos en el bundle, sin eval ni inline
+         - style-src 'self' 'unsafe-inline': React inyecta styles dinámicos (necesario)
+         - img-src/media-src: incluye blob:, data:, https:, media://, preset://
+           (los 2 últimos son nuestros custom protocols para imágenes/videos locales)
+         - connect-src: api.bible para versículos remotos + Supabase para cloud sync
+         - font-src: Google Fonts (Cormorant + Geist)
+         - frame-ancestors 'none': nadie puede embedir esta app -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com data:;
+      img-src 'self' data: blob: https: media: preset:;
+      media-src 'self' blob: https: media: preset:;
+      connect-src 'self' https://api.bible https://*.supabase.co wss://*.supabase.co https://eclesia-presenter.vercel.app https://api.qrserver.com https://images.pexels.com https://www.pexels.com https://videos.pexels.com https://*.ingest.sentry.io;
+      frame-ancestors 'none';
+      base-uri 'self';
+      object-src 'none';
+    " />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">

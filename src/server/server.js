@@ -24,13 +24,72 @@ let currentTheme = null
 // Sin PIN solo puede VER el slide actual (modo read-only).
 // El operador del PC ve el PIN en el panel Transmisión.
 const PAIRING_PIN = String(crypto.randomInt(100000, 1000000))
-const authorizedTokens = new Set()  // tokens emitidos tras validar el PIN
+// Map en vez de Set para asociar TTL. Sin esto, en una instalación 24/7
+// (iglesia con la app abierta meses) los tokens se acumulan sin tope.
+// TTL: 24 horas tras emisión.
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const authorizedTokens = new Map()  // token → { issuedAt }
+
+// Rate limit por IP en /api/pair contra brute-force del PIN (1M combos).
+// Sin esto, un atacante en la misma WiFi puede probar todos los PINs en
+// segundos. Con esto: 5 intentos por minuto por IP, bloqueo 15 min tras 5.
+const PIN_ATTEMPTS_WINDOW_MS = 60_000
+const PIN_LOCKOUT_MS = 15 * 60_000
+const PIN_MAX_ATTEMPTS = 5
+const pinAttempts = new Map()  // ip → { count, firstAttempt, lockedUntil }
+
+function checkPinRateLimit(ip) {
+  const now = Date.now()
+  const record = pinAttempts.get(ip)
+  if (!record) {
+    pinAttempts.set(ip, { count: 1, firstAttempt: now, lockedUntil: 0 })
+    return { allowed: true }
+  }
+  if (record.lockedUntil > now) {
+    return { allowed: false, retryAfterMs: record.lockedUntil - now }
+  }
+  // Si la ventana expiró, reset
+  if (now - record.firstAttempt > PIN_ATTEMPTS_WINDOW_MS) {
+    record.count = 1; record.firstAttempt = now; record.lockedUntil = 0
+    return { allowed: true }
+  }
+  record.count++
+  if (record.count > PIN_MAX_ATTEMPTS) {
+    record.lockedUntil = now + PIN_LOCKOUT_MS
+    return { allowed: false, retryAfterMs: PIN_LOCKOUT_MS }
+  }
+  return { allowed: true }
+}
 
 function issueToken() {
   const token = crypto.randomBytes(24).toString('hex')
-  authorizedTokens.add(token)
+  authorizedTokens.set(token, { issuedAt: Date.now() })
   return token
 }
+
+function isTokenValid(token) {
+  const rec = authorizedTokens.get(token)
+  if (!rec) return false
+  if (Date.now() - rec.issuedAt > TOKEN_TTL_MS) {
+    authorizedTokens.delete(token)
+    return false
+  }
+  return true
+}
+
+// Limpieza periódica: cada hora, borrar tokens expirados + IPs viejas
+setInterval(() => {
+  const now = Date.now()
+  for (const [token, rec] of authorizedTokens) {
+    if (now - rec.issuedAt > TOKEN_TTL_MS) authorizedTokens.delete(token)
+  }
+  for (const [ip, rec] of pinAttempts) {
+    // Limpia registros antiguos sin lockout activo
+    if (rec.lockedUntil < now && now - rec.firstAttempt > 24 * 60 * 60_000) {
+      pinAttempts.delete(ip)
+    }
+  }
+}, 60 * 60_000).unref()
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces()
@@ -116,8 +175,19 @@ function startServer() {
   // Mobile remote control
   app.get('/remote', (_req, res) => res.send(REMOTE_PAGE))
 
-  // Endpoint para que el móvil valide el PIN y reciba un token de autorización
+  // Endpoint para que el móvil valide el PIN y reciba un token de autorización.
+  // Rate-limited por IP para prevenir brute-force del PIN de 6 dígitos.
   app.post('/api/pair', (req, res) => {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown'
+    const rate = checkPinRateLimit(ip)
+    if (!rate.allowed) {
+      res.setHeader('Retry-After', Math.ceil(rate.retryAfterMs / 1000))
+      return res.status(429).json({
+        ok: false,
+        error: 'demasiados_intentos',
+        retryAfterMs: rate.retryAfterMs,
+      })
+    }
     const submitted = String(req.body?.pin || '').trim()
     if (submitted !== PAIRING_PIN) {
       return res.status(401).json({ ok: false, error: 'pin_incorrecto' })
@@ -134,7 +204,7 @@ function startServer() {
     // Endpoint para autenticarse via socket con un token previamente emitido
     let isAuthorized = false
     socket.on('auth:token', (token) => {
-      if (typeof token === 'string' && authorizedTokens.has(token)) {
+      if (typeof token === 'string' && isTokenValid(token)) {
         isAuthorized = true
         socket.emit('auth:ok')
       } else {

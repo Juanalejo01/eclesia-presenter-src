@@ -15,7 +15,35 @@ const PLAN_MAX_DEVICES = {
   free: 1,
 }
 
+// Rate limit en memoria por IP. El webhook real solo recibe llamadas de
+// Stripe (IPs conocidas) pero un atacante puede mandar miles de POSTs con
+// firmas inválidas que entran a la función serverless igual. Esto limita
+// el coste si pasara.
+const webhookRateLimit = new Map()  // ip → { count, windowStart }
+const WEBHOOK_RATE_LIMIT = 100      // máx 100 req/min por IP
+const WEBHOOK_WINDOW_MS = 60_000
+
+function isRateLimited(ip) {
+  const now = Date.now()
+  const rec = webhookRateLimit.get(ip)
+  if (!rec || now - rec.windowStart > WEBHOOK_WINDOW_MS) {
+    webhookRateLimit.set(ip, { count: 1, windowStart: now })
+    return false
+  }
+  rec.count++
+  return rec.count > WEBHOOK_RATE_LIMIT
+}
+
 export async function POST(request) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+             request.headers.get('x-real-ip') ||
+             'unknown'
+
+  if (isRateLimited(ip)) {
+    console.warn('[stripe webhook] rate limit excedido para IP:', ip)
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
+
   const sig = request.headers.get('stripe-signature')
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 

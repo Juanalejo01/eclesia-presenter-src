@@ -19,6 +19,14 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           // Limitar APIs sensibles del navegador a same-origin
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(self)' },
+          // Cross-Origin isolation — defense in depth contra Spectre y attacks
+          // que dependen de cargar recursos cross-origin sin permiso explícito.
+          // same-origin permite popups y embeds del propio dominio.
+          { key: 'Cross-Origin-Opener-Policy',  value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
+          // (Omitimos COEP: require-corp por compat con Stripe que aún sirve
+          //  assets sin Cross-Origin-Resource-Policy; activarlo bloquearía
+          //  el checkout iframe.)
           // Content Security Policy
           // - default: solo same-origin
           // - script: self + Stripe Checkout + Vercel analytics (si lo añades)
