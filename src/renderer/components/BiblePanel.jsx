@@ -6,6 +6,7 @@ import {
 import { normalizeText } from '../services/textUtils.js'
 import { subscribe } from '../hooks/useShortcuts.js'
 import { addItem as addToSchedule } from '../services/scheduleService.js'
+import { getBibleCache, updateBibleCache, resetBibleCache } from '../services/panelStateCache.js'
 import { useT } from '../services/i18n.js'
 import { useLicense, isPro } from '../services/licenseStore.js'
 import { IconSearch, IconPlus, IconArrowRight } from './Icons.jsx'
@@ -24,21 +25,25 @@ export default function BiblePanel({ onSendSlide }) {
   const [versions, setVersions] = useState(getVisibleVersions(pro))
   const [versionId, setVersionId] = useState(getActiveVersion().id)
 
+  // Restaurar estado de la sesión previa (cache módulo-level que sobrevive
+  // los mount/unmount del panel al cambiar de tab en el sidebar).
+  const _restore = getBibleCache()
+
   const [books, setBooks]         = useState([])
   const [loading, setLoading]     = useState(true)
   const [loadError, setLoadError] = useState(null)
-  const [bookSearch, setBookSearch] = useState('')
+  const [bookSearch, setBookSearch] = useState(_restore.bookSearch || '')
   const [textSearch, setTextSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
 
-  const [step, setStep]           = useState('book')   // 'book' | 'chapter' | 'verse'
-  const [selectedBookIndex, setSelectedBookIndex] = useState(null)
-  const [chapterNum, setChapterNum] = useState(1)
+  const [step, setStep]           = useState(_restore.step || 'book')
+  const [selectedBookIndex, setSelectedBookIndex] = useState(_restore.selectedBookIndex)
+  const [chapterNum, setChapterNum] = useState(_restore.chapterNum || 1)
   const [maxChapters, setMaxChapters] = useState(0)
 
   const [chapter, setChapter] = useState(null)
   const [chapterLoading, setChapterLoading] = useState(false)
-  const [selectedVerses, setSelectedVerses] = useState([])
+  const [selectedVerses, setSelectedVerses] = useState(_restore.selectedVerses || [])
 
   // Sub-slides cuando un versículo es muy largo y se divide en partes.
   // verseSlides = array de {text, reference, part?, totalParts?}
@@ -51,11 +56,39 @@ export default function BiblePanel({ onSendSlide }) {
     setVersions(getVisibleVersions(pro))
     setActiveVersion(versionId)
     setLoading(true); setLoadError(null); setBooks([])
-    setStep('book'); setSelectedBookIndex(null); setChapter(null)
+    // Solo reset al CAMBIAR de versión, no en el mount inicial si tenemos cache
+    if (versionId !== getActiveVersion().id) {
+      setStep('book'); setSelectedBookIndex(null); setChapter(null)
+    }
     getBooks(versionId)
       .then(b => { setBooks(b); setLoading(false) })
       .catch(err => { setLoadError(err.message); setLoading(false) })
   }, [versionId, pro])
+
+  // Re-cargar el capítulo si tenemos estado restaurado de la sesión previa
+  // pero el chapter está vacío (siempre el caso en el primer mount).
+  useEffect(() => {
+    if (books.length === 0) return
+    if (selectedBookIndex === null) return
+    if (chapter && chapter.chapterNum === chapterNum) return
+    if (step !== 'verse' && step !== 'chapter') return
+    // Cargar el capítulo y el max
+    getChapterCount(selectedBookIndex, versionId).then(setMaxChapters).catch(() => {})
+    if (step === 'verse' && chapterNum) {
+      setChapterLoading(true)
+      getChapter(selectedBookIndex, chapterNum, versionId)
+        .then(c => { setChapter(c); setChapterLoading(false) })
+        .catch(err => { setLoadError(err.message); setChapterLoading(false) })
+    }
+  }, [books, selectedBookIndex, chapterNum, step, versionId])
+
+  // Persistir cambios al cache de sesión.
+  useEffect(() => {
+    updateBibleCache({
+      selectedBookIndex, chapterNum, step,
+      selectedVerses, bookSearch, verseHistory,
+    })
+  }, [selectedBookIndex, chapterNum, step, selectedVerses, bookSearch, verseHistory])
 
   // Click sobre un libro
   const pickBook = async (bookIndex) => {
@@ -225,6 +258,30 @@ export default function BiblePanel({ onSendSlide }) {
     return () => clearTimeout(t)
   }, [textSearch, versionId])
 
+  // Click simple en un versículo guardado en la Lista del día → navegar al
+  // libro/capítulo pero SIN auto-proyectar el versículo. El usuario decide
+  // cuándo proyectar haciendo click en el verso desde la lista del capítulo.
+  useEffect(() => {
+    return subscribe('bible:focus-item', async (item) => {
+      const bi = item?.bookIndex
+      if (bi == null) return
+      const ch = item?.chapterNum || 1
+      setSelectedBookIndex(bi)
+      const count = await getChapterCount(bi, versionId)
+      setMaxChapters(count)
+      setChapterNum(ch)
+      // Cargar el capítulo pero NO seleccionar versículos (eso dispararía send)
+      try {
+        const c = await getChapter(bi, ch, versionId)
+        setChapter(c)
+        setSelectedVerses([])  // sin selección → no send slide
+        setStep('verse')
+      } catch (err) {
+        setLoadError(err.message)
+      }
+    })
+  }, [versionId])
+
   // Búsqueda lanzada desde el móvil (`socket → App → emit('bible:remote-search')`).
   // El móvil envía algo tipo `{ query: "salmos 22:1" }`; nosotros lo parseamos
   // con la misma logica del buscador local y navegamos automáticamente.
@@ -265,7 +322,7 @@ export default function BiblePanel({ onSendSlide }) {
   // (se borra al cerrar la app). Útil para volver a un versículo que
   // ya mostraste durante el servicio sin reescribir la búsqueda.
   // ════════════════════════════════════════════════════════════
-  const [verseHistory, setVerseHistory] = useState([])
+  const [verseHistory, setVerseHistory] = useState(_restore.verseHistory || [])
 
   const restoreFromHistory = (entry) => {
     if (!entry) return
@@ -277,7 +334,10 @@ export default function BiblePanel({ onSendSlide }) {
     )
   }
 
-  const clearHistory = () => setVerseHistory([])
+  const clearHistory = () => {
+    setVerseHistory([])
+    updateBibleCache({ verseHistory: [] })
+  }
 
   // Envío al live cuando cambian versículos seleccionados.
   // Si el texto excede ~280 caracteres, se divide en N sub-slides

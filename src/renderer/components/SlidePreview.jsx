@@ -9,6 +9,7 @@ import {
   SCHEDULE_DRAG_MIME,
   getScheduleDragPayload,
 } from '../services/scheduleService.js'
+import { emit } from '../hooks/useShortcuts.js'
 import SlideRenderer from './SlideRenderer.jsx'
 import {
   IconArrowRight, IconX, IconBible, IconMusic, IconList,
@@ -109,6 +110,12 @@ export default function SlidePreview() {
         <ScheduleStrip
           isMultiview={previewMode}
           onProject={(item) => setLive({ text: item.text, reference: item.reference, type: item.type })}
+          onNavigate={(item) => {
+            // Single click: lleva al panel correspondiente y selecciona ahí.
+            // El usuario decide cuándo proyectar (al hacer click en una sección,
+            // versículo, imagen, video, etc. dentro del panel).
+            emit('schedule:focus', item)
+          }}
         />
       </div>
 
@@ -224,7 +231,7 @@ const SCHED_ICONS = {
   video: IconVideo, text: IconType,
 }
 
-function ScheduleStrip({ isMultiview, onProject }) {
+function ScheduleStrip({ isMultiview, onProject, onNavigate }) {
   const [items, setItems] = useState(getScheduleItems)
   // Colapsada por defecto en multiview, abierta en PGM-only
   const [expanded, setExpanded] = useState(!isMultiview)
@@ -338,6 +345,7 @@ function ScheduleStrip({ isMultiview, onProject }) {
             const Icon = SCHED_ICONS[item.type] || IconList
             return (
               <div key={item.id || idx}
+                title="Click: ir al panel · Doble click: proyectar directo"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '20px 1fr auto',
@@ -347,7 +355,8 @@ function ScheduleStrip({ isMultiview, onProject }) {
                   cursor: 'pointer',
                   transition: 'background 0.1s',
                 }}
-                onClick={() => onProject(item)}
+                onClick={() => onNavigate(item)}
+                onDoubleClick={() => onProject(item)}
                 onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-3)'}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                 <span style={{ color: 'var(--copper-200)', display: 'flex' }}>

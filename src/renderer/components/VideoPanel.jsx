@@ -3,7 +3,7 @@ import {
   listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
 import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
-import { emit } from '../hooks/useShortcuts.js'
+import { emit, subscribe } from '../hooks/useShortcuts.js'
 import {
   IconUpload, IconVideo, IconTrash, IconArrowRight, IconPlus, IconPlay, IconPause,
 } from './Icons.jsx'
@@ -33,6 +33,17 @@ export default function VideoPanel({ onSendSlide }) {
     setLoading(false)
   }
   useEffect(() => { refresh() }, [])
+
+  // Click simple en la Lista del día → seleccionar el video aquí sin proyectar.
+  // El payload trae meta.bgVideo (URL); buscamos el item correspondiente.
+  useEffect(() => {
+    return subscribe('video:focus-item', (payload) => {
+      const url = payload?.bgVideo
+      if (!url) return
+      const found = items.find(it => getMediaURL(it) === url)
+      if (found) setSelected(found)
+    })
+  }, [items])
 
   const handleUpload = async () => {
     const added = await pickMedia('video')

@@ -3,6 +3,7 @@ import {
   listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
 import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
+import { subscribe } from '../hooks/useShortcuts.js'
 import {
   IconUpload, IconImage, IconTrash, IconArrowRight, IconPlus,
 } from './Icons.jsx'
@@ -32,6 +33,16 @@ export default function ImagePanel({ onSendSlide }) {
   }
 
   useEffect(() => { refresh() }, [])
+
+  // Click simple en la Lista del día → seleccionar imagen aquí sin proyectar.
+  useEffect(() => {
+    return subscribe('image:focus-item', (payload) => {
+      const url = payload?.bgImage
+      if (!url) return
+      const found = items.find(it => getMediaURL(it) === url)
+      if (found) setSelected(found)
+    })
+  }, [items])
 
   const handleUpload = async () => {
     const added = await pickMedia('image')

@@ -6,10 +6,21 @@ export default function Topbar({ onSettingsChange, onOpenSettings }) {
   const t = useT()
   const [time, setTime] = useState(formatNow())
   const [projectorOn, setProjectorOn] = useState(true)
+  const [version, setVersion] = useState(null)
 
   useEffect(() => {
     const id = setInterval(() => setTime(formatNow()), 1000)
     return () => clearInterval(id)
+  }, [])
+
+  // Pedir la versión real al main process (devuelve app.getVersion()).
+  // Así no queda hardcoded en código.
+  useEffect(() => {
+    if (window.electron?.app?.info) {
+      window.electron.app.info()
+        .then(info => setVersion(info?.version || null))
+        .catch(() => {})
+    }
   }, [])
 
   // Abrir la ventana de proyección moderna (background = pantalla completa para el proyector físico).
@@ -42,8 +53,20 @@ export default function Topbar({ onSettingsChange, onOpenSettings }) {
       <header className="header" style={{ ...dragStyle, paddingRight: 152 }}>
         <div className="brand" style={noDragStyle}>
           <div className="brand-mark"><LogoMonogram size={28} /></div>
-          <div className="brand-name">Eclesia<em>Presenter</em></div>
-          <span className="brand-version">v 0.2</span>
+          <div className="brand-name">
+            Eclesia
+            <em style={{
+              fontFamily: '"Cormorant Garamond", Georgia, serif',
+              fontStyle: 'italic',
+              fontWeight: 500,
+              color: 'var(--copper-200)',
+              marginLeft: 2,
+              letterSpacing: '0.005em',
+            }}>
+              Presenter
+            </em>
+          </div>
+          <span className="brand-version">v {version || '0.2.x'}</span>
         </div>
 
         <div className="header-status">

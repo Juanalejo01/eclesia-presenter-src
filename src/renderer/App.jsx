@@ -67,6 +67,31 @@ export default function App() {
       }
     })
 
+    // Click en un item de la Lista del día → navegar al panel correspondiente
+    // SIN proyectar (el doble click sí proyecta directamente — esa lógica vive
+    // en ScheduleStrip y llama a setLive sin pasar por aquí).
+    const offScheduleFocus = subscribe('schedule:focus', (item) => {
+      if (!item) return
+      switch (item.type) {
+        case 'song':
+          setActivePanel('songs')
+          setTimeout(() => emit('songs:focus-item', item), 80)
+          break
+        case 'bible':
+          setActivePanel('bible')
+          setTimeout(() => emit('bible:focus-item', item), 80)
+          break
+        case 'image':
+          setActivePanel('image')
+          setTimeout(() => emit('image:focus-item', item), 80)
+          break
+        case 'video':
+          setActivePanel('video')
+          setTimeout(() => emit('video:focus-item', item), 80)
+          break
+      }
+    })
+
     // Eventos del control remoto móvil → traducir a acciones de la app
     const offRemote = window.electron?.server?.onRemoteEvent?.((name, payload) => {
       switch (name) {
@@ -93,7 +118,7 @@ export default function App() {
       }
     })
 
-    return () => { offSettings(); offFullscreen(); offRemote?.() }
+    return () => { offSettings(); offFullscreen(); offScheduleFocus(); offRemote?.() }
   }, [])
 
   useGlobalShortcuts({

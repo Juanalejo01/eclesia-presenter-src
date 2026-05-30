@@ -5,6 +5,7 @@ import {
 import SongEditor from './SongEditor.jsx'
 import { subscribe, emit } from '../hooks/useShortcuts.js'
 import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
+import { getSongsCache, updateSongsCache } from '../services/panelStateCache.js'
 import { songToSlides } from '../services/songSplit.js'
 import {
   IconSearch, IconPlus, IconEdit, IconTrash, IconArrowRight,
@@ -29,10 +30,13 @@ const saveServiceOrder = (ids) => {
 
 export default function SongsPanel({ onSendSlide }) {
   const t = useT()
+  // Restaurar estado de sesión previa al volver al panel
+  const _restore = getSongsCache()
+
   const [songs, setSongs]         = useState([])     // todas, alfabético
-  const [search, setSearch]       = useState('')
-  const [selected, setSelected]   = useState(null)
-  const [sectionIndex, setSectionIndex] = useState(0)
+  const [search, setSearch]       = useState(_restore.search || '')
+  const [selected, setSelected]   = useState(null)   // se completa al cargar songs
+  const [sectionIndex, setSectionIndex] = useState(_restore.sectionIndex || 0)
   const [editing, setEditing]     = useState(null)
   const [serviceOrderIds, setServiceOrderIds] = useState(loadServiceOrder())
   // Drag&drop visual feedback
@@ -45,6 +49,28 @@ export default function SongsPanel({ onSendSlide }) {
   }
 
   useEffect(() => { refresh() }, [])
+
+  // Tras cargar songs, restaurar la canción seleccionada de la sesión previa
+  useEffect(() => {
+    if (songs.length === 0) return
+    if (selected) return
+    const cachedId = _restore.selectedId
+    if (cachedId) {
+      const found = songs.find(s => s.id === cachedId)
+      if (found) setSelected(found)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songs])
+
+  // Persistir cambios al cache de sesión
+  useEffect(() => {
+    updateSongsCache({
+      selectedId: selected?.id || null,
+      sectionIndex,
+      slideIndex: 0,  // se actualiza más abajo
+      search,
+    })
+  }, [selected, sectionIndex, search])
 
   // Cuando cambian las canciones, mantén el orden del servicio sincronizado:
   // - quita IDs que ya no son favoritos
@@ -235,6 +261,26 @@ export default function SongsPanel({ onSendSlide }) {
     const offPrev = subscribe('navigate:prev', prev)
     return () => { offNext(); offPrev() }
   }, [selected, slideIndex, flatSlides.length])
+
+  // Click simple en la Lista del día → seleccionar la canción aquí
+  // (sin proyectar). El usuario decide qué sección proyectar después.
+  useEffect(() => {
+    return subscribe('songs:focus-item', (payload) => {
+      const id = payload?.songId || payload?.id
+      if (!id) return
+      const found = songs.find(s => s.id === id)
+      if (found) {
+        setSelected(found)
+      } else {
+        // Refrescar y reintentar (puede que se cargara después)
+        listSongs({}).then(all => {
+          setSongs(all)
+          const s = all.find(x => x.id === id)
+          if (s) setSelected(s)
+        })
+      }
+    })
+  }, [songs])
 
   useEffect(() => {
     return subscribe('songs:remote-project', (payload) => {

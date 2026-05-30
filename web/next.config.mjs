@@ -47,8 +47,8 @@ const nextConfig = {
 
   // Los binarios se sirven desde GitHub Releases.
   async redirects() {
-    const tag = 'v0.2.3'
-    const ver = '0.2.3'
+    const tag = 'v0.2.4'
+    const ver = '0.2.4'
     const base = 'https://github.com/Juanalejo01/eclesia-presenter/releases'
     return [
       { source: '/download/installer', destination: `${base}/download/${tag}/EclesiaPresenter-${ver}-setup.exe`, permanent: false },

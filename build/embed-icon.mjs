@@ -43,7 +43,35 @@ async function main() {
     },
   })
 
-  console.log('[embed-icon] ✓ Listo. El portable y setup que se construyan a continuación heredarán el icono.')
+  console.log('[embed-icon] ✓ Icono embebido.')
+
+  // ════════════════════════════════════════════════════════════
+  // app-update.yml para electron-updater.
+  //
+  // Este archivo le dice a electron-updater dónde buscar 'latest.yml'.
+  // Cuando build hace --prepackaged, NO se genera automáticamente
+  // (porque salta el step de packaging que normalmente lo crea).
+  // Lo escribimos manualmente apuntando al feed de GitHub Releases.
+  // Sin esto, la app instalada falla con:
+  //   "ENOENT: no such file or directory, open '...resources\app-update.yml'"
+  // ════════════════════════════════════════════════════════════
+  const RESOURCES_DIR = path.join(ROOT, 'dist-electron', 'win-unpacked', 'resources')
+  const APP_UPDATE_YML = path.join(RESOURCES_DIR, 'app-update.yml')
+  if (!exists(RESOURCES_DIR)) fs.mkdirSync(RESOURCES_DIR, { recursive: true })
+
+  const ymlContent = [
+    'provider: github',
+    'owner: Juanalejo01',
+    'repo: eclesia-presenter',
+    'updaterCacheDirName: eclesia-presenter-updater',
+    'releaseType: release',
+    'publishAutoUpdate: true',
+    '',
+  ].join('\n')
+  fs.writeFileSync(APP_UPDATE_YML, ymlContent, 'utf8')
+  console.log('[embed-icon] ✓ app-update.yml generado en', APP_UPDATE_YML)
+
+  console.log('[embed-icon] ✓ Listo. Portable + setup ahora pueden auto-actualizarse.')
 }
 
 main().catch(err => {
