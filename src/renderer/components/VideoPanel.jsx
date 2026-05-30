@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
-import { addItem as addToSchedule } from '../services/scheduleService.js'
+import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
 import { emit } from '../hooks/useShortcuts.js'
 import {
   IconUpload, IconVideo, IconTrash, IconArrowRight, IconPlus, IconPlay, IconPause,
@@ -75,15 +75,16 @@ export default function VideoPanel({ onSendSlide }) {
     })
   }
 
-  const addToList = (item) => {
-    addToSchedule({
-      type: 'video',
-      title: caption || item.name || 'Video',
-      text: caption || '',
-      reference: reference || '',
-      meta: { bgType: 'video', bgVideo: getMediaURL(item), loop, muted, videoFit },
-    })
-  }
+  // Construye el payload para Lista del día (usado por botón add + drag)
+  const buildScheduleItem = (item) => ({
+    type: 'video',
+    title: caption || item.name || 'Video',
+    text: caption || '',
+    reference: reference || '',
+    meta: { bgType: 'video', bgVideo: getMediaURL(item), loop, muted, videoFit },
+  })
+
+  const addToList = (item) => addToSchedule(buildScheduleItem(item))
 
   return (
     <div className="workspace"
@@ -221,6 +222,7 @@ export default function VideoPanel({ onSendSlide }) {
                   isSelected={selected?.id === item.id}
                   onSelect={() => setSelected(item)}
                   onProject={() => project(item)}
+                  onSchedulePayload={() => buildScheduleItem(item)}
                   onDelete={async () => {
                     if (confirm(t('video.deleteConfirm', { name: item.name }))) {
                       await deleteMedia(item.id); refresh()
@@ -236,7 +238,7 @@ export default function VideoPanel({ onSendSlide }) {
   )
 }
 
-function VideoTile({ item, isSelected, onSelect, onProject, onDelete }) {
+function VideoTile({ item, isSelected, onSelect, onProject, onSchedulePayload, onDelete }) {
   const t = useT()
   const videoRef = useRef(null)
   const [playing, setPlaying] = useState(false)
@@ -252,9 +254,13 @@ function VideoTile({ item, isSelected, onSelect, onProject, onDelete }) {
 
   return (
     <div onClick={onSelect}
+      draggable
+      onDragStart={(e) => {
+        if (onSchedulePayload) setScheduleDragPayload(e, onSchedulePayload())
+      }}
       style={{
         position: 'relative', aspectRatio: '16 / 11',
-        borderRadius: 'var(--r-md)', overflow: 'hidden', cursor: 'pointer',
+        borderRadius: 'var(--r-md)', overflow: 'hidden', cursor: 'grab',
         border: '1px solid ' + (isSelected ? 'rgba(232,181,145,0.5)' : 'var(--line-1)'),
         boxShadow: isSelected ? 'var(--shadow-glow-copper)' : 'var(--shadow-1)',
         background: '#000',

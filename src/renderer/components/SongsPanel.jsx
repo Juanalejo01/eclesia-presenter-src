@@ -4,7 +4,7 @@ import {
 } from '../services/songsService.js'
 import SongEditor from './SongEditor.jsx'
 import { subscribe, emit } from '../hooks/useShortcuts.js'
-import { addItem as addToSchedule } from '../services/scheduleService.js'
+import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
 import { songToSlides } from '../services/songSplit.js'
 import {
   IconSearch, IconPlus, IconEdit, IconTrash, IconArrowRight,
@@ -106,11 +106,21 @@ export default function SongsPanel({ onSendSlide }) {
 
   // === DRAG & DROP ===
 
-  // Inicia drag — guarda el ID y la columna de origen.
+  // Inicia drag — guarda el ID, la columna de origen, Y un payload
+  // compatible con la Lista del día (así también se puede arrastrar la
+  // canción al ScheduleStrip de la derecha).
   const onDragStart = (e, song, source) => {
     e.dataTransfer.effectAllowed = source === 'col2' ? 'move' : 'copy'
     e.dataTransfer.setData('text/song-id', String(song.id))
     e.dataTransfer.setData('text/song-source', source)
+    // Payload para Lista del día
+    setScheduleDragPayload(e, {
+      type: 'song',
+      title: song.title,
+      text: song.sections?.[0]?.text || song.title,
+      reference: song.author || '',
+      meta: { songId: song.id, sections: song.sections },
+    })
   }
 
   // Mueve un song dentro del servicio a la posición de targetId

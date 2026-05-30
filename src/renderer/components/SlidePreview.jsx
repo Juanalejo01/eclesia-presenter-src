@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from '../services/themeStore.js'
 import { useSlideStore, setPreviewMode, commitPreview, setLive } from '../services/slideStore.js'
-import { subscribe as subscribeSchedule, getItems as getScheduleItems, removeItem as removeScheduleItem } from '../services/scheduleService.js'
+import {
+  subscribe as subscribeSchedule,
+  getItems as getScheduleItems,
+  removeItem as removeScheduleItem,
+  addItem as addScheduleItem,
+  SCHEDULE_DRAG_MIME,
+  getScheduleDragPayload,
+} from '../services/scheduleService.js'
 import SlideRenderer from './SlideRenderer.jsx'
 import {
   IconArrowRight, IconX, IconBible, IconMusic, IconList,
@@ -221,37 +228,70 @@ function ScheduleStrip({ isMultiview, onProject }) {
   const [items, setItems] = useState(getScheduleItems)
   // Colapsada por defecto en multiview, abierta en PGM-only
   const [expanded, setExpanded] = useState(!isMultiview)
+  const [dragOver, setDragOver] = useState(false)
 
   useEffect(() => subscribeSchedule(setItems), [])
   // Al cambiar de modo monitor, ajustar el default de colapso
   useEffect(() => { setExpanded(!isMultiview) }, [isMultiview])
 
+  // Drag&drop: aceptar items arrastrados desde cualquier panel
+  const handleDragOver = (e) => {
+    if (!e.dataTransfer?.types?.includes(SCHEDULE_DRAG_MIME)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setDragOver(true)
+  }
+  const handleDragLeave = (e) => {
+    // Solo des-marcar cuando salimos del contenedor del strip
+    if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
+  }
+  const handleDrop = (e) => {
+    setDragOver(false)
+    const payload = getScheduleDragPayload(e)
+    if (!payload) return
+    e.preventDefault()
+    addScheduleItem(payload)
+    // Expandir automáticamente cuando se añade por drag — feedback inmediato
+    setExpanded(true)
+  }
+
   if (items.length === 0) {
     return (
-      <div style={{
-        marginTop: 12, padding: 10,
-        border: '1px dashed var(--line-1)',
-        borderRadius: 8,
-        background: 'var(--bg-1)',
-        fontSize: 11, color: 'var(--text-3)',
-        fontFamily: 'var(--font-mono)',
-        textAlign: 'center',
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-      }}>
-        Lista vacía · añade desde paneles
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        style={{
+          marginTop: 12, padding: dragOver ? 14 : 10,
+          border: '1px dashed ' + (dragOver ? 'var(--copper-200)' : 'var(--line-1)'),
+          borderRadius: 8,
+          background: dragOver ? 'rgba(168, 95, 51, 0.10)' : 'var(--bg-1)',
+          fontSize: 11,
+          color: dragOver ? 'var(--copper-100)' : 'var(--text-3)',
+          fontFamily: 'var(--font-mono)',
+          textAlign: 'center',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          transition: 'all 0.15s',
+        }}>
+        {dragOver ? '↓ Soltar para añadir ↓' : 'Lista vacía · añade desde paneles o arrastra aquí'}
       </div>
     )
   }
 
   return (
-    <div style={{
-      marginTop: 12,
-      border: '1px solid var(--line-1)',
-      borderRadius: 8,
-      background: 'var(--bg-1)',
-      overflow: 'hidden',
-    }}>
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{
+        marginTop: 12,
+        border: '1px solid ' + (dragOver ? 'var(--copper-200)' : 'var(--line-1)'),
+        borderRadius: 8,
+        background: dragOver ? 'rgba(168, 95, 51, 0.08)' : 'var(--bg-1)',
+        overflow: 'hidden',
+        transition: 'all 0.15s',
+      }}>
       <button
         onClick={() => setExpanded(v => !v)}
         style={{

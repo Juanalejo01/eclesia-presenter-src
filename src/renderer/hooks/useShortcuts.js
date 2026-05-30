@@ -132,11 +132,19 @@ export function useGlobalShortcuts({ onPanelChange, onBlank, onClearSlide, onOpe
           return
         }
 
-        // Ctrl+1..8 sigue funcionando como antes (compatibilidad)
-        if (['1','2','3','4','5','6','7','8'].includes(e.key)) {
+        // Ctrl+1..7 sigue funcionando. Ctrl+3 (que era schedule) deja de
+        // tener efecto — la Lista ya no es un panel, es sticky a la derecha.
+        if (['1','2','3','4','5','6','7'].includes(e.key)) {
           e.preventDefault()
-          const panels = ['bible', 'songs', 'schedule', 'image', 'video', 'text', 'projection', 'transmision']
-          onPanelChange?.(panels[+e.key - 1])
+          // index 2 (Ctrl+3) intencionalmente null: ya no hay schedule panel
+          const panels = ['bible', 'songs', null, 'image', 'video', 'text', 'projection']
+          const target = panels[+e.key - 1]
+          if (target) onPanelChange?.(target)
+          return
+        }
+        if (e.key === '8') {
+          e.preventDefault()
+          onPanelChange?.('transmision')
           return
         }
       }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
-import { addItem as addToSchedule } from '../services/scheduleService.js'
+import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
 import {
   IconUpload, IconImage, IconTrash, IconArrowRight, IconPlus,
 } from './Icons.jsx'
@@ -76,15 +76,16 @@ export default function ImagePanel({ onSendSlide }) {
 
   const projectCaption = () => selected && project(selected, true)
 
-  const addToList = (item) => {
-    addToSchedule({
-      type: 'image',
-      title: caption || item.name || 'Imagen',
-      text: caption || '',
-      reference: reference || '',
-      meta: { bgType: 'image', bgImage: getMediaURL(item), imageFit, bgImageBlur },
-    })
-  }
+  // Construye el payload para Lista del día (botón add + drag)
+  const buildScheduleItem = (item) => ({
+    type: 'image',
+    title: caption || item.name || 'Imagen',
+    text: caption || '',
+    reference: reference || '',
+    meta: { bgType: 'image', bgImage: getMediaURL(item), imageFit, bgImageBlur },
+  })
+
+  const addToList = (item) => addToSchedule(buildScheduleItem(item))
 
   return (
     <div className="workspace"
@@ -217,9 +218,11 @@ export default function ImagePanel({ onSendSlide }) {
                 return (
                   <div key={item.id}
                     onClick={() => setSelected(item)}
+                    draggable
+                    onDragStart={(e) => setScheduleDragPayload(e, buildScheduleItem(item))}
                     style={{
                       position: 'relative', aspectRatio: '16 / 11',
-                      borderRadius: 'var(--r-md)', overflow: 'hidden', cursor: 'pointer',
+                      borderRadius: 'var(--r-md)', overflow: 'hidden', cursor: 'grab',
                       border: '1px solid ' + (isSel ? 'rgba(232,181,145,0.5)' : 'var(--line-1)'),
                       boxShadow: isSel ? 'var(--shadow-glow-copper)' : 'var(--shadow-1)',
                       background: '#000',

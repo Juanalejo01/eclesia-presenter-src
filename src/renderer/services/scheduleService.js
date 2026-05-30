@@ -4,6 +4,34 @@
 //
 // Suscripción reactiva: los componentes se enteran de cambios sin polling.
 
+// MIME type usado para drag&drop hacia la Lista del día.
+// Cualquier panel puede arrastrar items con este tipo y el ScheduleStrip
+// los acepta. El payload es el JSON del schedule item completo.
+export const SCHEDULE_DRAG_MIME = 'application/x-eclesia-schedule-item'
+
+/**
+ * Helper para usar en onDragStart de un elemento que se va a soltar en la Lista.
+ * Pasa el item completo (con type, title, text, reference, meta).
+ *
+ *   <div draggable onDragStart={e => setScheduleDragPayload(e, item)}>...
+ */
+export function setScheduleDragPayload(event, item) {
+  if (!event?.dataTransfer || !item) return
+  try {
+    event.dataTransfer.setData(SCHEDULE_DRAG_MIME, JSON.stringify(item))
+    event.dataTransfer.effectAllowed = 'copy'
+  } catch {}
+}
+
+/** ¿Este evento de drop trae un item para la Lista del día? */
+export function getScheduleDragPayload(event) {
+  try {
+    const raw = event?.dataTransfer?.getData(SCHEDULE_DRAG_MIME)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
+
 const STORAGE_KEY = 'eclesia.schedule'
 const listeners = new Set()
 
