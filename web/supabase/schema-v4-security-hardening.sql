@@ -135,22 +135,31 @@ create index if not exists idx_cloud_songs_user_active
   on public.cloud_songs(user_id, updated_at desc)
   where deleted_at is null;
 
--- Lookups por title para búsqueda fuzzy (LIKE %x%) en endpoint de search:
-create index if not exists idx_cloud_songs_title_trgm
-  on public.cloud_songs using gin (title gin_trgm_ops);
--- Requiere extensión pg_trgm. Si no existe, ignoramos.
-
 -- Activaciones: lookup por device_id en /api/activate
 create index if not exists idx_activations_device
   on public.activations(device_id);
 
--- Verificación
+-- ---------- 8b. Índice fuzzy con pg_trgm (opcional pero útil) ----------
+-- pg_trgm habilita búsquedas LIKE %x% rápidas via trigrams. Es ideal
+-- para el buscador de canciones donde el usuario escribe parcialmente.
+-- En Supabase la extensión hay que habilitarla explícitamente — lo
+-- intentamos; si falla por permisos, seguimos sin ella (el resto del
+-- script no depende de pg_trgm).
 do $$
 begin
-  -- Probar si pg_trgm está disponible (silencioso si no)
-  perform extname from pg_extension where extname = 'pg_trgm';
-  if not found then
-    raise notice 'pg_trgm no instalada. Para búsqueda fuzzy óptima ejecuta: CREATE EXTENSION pg_trgm;';
+  begin
+    create extension if not exists pg_trgm;
+  exception when others then
+    raise notice 'No se pudo habilitar pg_trgm: %. Habilítala desde Supabase Dashboard → Database → Extensions.', SQLERRM;
+  end;
+
+  -- Solo crear el índice si pg_trgm está disponible AHORA mismo
+  if exists (select 1 from pg_extension where extname = 'pg_trgm') then
+    execute 'create index if not exists idx_cloud_songs_title_trgm
+             on public.cloud_songs using gin (title gin_trgm_ops)';
+    raise notice 'OK · idx_cloud_songs_title_trgm creado';
+  else
+    raise notice 'pg_trgm no instalada. Búsqueda fuzzy seguirá funcionando pero con scan secuencial.';
   end if;
 end $$;
 
