@@ -952,7 +952,7 @@ function SectionAcerca() {
         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
           <span style={{ color: 'var(--text-3)' }}>Versión</span>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-1)' }}>
-            {info?.version || upd?.currentVersion || '0.2.6'}
+            {info?.version || upd?.currentVersion || '0.2.7'}
             {isPortable && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)' }}>(portable)</span>}
           </span>
           <span style={{ color: 'var(--text-3)' }}>Datos del usuario</span>

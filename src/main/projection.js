@@ -161,7 +161,12 @@ function openProjection(opts = {}) {
     skipTaskbar: false,
     alwaysOnTop: false,
     resizable: !isOverlay,
-    focusable: !isOverlay,
+    // CRÍTICO: solo el Stage Display es focusable (el usuario lo mueve/coloca).
+    // El overlay (OBS) y la Pantalla completa (proyector) NUNCA reciben teclado,
+    // así que focusable:false evita que roben el foco del teclado a la ventana
+    // principal. Sin esto, al abrir el proyector los inputs de la app dejaban
+    // de aceptar texto hasta minimizar/cerrar (bug reportado en uso real).
+    focusable: isStage,
     show: !isOverlay,
     title:
       isOverlay ? 'EclesiaPresenter — Lower-Third (OBS)' :
@@ -202,10 +207,33 @@ function openProjection(opts = {}) {
     win.webContents.send('projection:init', { mode, slide: currentSlide, theme: currentTheme })
   })
 
-  win.on('closed', () => projections.delete(mode))
+  win.on('closed', () => {
+    projections.delete(mode)
+    // Al cerrar cualquier proyección, devolver foco a la ventana principal
+    // para que el teclado siga funcionando ahí.
+    returnFocusToMain()
+  })
 
   projections.set(mode, { window: win, options: opts })
+
+  // Tras abrir una proyección no interactiva (background/overlay), asegurar
+  // que el foco del teclado vuelve a la ventana principal. Belt-and-suspenders
+  // junto con focusable:false.
+  if (!isStage) {
+    setTimeout(returnFocusToMain, 500)
+  }
+
   return win.id
+}
+
+let _mainWindow = null
+function setMainWindow(win) { _mainWindow = win }
+function returnFocusToMain() {
+  try {
+    if (_mainWindow && !_mainWindow.isDestroyed() && !_mainWindow.isMinimized()) {
+      _mainWindow.focus()
+    }
+  } catch {}
 }
 
 function closeProjection(mode) {
@@ -290,7 +318,7 @@ function getState() {
 }
 
 module.exports = {
-  openProjection, closeProjection, closeAll,
+  openProjection, closeProjection, closeAll, setMainWindow,
   setSlide, setTheme, setNotes, setCountdown, getState,
   toggleOverlayVisible,
 }

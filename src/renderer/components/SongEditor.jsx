@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { songToSlides } from '../services/songSplit.js'
 import {
   IconX, IconPlus, IconArrowUp, IconArrowDown, IconCheck, IconChevDown,
@@ -91,6 +91,39 @@ export default function SongEditor({ song, onSave, onCancel }) {
   const [maxLines, setMaxLines] = useState(song?.maxLines ?? song?.max_lines ?? 4)
   const [tab, setTab] = useState('edit')
 
+  // Snapshot del estado inicial para detectar cambios sin guardar.
+  // Si el usuario escribió algo y cierra sin guardar, confirmamos antes
+  // de descartar (evita perder una canción a medio escribir por un click
+  // accidental fuera del modal).
+  const initialRef = useRef(JSON.stringify({
+    title: song?.title || '', author: song?.author || '', tags: song?.tags || '',
+    sections: song?.sections?.length ? song.sections : [{ type: 'verse', label: 'Estrofa 1', text: '' }],
+    maxLines: song?.maxLines ?? song?.max_lines ?? 4,
+    themeOverride: song?.theme_override || null,
+  }))
+
+  const hasUnsavedChanges = () => {
+    const current = JSON.stringify({ title, author, tags, sections, maxLines, themeOverride })
+    return current !== initialRef.current
+  }
+
+  // Cierre seguro: si hay cambios sin guardar, pedir confirmación.
+  const requestClose = () => {
+    if (hasUnsavedChanges()) {
+      const ok = confirm('Tienes cambios sin guardar. ¿Seguro que quieres cerrar y descartar lo escrito?')
+      if (!ok) return
+    }
+    onCancel()
+  }
+
+  // Escape también pasa por la confirmación
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); requestClose() } }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, author, tags, sections, maxLines, themeOverride])
+
   // Theme override por canción. null = usa el theme global de proyección
   // (caso "Igual que en proyección"). Si el usuario configura algo aquí,
   // SOLO afecta a esta canción y no toca el theme global. Cuando se proyecta
@@ -148,7 +181,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
   const sliderVal = ((maxLines - 2) / 6 * 100) + '%'
 
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
+    <div className="modal-backdrop" onClick={requestClose}>
       <div className="modal" onClick={e => e.stopPropagation()}
         style={{ width: 'min(1200px, 96vw)', maxHeight: '92vh' }}>
         <div className="modal-header">
@@ -160,7 +193,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
                 Presentación · {presentationSlides.length}
               </button>
             </div>
-            <button className="btn btn-ghost" onClick={onCancel} style={{ padding: 6 }}><IconX size={16} /></button>
+            <button className="btn btn-ghost" onClick={requestClose} style={{ padding: 6 }}><IconX size={16} /></button>
           </div>
         </div>
 
@@ -305,7 +338,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
             {sections.length} secciones · {presentationSlides.length} slides al proyectar
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn" onClick={onCancel}>Cancelar</button>
+            <button className="btn" onClick={requestClose}>Cancelar</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={!title.trim()}>
               <IconCheck size={14} /> Guardar
             </button>

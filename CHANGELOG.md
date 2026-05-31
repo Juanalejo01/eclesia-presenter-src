@@ -11,6 +11,31 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.7] — 2026-05-31
+
+Fixes de 3 problemas reportados, uno de ellos crítico (visto en uso real).
+
+### Fixed
+- 🔴 **CRÍTICO: los inputs dejaban de aceptar texto** durante un servicio
+  real (escuela dominical). De repente no se podía escribir en ningún
+  campo (Biblia, Canciones, editor) hasta minimizar/cerrar. Causa: la
+  ventana de Pantalla completa (proyector) era `focusable: true` y robaba
+  el foco del teclado de la ventana principal. Fix: la proyección y el
+  overlay ahora son `focusable: false` (nunca reciben teclado) + se
+  devuelve el foco a la ventana principal al abrir/cerrar proyecciones.
+- 🪟 **Ventanas de proyección huérfanas** al cerrar la app — quedaban
+  abiertas en el proyector. Ahora se cierran todas (before-quit +
+  window-all-closed + cierre confirmado).
+- ✍️ **Editor de canciones perdía todo** al hacer click fuera del modal.
+  Ahora detecta cambios sin guardar y pide confirmación antes de
+  descartar (backdrop, botón X, Cancelar y Escape).
+
+### Added
+- 🛑 **Confirmación al cerrar la app** ("¿Seguro que quieres cerrar?")
+  para evitar cierres accidentales en mitad de un servicio.
+
+---
+
 ## [0.2.6] — 2026-05-31
 
 Sprint de seguridad + escalabilidad + fixes de UX.
@@ -243,7 +268,8 @@ Cimientos iniciales (pre-beta).
 - **Fixed**: bug fixes
 - **Security**: cambios relacionados con seguridad
 
-[Unreleased]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.7
 [0.2.6]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.6
 [0.2.2]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.1

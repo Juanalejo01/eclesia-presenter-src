@@ -156,8 +156,35 @@ function createMainWindow() {
     mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'))
   }
 
+  // Confirmación al cerrar + cierre de ventanas de proyección huérfanas.
+  // Sin esto, al cerrar la app las ventanas de Pantalla completa / overlay /
+  // stage quedaban abiertas (procesos huérfanos visibles en el proyector).
+  mainWindow.on('close', (e) => {
+    if (_isQuitting) return  // ya confirmado, dejar cerrar
+    e.preventDefault()
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'question',
+      buttons: ['Cancelar', 'Cerrar EclesiaPresenter'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+      title: 'Cerrar EclesiaPresenter',
+      message: '¿Seguro que quieres cerrar la aplicación?',
+      detail: 'Se cerrarán también las ventanas de proyección y overlay que estén abiertas.',
+    })
+    if (choice === 1) {
+      _isQuitting = true
+      try { projection.closeAll() } catch {}
+      mainWindow.close()
+    }
+  })
+
   mainWindow.on('closed', () => { mainWindow = null })
 }
+
+// Flag para distinguir el cierre confirmado del primer intento (que muestra
+// el diálogo). También lo activan before-quit / window-all-closed.
+let _isQuitting = false
 
 // Server local: se inicializa en app.whenReady. Lo guardamos en closure para
 // poder llamar a pushSlide / onRemoteEvent desde los handlers IPC.
@@ -623,6 +650,7 @@ app.whenReady().then(() => {
   cloudSync.setMainWindow(mainWindow)
   backgroundLibrary.setMainWindow(mainWindow)
   autoUpdater.setMainWindow(mainWindow)
+  projection.setMainWindow(mainWindow)
   autoUpdater.init()  // arranca check inicial 30s después
 })
 
@@ -643,7 +671,16 @@ function syncSongsToServer() {
 // (Nota: los handlers ya están registrados arriba; los re-wrapeamos abajo después
 // de definir syncSongsToServer.)
 
+// Antes de salir por CUALQUIER vía (Cmd+Q, app.quit, cierre de ventana ya
+// confirmado), marcar quitting y cerrar todas las proyecciones para no dejar
+// ventanas huérfanas.
+app.on('before-quit', () => {
+  _isQuitting = true
+  try { projection.closeAll() } catch {}
+})
+
 app.on('window-all-closed', () => {
+  try { projection.closeAll() } catch {}
   if (process.platform !== 'darwin') app.quit()
 })
 
