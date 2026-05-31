@@ -1,4 +1,33 @@
+import { useState, useEffect, useRef } from 'react'
 import SlideTransition from './SlideTransition.jsx'
+
+// Formato idéntico al de ToolsPanel.formatCountdown.
+function formatCountdown(ms) {
+  const totalSec = Math.ceil(ms / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  const pad = n => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
+}
+
+/**
+ * Texto de countdown con RELOJ PROPIO. Recalcula el tiempo restante a partir
+ * de `endsAt` (timestamp absoluto) en cada tick, en vez de depender de que
+ * un componente externo envíe el texto ya formateado. Esto hace que el
+ * countdown siga contando aunque el panel Herramientas esté desmontado
+ * (usuario navegó a Biblia/Proyección) o la app esté minimizada.
+ */
+function LiveCountdown({ endsAt, endMessage, style }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(id)
+  }, [])
+  const remaining = Math.max(0, (endsAt || 0) - now)
+  const text = remaining > 0 ? formatCountdown(remaining) : (endMessage || '')
+  return <p style={style}>{text}</p>
+}
 
 /**
  * Renderizador unificado de un slide con tema aplicado.
@@ -19,7 +48,7 @@ import SlideTransition from './SlideTransition.jsx'
  *                    transparente (ventana overlay de OBS). Cuando false,
  *                    pinta un patrón ajedrez (preview en el panel).
  */
-export default function SlideRenderer({ slide, theme, isBlackout: forceBlackout = false, transparentBg = false }) {
+function SlideRendererInner({ slide, theme, isBlackout: forceBlackout = false, transparentBg = false }) {
   // Mezcla: el slide puede sobreescribir aspectos visuales del tema global.
   const eff = mergeThemeWithSlide(theme, slide)
 
@@ -60,7 +89,24 @@ export default function SlideRenderer({ slide, theme, isBlackout: forceBlackout 
       padding: paddingPct, boxSizing: 'border-box',
     }}>
       <div style={{ textAlign: 'center', maxWidth: '100%' }}>
-        {s.text && (
+        {/* Countdown self-contained: si el slide trae endsAt, usamos un reloj
+            propio que sigue contando aunque el panel Herramientas no esté
+            montado. Si no (countdown sin endsAt o slide normal), texto plano. */}
+        {s.type === 'countdown' && s.endsAt ? (
+          <LiveCountdown
+            endsAt={s.endsAt}
+            endMessage={s.endMessage}
+            style={{
+              color: eff.fontColor,
+              fontSize,
+              fontFamily: eff.fontFamily || 'var(--font-display)',
+              fontWeight: eff.fontWeight ?? 500,
+              textShadow: eff.textShadow ? '0 4px 20px rgba(0,0,0,0.6)' : 'none',
+              lineHeight: 1.25, margin: 0, letterSpacing: '0.005em',
+              whiteSpace: 'pre-line',
+            }}
+          />
+        ) : s.text && (
           <p style={{
             color: eff.fontColor,
             fontSize,
@@ -155,4 +201,96 @@ function mergeThemeWithSlide(theme, slide) {
     if (slide[k] !== undefined) out[k] = slide[k]
   }
   return out
+}
+
+// ============================================================
+// CROSSFADE DE TEMA
+// ============================================================
+// Calcula una "huella" de las propiedades VISUALES del tema efectivo
+// (fondo + tipografía). Cuando esta huella cambia mientras el mismo slide
+// está en vivo, hacemos un crossfade suave en vez de un cambio en seco.
+function visualThemeKey(theme, slide) {
+  const eff = mergeThemeWithSlide(theme, slide)
+  return [
+    eff.bgType, eff.bgColor,
+    Array.isArray(eff.bgGradient) ? eff.bgGradient.join(',') : '',
+    eff.bgImage || '', eff.bgVideo || '',
+    eff.imageFit, eff.videoFit, eff.bgImageBlur,
+    eff.fontColor, eff.fontFamily, eff.fontSize, eff.fontWeight, eff.textAlign,
+  ].join('|')
+}
+
+/**
+ * Wrapper que añade crossfade cuando cambia el TEMA (fondo/tipografía) sobre
+ * el mismo contenido. La transición de SLIDE (texto) la sigue gestionando
+ * SlideTransition dentro de SlideRendererInner.
+ *
+ * Diseño defensivo: si algo va mal, siempre renderiza al menos la capa
+ * activa con el tema actual = comportamiento idéntico al anterior.
+ *
+ * Durante un crossfade hay 2 capas: la saliente congela el tema VIEJO,
+ * la entrante usa el tema NUEVO. Ambas con el slide actual. Tras la
+ * duración, se descarta la saliente.
+ */
+const FADE_MS = 450
+
+export default function SlideRenderer(props) {
+  const { slide, theme } = props
+  const key = visualThemeKey(theme, slide)
+
+  // Cada capa congela el theme con el que se montó.
+  const [layers, setLayers] = useState(() => [{ id: 0, theme, phase: 'active' }])
+  const idRef = useRef(1)
+  const lastKeyRef = useRef(key)
+
+  useEffect(() => {
+    if (key === lastKeyRef.current) return
+    lastKeyRef.current = key
+    const id = idRef.current++
+
+    // Capas viejas → exiting (se desvanecen). Nueva capa con el theme actual.
+    setLayers(prev => [
+      ...prev.map(l => ({ ...l, phase: 'exiting' })),
+      { id, theme, phase: 'entering' },
+    ])
+
+    let raf2 = 0
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        setLayers(prev => prev.map(l => l.id === id ? { ...l, phase: 'active' } : l))
+      })
+    })
+    const timer = setTimeout(() => {
+      setLayers(prev => prev.filter(l => l.phase !== 'exiting'))
+    }, FADE_MS + 60)
+
+    return () => {
+      cancelAnimationFrame(raf1)
+      if (raf2) cancelAnimationFrame(raf2)
+      clearTimeout(timer)
+    }
+  }, [key, theme])
+
+  // Sin transición pendiente: render directo (caso normal, sin overhead).
+  if (layers.length === 1 && layers[0].phase === 'active') {
+    return <SlideRendererInner {...props} />
+  }
+
+  return (
+    <div style={{ position: 'absolute', inset: 0 }}>
+      {layers.map(layer => (
+        <div
+          key={layer.id}
+          style={{
+            position: 'absolute', inset: 0,
+            opacity: layer.phase === 'active' ? 1 : 0,
+            transition: `opacity ${FADE_MS}ms ease-in-out`,
+            willChange: 'opacity',
+          }}
+        >
+          <SlideRendererInner {...props} theme={layer.theme} />
+        </div>
+      ))}
+    </div>
+  )
 }

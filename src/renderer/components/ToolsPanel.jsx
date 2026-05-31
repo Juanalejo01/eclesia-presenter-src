@@ -71,17 +71,21 @@ function CountdownWidget() {
   const state = useCountdown()
   const { mode, hours, minutes, seconds, targetDate, message, endMessage, running, endsAt, autoProject, now } = state
 
-  // Auto-proyección al live cuando está corriendo
+  // Auto-proyección al live. IMPORTANTE: NO dependemos de `now` — proyectamos
+  // UNA sola vez (cuando arranca o cambia la config) enviando `endsAt`. El
+  // SlideRenderer tiene su propio reloj que cuenta a partir de endsAt, así el
+  // live sigue corriendo aunque salgamos del panel Herramientas o se minimice.
   useEffect(() => {
     if (!running || !endsAt || !autoProject) return
-    const remaining = Math.max(0, endsAt - now)
-    const text = remaining > 0 ? formatCountdown(remaining) : endMessage
     selectSlide({
       type: 'countdown',
-      text,
+      endsAt,
+      endMessage,
       reference: message,
+      // texto inicial como fallback (si el renderer no soportara endsAt)
+      text: formatCountdown(Math.max(0, endsAt - Date.now())),
     })
-  }, [now, running, endsAt, autoProject, message, endMessage])
+  }, [running, endsAt, autoProject, message, endMessage])
 
   const remaining = endsAt ? Math.max(0, endsAt - now) : (hours * 3600 + minutes * 60 + seconds) * 1000
 
@@ -160,8 +164,10 @@ function CountdownWidget() {
         <button className="btn btn-ghost" onClick={resetCountdown}>↻ Reset</button>
         <button className="btn" onClick={() => selectSlide({
           type: 'countdown',
-          text: remaining > 0 ? formatCountdown(remaining) : endMessage,
+          endsAt: running ? endsAt : null,  // si corre, reloj propio; si no, estático
+          endMessage,
           reference: message,
+          text: remaining > 0 ? formatCountdown(remaining) : endMessage,
         })}>Proyectar ahora</button>
       </div>
     </>

@@ -11,6 +11,45 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.6] — 2026-05-31
+
+Sprint de seguridad + escalabilidad + fixes de UX.
+
+### Fixed
+- 🐛 **Crash de pantalla negra** (v0.2.4/v0.2.5) — `ReferenceError: Cannot
+  access verseHistory before initialization` (TDZ) en BiblePanel. State
+  movido arriba.
+- ⏱ **Timer (countdown) se congelaba** al cambiar de panel o minimizar.
+  Ahora el slide de countdown lleva `endsAt` y el SlideRenderer cuenta con
+  su propio reloj — sigue corriendo aunque Herramientas esté desmontado.
+  `backgroundThrottling: false` en la ventana principal para que los
+  timers no se ralenticen al minimizar.
+
+### Added
+- 🎞 **Crossfade al cambiar tema en vivo** — cambiar fondo o tipografía
+  mientras hay algo proyectado ahora hace un fade suave (450ms) en vez de
+  un corte en seco. Wrapper aditivo y defensivo sobre SlideRenderer.
+- 🎨 **Topbar typography** — 'Presenter' en Cormorant Garamond itálica
+  cobre, idéntico al SplashScreen. Versión completa (0.2.6).
+
+### Security (hardening del audit con subagente)
+- 🔒 **Path traversal** bloqueado en protocolos `media://`, `preset://` y
+  en IPC de biblias importadas (validación de id + safeResolveWithin).
+- 🔒 **Brute-force del PIN** del mobile remote: rate-limit 5/min/IP +
+  lockout 15 min. Tokens con TTL 24h (antes leak de memoria).
+- 🔒 **Race condition** en cloudSync que perdía cambios durante un sync.
+- 🔒 **SQL LIKE DoS** mitigado (escape de %_ en búsqueda de canciones).
+- 🔒 **Stripe webhook** rate-limited (100 req/min/IP).
+- 🔒 **CORS allowlist** estricta en `/api/*` (solo orígenes legítimos).
+- 🔒 **CSP** en el renderer de Electron + COOP/CORP en la web.
+- 🔒 **Supabase** schema-v4: FORCE RLS, REVOKE anon, WITH CHECK en update.
+
+### Performance
+- 🏎 Índices nuevos SQLite (title COLLATE NOCASE, updated_at) y Postgres
+  (partial WHERE deleted_at IS NULL, device_id, trgm opcional).
+
+---
+
 ## [0.2.2] — 2026-05-23
 
 Release de iteración rápida basada en feedback de uso real. **Primera
@@ -204,7 +243,8 @@ Cimientos iniciales (pre-beta).
 - **Fixed**: bug fixes
 - **Security**: cambios relacionados con seguridad
 
-[Unreleased]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.6
 [0.2.2]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Juanalejo01/eclesia-presenter/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Juanalejo01/eclesia-presenter/compare/v0.1.0...v0.2.0

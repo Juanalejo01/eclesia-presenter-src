@@ -126,6 +126,11 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Sin esto, Chromium ralentiza/pausa los setInterval y requestAnimationFrame
+      // cuando la ventana se minimiza o queda en background. Eso congelaba el
+      // countdown y el cronómetro. El proyector (projection.js) ya lo tiene en
+      // false; lo igualamos aquí para que el monitor lateral siga contando.
+      backgroundThrottling: false,
     },
   })
 
