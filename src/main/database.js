@@ -279,13 +279,26 @@ function toggleFavorite(id) {
 
 // --------- Cloud sync helpers ---------
 
-/** Lista todas las canciones más sus tombstones para enviar al server en sync. */
-function getSyncPayload() {
+/**
+ * Devuelve las canciones y tombstones que han cambiado desde `since` (ms).
+ *
+ * `since = 0` significa "enviar todo" (primer sync o reset).
+ * Con el indice idx_songs_updated_at la query es O(log n) en vez de O(n).
+ *
+ * Por que importa: antes se enviaba la tabla entera en cada mutacion.
+ * Con 2000 canciones = varios MB por sync. Ahora solo viajan las filas
+ * modificadas desde el ultimo sync exitoso.
+ */
+function getSyncPayload(since = 0) {
+  // Convertir ms a ISO para la comparacion; si since=0 mandamos todo.
+  const sinceIso = since > 0 ? new Date(since).toISOString() : '1970-01-01T00:00:00.000Z'
+
   const songs = db.prepare(`
     SELECT id, cloud_id, title, author, tags, key_signature, tempo, sections,
            max_lines, is_favorite, updated_at
     FROM songs
-  `).all().map(s => ({
+    WHERE updated_at > ?
+  `).all(since).map(s => ({
     local_key: `local-${s.id}`,
     cloud_id: s.cloud_id || null,
     title: s.title,
@@ -299,6 +312,9 @@ function getSyncPayload() {
     updated_at: s.updated_at,
     deleted: false,
   }))
+
+  // Tombstones: mandamos todos siempre porque son pocos y no tienen updated_at
+  // separado del deleted_at. El servidor los idempotentiza.
   const tombstones = db.prepare(`
     SELECT cloud_id, deleted_at FROM songs_tombstones
   `).all().map(t => ({
@@ -306,6 +322,7 @@ function getSyncPayload() {
     updated_at: t.deleted_at,
     deleted: true,
   }))
+
   return [...songs, ...tombstones]
 }
 

@@ -98,97 +98,129 @@ export async function POST(request) {
 
     const userId = license.user_id
     const mapping = {}
-    // Contadores de lo que el SERVER aplicó (push del cliente al cloud)
     const pushed = { uploaded: 0, updated: 0, deleted: 0 }
 
-    // === PUSH: subir cambios locales al cloud ===
-    for (const song of local) {
-      if (!song || typeof song !== 'object') continue
+    // === PUSH: subir cambios locales al cloud (batch, no N+1) ===
+    //
+    // Antes: 1-3 queries por cancion → con 500 canciones = hasta 1500 queries
+    //        serializadas → timeout 30s garantizado en Vercel.
+    // Ahora: 1 query batch al inicio para cargar el estado actual en cloud,
+    //        luego operaciones agrupadas por tipo (inserts / updates / deletes).
 
-      const isDelete = song.deleted === true && song.cloud_id
-      const localUpdatedMs = Number(song.updated_at) || Date.now()
-      const localUpdatedAt = new Date(localUpdatedMs).toISOString()
+    const validLocal = local.filter(s => s && typeof s === 'object')
 
-      if (isDelete) {
-        // Soft delete en cloud
+    // 1. Separar canciones por tipo de operacion
+    const toDelete  = validLocal.filter(s => s.deleted && s.cloud_id)
+    const toInsert  = validLocal.filter(s => !s.deleted && !s.cloud_id)
+    const toUpdate  = validLocal.filter(s => !s.deleted && s.cloud_id)
+
+    // 2. Si hay canciones con cloud_id, fetch batch de su estado actual en cloud
+    //    (1 sola query en vez de 1 por cancion)
+    const existingCloudIds = [...toUpdate.map(s => s.cloud_id), ...toDelete.map(s => s.cloud_id)]
+      .filter(Boolean)
+    const cloudMap = new Map()  // cloud_id -> { updated_at, deleted_at }
+    if (existingCloudIds.length > 0) {
+      // Supabase permite hasta ~1000 items en .in(); si hay mas, chunkeamos.
+      const CHUNK = 900
+      for (let i = 0; i < existingCloudIds.length; i += CHUNK) {
+        const chunk = existingCloudIds.slice(i, i + CHUNK)
+        const { data: rows } = await admin
+          .from('cloud_songs')
+          .select('id, updated_at, deleted_at')
+          .eq('user_id', userId)
+          .in('id', chunk)
+        for (const r of rows || []) cloudMap.set(r.id, r)
+      }
+    }
+
+    // 3. Soft deletes en batch (max 900 por llamada)
+    const deleteIds = toDelete
+      .filter(s => cloudMap.has(s.cloud_id))  // solo si existe en cloud
+      .map(s => s.cloud_id)
+    if (deleteIds.length > 0) {
+      const deletedAt = new Date().toISOString()
+      const CHUNK = 900
+      for (let i = 0; i < deleteIds.length; i += CHUNK) {
+        const chunk = deleteIds.slice(i, i + CHUNK)
         const { error } = await admin
           .from('cloud_songs')
-          .update({ deleted_at: localUpdatedAt, updated_at: localUpdatedAt })
-          .eq('id', song.cloud_id)
+          .update({ deleted_at: deletedAt, updated_at: deletedAt })
           .eq('user_id', userId)
-        if (!error) pushed.deleted++
-        continue
+          .in('id', chunk)
+        if (!error) pushed.deleted += chunk.length
       }
+    }
 
-      if (!song.cloud_id) {
-        // Nueva canción local → insertar en cloud
+    // 4. Inserts batch (canciones nuevas sin cloud_id)
+    if (toInsert.length > 0) {
+      const CHUNK = 500
+      for (let i = 0; i < toInsert.length; i += CHUNK) {
+        const chunk = toInsert.slice(i, i + CHUNK)
+        const rows = chunk.map(s => ({
+          user_id: userId,
+          title: String(s.title || '').slice(0, 500),
+          author: s.author ? String(s.author).slice(0, 200) : null,
+          tags: s.tags ? String(s.tags).slice(0, 500) : null,
+          key_signature: s.key_signature ? String(s.key_signature).slice(0, 16) : null,
+          tempo: s.tempo ? Number(s.tempo) : null,
+          sections: s.sections || [],
+          max_lines: s.max_lines || 4,
+          is_favorite: !!s.is_favorite,
+          updated_at: new Date(Number(s.updated_at) || Date.now()).toISOString(),
+        }))
         const { data: inserted, error: insErr } = await admin
           .from('cloud_songs')
-          .insert({
-            user_id: userId,
-            title: String(song.title || '').slice(0, 500),
-            author: song.author ? String(song.author).slice(0, 200) : null,
-            tags: song.tags ? String(song.tags).slice(0, 500) : null,
-            key_signature: song.key_signature ? String(song.key_signature).slice(0, 16) : null,
-            tempo: song.tempo ? Number(song.tempo) : null,
-            sections: song.sections || [],
-            max_lines: song.max_lines || 4,
-            is_favorite: !!song.is_favorite,
-            updated_at: localUpdatedAt,
-          })
+          .insert(rows)
           .select('id')
-          .single()
         if (insErr) {
-          console.error('[songs/sync] insert error')
+          console.error('[songs/sync] batch insert error')
           continue
         }
-        pushed.uploaded++
-        if (song.local_key) mapping[song.local_key] = inserted.id
-      } else {
-        // Actualizar — solo si local es más reciente que cloud
-        const { data: cloudRow } = await admin
+        // Mapear local_key -> cloud_id para que el cliente guarde la relacion
+        ;(inserted || []).forEach((row, idx) => {
+          pushed.uploaded++
+          const s = chunk[idx]
+          if (s.local_key) mapping[s.local_key] = row.id
+        })
+      }
+    }
+
+    // 5. Updates batch (solo los que local gana por last-write-wins)
+    const updateRows = []
+    for (const s of toUpdate) {
+      const cloudRow = cloudMap.get(s.cloud_id)
+      if (!cloudRow) {
+        // No existe en cloud (puede haber sido borrado por otro PC) → re-insertar
+        toInsert.push(s)  // se procesara en una segunda pasada si hace falta
+        continue
+      }
+      if (cloudRow.deleted_at) continue  // cloud ya lo borro, no pisamos
+      const localMs  = Number(s.updated_at) || 0
+      const cloudMs  = new Date(cloudRow.updated_at).getTime()
+      if (localMs <= cloudMs) continue   // cloud es mas reciente, cloud gana
+      updateRows.push({
+        id: s.cloud_id,
+        title: String(s.title || '').slice(0, 500),
+        author: s.author ? String(s.author).slice(0, 200) : null,
+        tags: s.tags ? String(s.tags).slice(0, 500) : null,
+        key_signature: s.key_signature ? String(s.key_signature).slice(0, 16) : null,
+        tempo: s.tempo ? Number(s.tempo) : null,
+        sections: s.sections || [],
+        max_lines: s.max_lines || 4,
+        is_favorite: !!s.is_favorite,
+        updated_at: new Date(localMs).toISOString(),
+      })
+    }
+
+    if (updateRows.length > 0) {
+      const CHUNK = 500
+      for (let i = 0; i < updateRows.length; i += CHUNK) {
+        const chunk = updateRows.slice(i, i + CHUNK)
+        // upsert con onConflict:'id' aplica un UPDATE cuando el id ya existe
+        const { error } = await admin
           .from('cloud_songs')
-          .select('updated_at, deleted_at')
-          .eq('id', song.cloud_id)
-          .eq('user_id', userId)
-          .maybeSingle()
-        if (!cloudRow) {
-          const { data: inserted } = await admin
-            .from('cloud_songs')
-            .insert({
-              user_id: userId,
-              title: String(song.title || '').slice(0, 500),
-              sections: song.sections || [],
-              updated_at: localUpdatedAt,
-            })
-            .select('id').single()
-          if (inserted) {
-            pushed.uploaded++
-            if (song.local_key) mapping[song.local_key] = inserted.id
-          }
-        } else if (cloudRow.deleted_at) {
-          continue
-        } else {
-          const cloudUpdatedMs = new Date(cloudRow.updated_at).getTime()
-          if (localUpdatedMs > cloudUpdatedMs) {
-            const { error } = await admin
-              .from('cloud_songs')
-              .update({
-                title: String(song.title || '').slice(0, 500),
-                author: song.author ? String(song.author).slice(0, 200) : null,
-                tags: song.tags ? String(song.tags).slice(0, 500) : null,
-                key_signature: song.key_signature ? String(song.key_signature).slice(0, 16) : null,
-                tempo: song.tempo ? Number(song.tempo) : null,
-                sections: song.sections || [],
-                max_lines: song.max_lines || 4,
-                is_favorite: !!song.is_favorite,
-                updated_at: localUpdatedAt,
-              })
-              .eq('id', song.cloud_id)
-              .eq('user_id', userId)
-            if (!error) pushed.updated++
-          }
-        }
+          .upsert(chunk, { onConflict: 'id' })
+        if (!error) pushed.updated += chunk.length
       }
     }
 

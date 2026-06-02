@@ -30,6 +30,7 @@ export default function BiblePanel({ onSendSlide }) {
   const _restore = getBibleCache()
 
   const [books, setBooks]         = useState([])
+  const booksRef = useRef([])  // ref mutable para handlers de eventos sin re-suscribir
   const [loading, setLoading]     = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [bookSearch, setBookSearch] = useState(_restore.bookSearch || '')
@@ -67,7 +68,7 @@ export default function BiblePanel({ onSendSlide }) {
       setStep('book'); setSelectedBookIndex(null); setChapter(null)
     }
     getBooks(versionId)
-      .then(b => { setBooks(b); setLoading(false) })
+      .then(b => { booksRef.current = b; setBooks(b); setLoading(false) })
       .catch(err => { setLoadError(err.message); setLoading(false) })
   }, [versionId, pro])
 
@@ -312,16 +313,15 @@ export default function BiblePanel({ onSendSlide }) {
       const bookText = tokens.join(' ')
       if (!bookText) return
       const q = normalizeText(bookText)
-      const match = books.find(b => normalizeText(b.name).includes(q))
+      const match = booksRef.current.find(b => normalizeText(b.name).includes(q))
       if (match) {
         goToReference(match.index, chapter, verse, verseEnd)
       } else {
-        // No encontramos libro: lo dejamos como filtro escrito en el buscador
-        // para que el usuario vea el estado.
         setBookSearch(query)
       }
     })
-  }, [books, versionId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versionId])  // versionId para re-suscribir cuando cambia la version; books via ref
 
   // ════════════════════════════════════════════════════════════
   // HISTORIAL DE VERSÍCULOS PROYECTADOS — el state vive arriba (necesario

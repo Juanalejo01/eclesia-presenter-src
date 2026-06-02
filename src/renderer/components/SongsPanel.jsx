@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   listSongs, createSong, updateSong, deleteSong, toggleFavorite, isUsingSQLite,
 } from '../services/songsService.js'
@@ -262,17 +262,22 @@ export default function SongsPanel({ onSendSlide }) {
     return () => { offNext(); offPrev() }
   }, [selected, slideIndex, flatSlides.length])
 
-  // Click simple en la Lista del día → seleccionar la canción aquí
-  // (sin proyectar). El usuario decide qué sección proyectar después.
+  // Ref mutable para acceder a `songs` dentro de handlers sin re-suscribir
+  // cada vez que cambia el array. Antes la dependencia [songs] en useEffect
+  // causaba un window de desuscripcion/re-suscripcion en cada mutacion donde
+  // los eventos del remoto podian perderse.
+  const songsRef = useRef(songs)
+  useEffect(() => { songsRef.current = songs }, [songs])
+
+  // Click simple en la Lista del dia → seleccionar la cancion aqui.
   useEffect(() => {
     return subscribe('songs:focus-item', (payload) => {
       const id = payload?.songId || payload?.id
       if (!id) return
-      const found = songs.find(s => s.id === id)
+      const found = songsRef.current.find(s => s.id === id)
       if (found) {
         setSelected(found)
       } else {
-        // Refrescar y reintentar (puede que se cargara después)
         listSongs({}).then(all => {
           setSongs(all)
           const s = all.find(x => x.id === id)
@@ -280,13 +285,14 @@ export default function SongsPanel({ onSendSlide }) {
         })
       }
     })
-  }, [songs])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     return subscribe('songs:remote-project', (payload) => {
       const id = payload?.id
       if (!id) return
-      const found = songs.find(s => s.id === id)
+      const found = songsRef.current.find(s => s.id === id)
       const doProject = (song) => {
         if (!song) return
         setSelected(song)
@@ -306,7 +312,8 @@ export default function SongsPanel({ onSendSlide }) {
         doProject(all.find(s => s.id === id))
       })
     })
-  }, [songs])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const clearService = async () => {
     if (!confirm(t('songs.clearListConfirm'))) return

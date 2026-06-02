@@ -294,12 +294,52 @@ ipcMain.handle('media:pick', async (_e, kind = 'all') => {
 ipcMain.handle('media:list',   (_e, opts) => db.listMedia(opts))
 ipcMain.handle('media:delete', (_e, id)   => db.deleteMedia(id))
 
+// Directorios que nunca deben ser fuente de archivos de media.
+// Un XSS en el renderer podria llamar addFiles(['C:/Windows/System32/...'])
+// y copiar archivos sensibles a userData/media (exfiltracion local).
+// Usamos una whitelist de directorios permitidos: solo carpetas del usuario.
+function isMediaSourceAllowed(sourcePath) {
+  if (!sourcePath || typeof sourcePath !== 'string') return false
+  const resolved = path.resolve(sourcePath)
+
+  // En Windows, bloquear rutas del sistema
+  if (process.platform === 'win32') {
+    const systemRoots = [
+      process.env.SYSTEMROOT || 'C:\\Windows',
+      process.env.PROGRAMDATA || 'C:\\ProgramData',
+      process.env.WINDIR || 'C:\\Windows',
+      path.join(process.env.APPDATA || '', 'Microsoft'),
+      path.join(process.env.LOCALAPPDATA || '', 'Microsoft'),
+    ].filter(Boolean).map(p => path.resolve(p).toLowerCase())
+    const lower = resolved.toLowerCase()
+    if (systemRoots.some(root => lower.startsWith(root))) {
+      console.warn('[security] media:addFiles fuente bloqueada:', resolved)
+      return false
+    }
+  }
+
+  // En macOS/Linux, bloquear rutas del sistema
+  if (process.platform !== 'win32') {
+    const blocked = ['/System', '/Library/Keychains', '/etc', '/var', '/usr/bin', '/usr/sbin']
+    const home = app.getPath('home')
+    const blockedHome = [path.join(home, '.ssh'), path.join(home, '.gnupg')]
+    const allBlocked = [...blocked, ...blockedHome]
+    if (allBlocked.some(b => resolved.startsWith(b))) {
+      console.warn('[security] media:addFiles fuente bloqueada:', resolved)
+      return false
+    }
+  }
+
+  return true
+}
+
 // Drag & drop: recibe paths absolutos de archivos arrastrados al renderer
 // y los copia a userData/media igual que media:pick.
 ipcMain.handle('media:addFiles', async (_e, sourcePaths = []) => {
   const added = []
   for (const sourcePath of sourcePaths) {
     if (!sourcePath || !fs.existsSync(sourcePath)) continue
+    if (!isMediaSourceAllowed(sourcePath)) continue  // bloquear rutas del sistema
     const detected = detectType(sourcePath)
     if (!detected) continue
     const name = path.basename(sourcePath)

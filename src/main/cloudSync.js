@@ -73,7 +73,7 @@ async function syncOnce() {
   emit('cloud-sync:start', { time: Date.now() })
 
   try {
-    const localPayload = _db.getSyncPayload()
+    const localPayload = _db.getSyncPayload(state.lastSyncAt)
     const res = await fetch(`${API_BASE}/api/songs/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
