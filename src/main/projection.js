@@ -161,12 +161,11 @@ function openProjection(opts = {}) {
     skipTaskbar: false,
     alwaysOnTop: false,
     resizable: !isOverlay,
-    // CRÍTICO: solo el Stage Display es focusable (el usuario lo mueve/coloca).
-    // El overlay (OBS) y la Pantalla completa (proyector) NUNCA reciben teclado,
-    // así que focusable:false evita que roben el foco del teclado a la ventana
-    // principal. Sin esto, al abrir el proyector los inputs de la app dejaban
-    // de aceptar texto hasta minimizar/cerrar (bug reportado en uso real).
-    focusable: isStage,
+    // focusable: true para todas las ventanas (overlay ya usa setIgnoreMouseEvents).
+    // Poner focusable:false en fullscreen causa pantalla negra en Electron 29/Win.
+    // El robo de foco se resuelve devolviendo el foco a mainWindow con
+    // returnFocusToMain() tras abrir/cerrar la proyección (ver más abajo).
+    focusable: true,
     show: !isOverlay,
     title:
       isOverlay ? 'EclesiaPresenter — Lower-Third (OBS)' :
