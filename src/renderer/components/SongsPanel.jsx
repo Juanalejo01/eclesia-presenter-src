@@ -91,11 +91,14 @@ export default function SongsPanel({ onSendSlide }) {
   const allSongsFiltered = useMemo(() => {
     if (!search) return songs
     const q = search.trim().toLowerCase()
-    return songs.filter(s =>
-      (s.title || '').toLowerCase().includes(q) ||
-      (s.author || '').toLowerCase().includes(q) ||
-      (s.tags || '').toLowerCase().includes(q)
-    )
+    return songs.filter(s => {
+      if ((s.title || '').toLowerCase().includes(q)) return true
+      if ((s.author || '').toLowerCase().includes(q)) return true
+      if ((s.tags || '').toLowerCase().includes(q)) return true
+      // Buscar en el texto de las secciones
+      const sections = Array.isArray(s.sections) ? s.sections : []
+      return sections.some(sec => (sec.text || '').toLowerCase().includes(q))
+    })
   }, [songs, search])
 
   // Canciones del servicio (col 2) en el orden del servicio

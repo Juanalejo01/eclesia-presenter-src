@@ -43,20 +43,29 @@ function seedLSIfEmpty() {
   return seed
 }
 
+// --------- Helpers ---------
+
+/**
+ * Comprueba si una canción coincide con la query normalizada.
+ * Busca en: título, autor, etiquetas, y el texto de todas las secciones.
+ */
+function songMatchesQuery(song, q) {
+  if (normalizeText(song.title).includes(q)) return true
+  if (normalizeText(song.author || '').includes(q)) return true
+  if (normalizeText(song.tags || '').includes(q)) return true
+  // Buscar en el texto de cada sección
+  const sections = Array.isArray(song.sections) ? song.sections : []
+  return sections.some(sec => normalizeText(sec.text || '').includes(q))
+}
+
 // --------- API pública ---------
 
 export async function listSongs({ search = '', onlyFavorites = false } = {}) {
   if (hasElectron) {
-    // Pide TODAS al main (sin filter SQL) y filtra en cliente con normalizeText.
-    // Así la búsqueda funciona aunque el usuario omita tildes/comas.
     let songs = await window.electron.songs.list({ search: '', onlyFavorites })
     if (search) {
       const q = normalizeText(search)
-      songs = songs.filter(s =>
-        normalizeText(s.title).includes(q) ||
-        normalizeText(s.author || '').includes(q) ||
-        normalizeText(s.tags || '').includes(q)
-      )
+      songs = songs.filter(s => songMatchesQuery(s, q))
     }
     return songs
   }
@@ -64,11 +73,7 @@ export async function listSongs({ search = '', onlyFavorites = false } = {}) {
   let songs = seedLSIfEmpty()
   if (search) {
     const q = normalizeText(search)
-    songs = songs.filter(s =>
-      normalizeText(s.title).includes(q) ||
-      normalizeText(s.author || '').includes(q) ||
-      normalizeText(s.tags || '').includes(q)
-    )
+    songs = songs.filter(s => songMatchesQuery(s, q))
   }
   if (onlyFavorites) songs = songs.filter(s => s.is_favorite)
 
