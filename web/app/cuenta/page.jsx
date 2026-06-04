@@ -146,11 +146,16 @@ export default async function CuentaPage() {
       )}
 
       {/* Quick links */}
-      <div className="grid sm:grid-cols-3 gap-4 mt-8">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
         <Link href="/download" className="rounded-xl border border-copper-300/15 bg-bg-2 p-5 hover:border-copper-300/30 transition-colors">
           <div className="text-2xl mb-2">📥</div>
           <div className="font-semibold text-ink-1 mb-1">Descargar app</div>
           <div className="text-xs text-ink-3">Última versión para Windows</div>
+        </Link>
+        <Link href="/cuenta/seguridad" className="rounded-xl border border-copper-300/15 bg-bg-2 p-5 hover:border-copper-300/30 transition-colors">
+          <div className="text-2xl mb-2">🔒</div>
+          <div className="font-semibold text-ink-1 mb-1">Privacidad y seguridad</div>
+          <div className="text-xs text-ink-3">Recuperación, sesión y cuenta</div>
         </Link>
         <Link href="/docs" className="rounded-xl border border-copper-300/15 bg-bg-2 p-5 hover:border-copper-300/30 transition-colors">
           <div className="text-2xl mb-2">📚</div>

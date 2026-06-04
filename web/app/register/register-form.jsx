@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../lib/supabase/client'
 import Turnstile from '../../components/Turnstile'
 
 export default function RegisterForm() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const plan = searchParams.get('plan')
 
@@ -18,6 +19,10 @@ export default function RegisterForm() {
   const [error, setError] = useState(null)
   const [captchaToken, setCaptchaToken] = useState(null)
   const captchaReady = captchaToken !== null
+
+  // Verificacion por codigo de 6 digitos
+  const [code, setCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -69,23 +74,99 @@ export default function RegisterForm() {
     }
   }
 
+  // Verificar el codigo de 6 digitos introducido por el usuario
+  const handleVerify = async (e) => {
+    e.preventDefault()
+    const token = code.trim()
+    if (token.length !== 6) { setError('El código tiene 6 dígitos'); return }
+    setVerifying(true); setError(null)
+
+    const supabase = createClient()
+    try {
+      const { error: vErr } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token,
+        type: 'email',
+      })
+      setVerifying(false)
+      if (vErr) {
+        setError(vErr.message || 'Código incorrecto o caducado')
+      } else {
+        // Sesion creada. Redirigir a la cuenta (o checkout si habia plan).
+        const next = plan ? `/checkout?plan=${plan}` : '/cuenta'
+        router.push(next)
+        router.refresh()
+      }
+    } catch (err) {
+      setVerifying(false)
+      setError(err?.message || String(err))
+    }
+  }
+
+  // Reenviar el codigo
+  const handleResend = async () => {
+    setError(null)
+    const supabase = createClient()
+    const { error: rErr } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: true, data: { name: name.trim() || null, organization: organization.trim() || null } },
+    })
+    if (rErr) setError(rErr.message)
+  }
+
   if (sent) {
     return (
-      <div className="rounded-2xl border border-copper-300/30 bg-copper-300/5 p-8 text-center">
+      <form onSubmit={handleVerify} className="rounded-2xl border border-copper-300/30 bg-copper-300/5 p-8 text-center">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-copper-300/20 grid place-items-center">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
             <path d="M3 7l9 6 9-6M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7M3 7l2-2h14l2 2"
               stroke="#db9f75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <h2 className="font-display text-2xl text-ink-1 mb-2">¡Casi listo!</h2>
-        <p className="text-ink-2 text-sm mb-2 leading-relaxed">
-          Te enviamos un enlace a <b className="text-copper-200">{email}</b>.
+        <h2 className="font-display text-2xl text-ink-1 mb-2">Revisa tu correo</h2>
+        <p className="text-ink-2 text-sm mb-6 leading-relaxed">
+          Enviamos un código de 6 dígitos a <b className="text-copper-200">{email}</b>.
+          Introdúcelo aquí para activar tu cuenta.
         </p>
-        <p className="text-ink-2 text-sm leading-relaxed">
-          Haz click en el enlace para activar tu cuenta gratis. El enlace caduca en 1 hora.
-        </p>
-      </div>
+
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={6}
+          value={code}
+          onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+          placeholder="000000"
+          autoFocus
+          className="w-full h-16 text-center text-3xl tracking-[0.5em] font-mono
+                     rounded-lg bg-bg-1 border border-copper-300/25 text-copper-100
+                     outline-none focus:border-copper-300/60 focus:ring-2 focus:ring-copper-300/15 mb-4"
+        />
+
+        {error && (
+          <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-md mb-4">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={verifying || code.length !== 6}
+          className="w-full h-12 rounded-lg bg-gradient-to-b from-copper-200 to-copper-300
+                     text-[#1a0e08] font-semibold disabled:opacity-50 disabled:cursor-not-allowed
+                     hover:from-copper-100 hover:to-copper-200 transition-all"
+        >
+          {verifying ? 'Verificando…' : 'Verificar y entrar'}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleResend}
+          className="text-xs text-ink-3 hover:text-copper-200 mt-4 underline underline-offset-2"
+        >
+          No me llegó · Reenviar código
+        </button>
+      </form>
     )
   }
 

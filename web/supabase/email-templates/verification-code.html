@@ -1,0 +1,160 @@
+<!--
+  EclesiaPresenter - Email de verificacion con codigo de 6 digitos
+  ============================================================
+  Pegar en: Supabase Dashboard -> Authentication -> Email Templates -> Magic Link
+  (tambien sirve para "Confirm signup" si usas ese flujo)
+
+  Variables de Supabase disponibles:
+    {{ .Token }}            -> codigo OTP de 6 digitos
+    {{ .ConfirmationURL }}  -> enlace magico (fallback)
+    {{ .SiteURL }}          -> URL de tu web
+    {{ .Email }}            -> email del destinatario
+
+  Disenado con tablas + CSS inline para compatibilidad con Gmail,
+  Outlook, Apple Mail y clientes moviles (no soportan <style> ni flex).
+-->
+<!DOCTYPE html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Tu codigo de verificacion</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+</head>
+<body style="margin:0; padding:0; background-color:#0c0a09; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+
+  <!-- Preheader oculto (texto de vista previa en la bandeja) -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent; height:0; width:0;">
+    Tu codigo de verificacion de EclesiaPresenter: {{ .Token }}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0c0a09;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+
+        <!-- Contenedor principal -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; margin:0 auto;">
+
+          <!-- Logo / marca -->
+          <tr>
+            <td align="center" style="padding-bottom:28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="
+                    width:56px; height:56px;
+                    background:linear-gradient(135deg, #db9f75, #a85f33);
+                    border-radius:14px;
+                    font-family:Georgia, 'Times New Roman', serif;
+                    font-size:30px; font-weight:bold; color:#1a0e08;
+                    line-height:56px; text-align:center;">
+                    E
+                  </td>
+                </tr>
+              </table>
+              <div style="font-family:Georgia, 'Times New Roman', serif; font-size:22px; color:#f5ebe0; margin-top:14px; letter-spacing:0.3px;">
+                Eclesia<span style="font-style:italic; color:#db9f75;">Presenter</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Tarjeta -->
+          <tr>
+            <td style="
+              background-color:#14100d;
+              border:1px solid rgba(219,159,117,0.18);
+              border-radius:18px;
+              padding:40px 36px;">
+
+              <!-- Titulo -->
+              <h1 style="
+                margin:0 0 12px 0;
+                font-family:Georgia, 'Times New Roman', serif;
+                font-size:26px; font-weight:500; color:#f5ebe0; text-align:center;">
+                Verifica tu cuenta
+              </h1>
+
+              <p style="
+                margin:0 0 28px 0;
+                font-family:-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                font-size:15px; line-height:1.6; color:#c9b29c; text-align:center;">
+                Usa este codigo para completar tu acceso a EclesiaPresenter.
+                Caduca en 60 minutos.
+              </p>
+
+              <!-- Codigo -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding:8px 0 28px 0;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="
+                      background-color:#0c0a09;
+                      border:1px solid rgba(219,159,117,0.30);
+                      border-radius:12px;">
+                      <tr>
+                        <td style="
+                          padding:20px 32px;
+                          font-family:'Courier New', Courier, monospace;
+                          font-size:38px; font-weight:bold;
+                          letter-spacing:10px;
+                          color:#f4e6d7; text-align:center;">
+                          {{ .Token }}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Separador -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="border-top:1px solid rgba(219,159,117,0.12); padding-top:24px;">
+                    <p style="
+                      margin:0;
+                      font-family:-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                      font-size:13px; line-height:1.6; color:#8a7866; text-align:center;">
+                      Si no creaste una cuenta en EclesiaPresenter, puedes ignorar
+                      este correo de forma segura. Nadie podra acceder sin este codigo.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:28px 16px 0 16px;">
+              <p style="
+                margin:0 0 6px 0;
+                font-family:-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                font-size:13px; color:#c9b29c;">
+                EclesiaPresenter - Software de presentacion para iglesias
+              </p>
+              <p style="
+                margin:0;
+                font-family:-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                font-size:12px; color:#6b5d4f;">
+                Este es un correo automatico. Para soporte escribe a
+                <a href="mailto:juanlpz.dev@gmail.com" style="color:#db9f75; text-decoration:none;">juanlpz.dev@gmail.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
