@@ -14,6 +14,7 @@ import Topbar from './components/Topbar.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import Settings from './components/Settings.jsx'
 import SplashScreen from './components/SplashScreen.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { useGlobalShortcuts, subscribe, emit } from './hooks/useShortcuts.js'
 import { selectSlide, setLive, useSlideStore } from './services/slideStore.js'
 import { syncFromMain } from './services/themeStore.js'
@@ -141,8 +142,15 @@ export default function App() {
         />
         <div className="main-grid">
           <Sidebar active={activePanel} onChange={setActivePanel} />
-          <Panel key={settingsRev} onSendSlide={selectSlide} slide={live} />
-          <SlidePreview />
+          {/* Cada panel envuelto: si uno crashea, el resto de la app sigue
+              usable (no pantalla negra total). key=activePanel resetea el
+              boundary al cambiar de panel. */}
+          <ErrorBoundary key={activePanel + ':' + settingsRev}>
+            <Panel key={settingsRev} onSendSlide={selectSlide} slide={live} />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <SlidePreview />
+          </ErrorBoundary>
         </div>
       </div>
       <CommandPalette

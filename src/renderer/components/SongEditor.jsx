@@ -91,6 +91,13 @@ export default function SongEditor({ song, onSave, onCancel }) {
   const [maxLines, setMaxLines] = useState(song?.maxLines ?? song?.max_lines ?? 4)
   const [tab, setTab] = useState('edit')
 
+  // Theme override por canción. null = usa el theme global de proyección.
+  // DECLARADO AQUÍ ARRIBA (antes de los useEffect/helpers que lo usan) para
+  // evitar un ReferenceError TDZ que dejaba la app en pantalla negra al abrir
+  // el editor.
+  const [themeOverride, setThemeOverride] = useState(song?.theme_override || null)
+  const [styleOpen, setStyleOpen] = useState(false)
+
   // Snapshot del estado inicial para detectar cambios sin guardar.
   // Si el usuario escribió algo y cierra sin guardar, confirmamos antes
   // de descartar (evita perder una canción a medio escribir por un click
@@ -124,13 +131,8 @@ export default function SongEditor({ song, onSave, onCancel }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, author, tags, sections, maxLines, themeOverride])
 
-  // Theme override por canción. null = usa el theme global de proyección
-  // (caso "Igual que en proyección"). Si el usuario configura algo aquí,
-  // SOLO afecta a esta canción y no toca el theme global. Cuando se proyecta
-  // la canción, SlideRenderer hace merge: override > global theme.
-  const [themeOverride, setThemeOverride] = useState(song?.theme_override || null)
-  const [styleOpen, setStyleOpen] = useState(false)
-
+  // (themeOverride y styleOpen se declaran arriba, junto a los otros useState,
+  //  para evitar el TDZ que rompía el render del editor.)
   const updateOverride = (patch) => {
     setThemeOverride(prev => ({ ...(prev || {}), ...patch }))
   }
