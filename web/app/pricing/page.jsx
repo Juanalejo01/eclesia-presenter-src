@@ -84,9 +84,40 @@ const PLANS = [
   },
 ]
 
+// Fuente de verdad para el JSON-LD de FAQPage (texto plano).
+// Mantener en sí­ncronía con los <FaqItem> visibles de abajo.
+const FAQ_SCHEMA = [
+  ['¿Puedo cancelar cuando quiera?',
+    'Sí. Puedes cancelar desde tu panel de cuenta en un click. Mantienes acceso hasta el final del periodo pagado y luego pasas a Free automáticamente.'],
+  ['¿Qué pasa con mis canciones si cancelo?',
+    'Tus canciones nunca desaparecen. Exporta tu biblioteca a JSON en cualquier momento desde Ajustes → Canciones. Si superas el límite de Free, las canciones quedan visibles pero solo puedes proyectar las 5 primeras hasta que vuelvas a Pro.'],
+  ['¿Cuántos PCs puedo usar?',
+    'Free: 1 PC. Pro Mensual: 1 PC. Pro Anual y Lifetime: hasta 3 PCs simultáneos. Puedes desactivar uno y activar otro desde tu panel cuando cambies de equipo.'],
+  ['¿Aceptan PayPal?',
+    'Procesamos pagos vía Stripe, que acepta tarjetas, Apple Pay, Google Pay, SEPA (transferencia europea) y otros métodos. PayPal está en evaluación.'],
+  ['¿Garantía de devolución?',
+    '30 días. Si la app no es lo que esperabas, te devolvemos el dinero sin preguntas.'],
+  ['¿Hay descuentos para iglesias pequeñas o misiones?',
+    'Sí. Escríbenos a juanlpz.dev@gmail.com con tu caso y vemos qué podemos hacer.'],
+]
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ_SCHEMA.map(([q, a]) => ({
+    '@type': 'Question',
+    name: q,
+    acceptedAnswer: { '@type': 'Answer', text: a },
+  })),
+}
+
 export default function PricingPage() {
   return (
     <div className="container mx-auto px-6 py-20 max-w-7xl">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <div className="text-center mb-12">
         <div className="text-xs font-mono uppercase tracking-widest text-copper-200 mb-3">
           Precios honestos

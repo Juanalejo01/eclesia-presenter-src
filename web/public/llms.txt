@@ -1,0 +1,21 @@
+# EclesiaPresenter
+
+> Software de presentación para iglesias hispanohablantes. Proyecta versículos, canciones y videos sin red ni latencia, capturable por OBS. App de escritorio para Windows con panel web de cuenta y licencias.
+
+EclesiaPresenter es una aplicación de escritorio (Electron, Windows 10/11) creada por Juan Alejandro López Ospina. Funciona 100% en local —sin conexión y sin latencia— con biblias offline, gestor de canciones, proyección a pantalla completa, lower-third para OBS Studio, Stage Display (pantalla del músico) y control remoto desde el móvil. El plan Free es gratuito; los planes Pro (mensual 9€, anual 79€, lifetime 249€) añaden biblias modernas, canciones ilimitadas, integración con OBS y backup automático en la nube.
+
+## Páginas principales
+- [Inicio](https://eclesia-presenter.vercel.app/): visión general del producto y funciones.
+- [Precios](https://eclesia-presenter.vercel.app/pricing): planes Free y Pro, garantía de 30 días y preguntas frecuentes.
+- [Descargar](https://eclesia-presenter.vercel.app/download): instalador y versión portable para Windows.
+- [Casos de uso](https://eclesia-presenter.vercel.app/casos-de-uso): cómo lo usan las iglesias en su servicio.
+- [Documentación](https://eclesia-presenter.vercel.app/docs): guías de instalación, OBS, atajos de teclado, biblias y cuentas.
+- [Contacto](https://eclesia-presenter.vercel.app/contacto): soporte y plan a medida para iglesias grandes.
+
+## Recursos
+- [GitHub](https://github.com/Juanalejo01/eclesia-presenter): código fuente y releases.
+- [Guía de OBS](https://eclesia-presenter.vercel.app/docs/obs): integración con streaming.
+
+## Contacto
+- Email: juanlpz.dev@gmail.com
+- WhatsApp: +34 624766578
