@@ -98,6 +98,18 @@ export function setOverlay(overlayPatch) {
 }
 
 /**
+ * Restablece TODO el theme de proyección a los valores por defecto.
+ * Recupera de un tema oscuro/roto (p.ej. fondo casi-negro o restos de vídeo).
+ * Actualiza el preview al instante y resetea también la ventana de proyección.
+ */
+export function resetTheme() {
+  currentTheme = { ...DEFAULT_THEME, overlay: { ...DEFAULT_OVERLAY } }
+  emit()
+  if (window.electron?.projection?.resetTheme) window.electron.projection.resetTheme()
+  else if (window.electron?.projection) window.electron.projection.theme(currentTheme)
+}
+
+/**
  * Aplica un preset al overlay reemplazando los campos visuales (fondo, colores,
  * posición, tipografía del preset) pero PRESERVANDO los ajustes personales del
  * usuario (tamaño de letra, alineación, peso, fuente personalizada).

@@ -392,9 +392,22 @@ function ScheduleStrip({ isMultiview, onProject, onNavigate }) {
 
 function MonScreen({ slide, theme, isLive, label, t }) {
   const isBlackout = slide?.type === 'blackout'
+  const isEmpty = !slide || slide.type === 'blank'
   return (
     <div className={'mon-screen' + (isLive ? ' live-screen' : '')} style={{ background: 'transparent' }}>
       <SlideRenderer slide={slide} theme={theme} isBlackout={isBlackout} />
+      {/* Aviso solo para el operador (este monitor, no la proyección real):
+          un monitor vacío no debe parecer "apagado/roto". */}
+      {isEmpty && !isBlackout && (
+        <span style={{
+          position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+          pointerEvents: 'none', zIndex: 1,
+          color: 'rgba(255,255,255,0.30)', fontFamily: 'var(--font-mono)',
+          fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase',
+        }}>
+          {isLive ? 'Sin contenido en vivo' : 'Sin contenido'}
+        </span>
+      )}
       <span className="mon-corner left" style={{ zIndex: 2 }}>
         {isLive
           ? <span className="tally live"><span className="led" /> {t ? t('monitor.onAir') : 'ON AIR'}</span>

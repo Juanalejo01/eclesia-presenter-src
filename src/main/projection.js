@@ -6,6 +6,7 @@ const { app, BrowserWindow, screen } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
+const { sanitizeTheme } = require('./themeSanitize')
 
 const isDev = !app.isPackaged
 const projections = new Map()  // mode → { window, options }
@@ -25,21 +26,8 @@ function loadPersistedTheme() {
     if (data && typeof data === 'object') {
       // Merge con defaults (en caso de añadir keys nuevas en updates)
       currentTheme = { ...defaultTheme(), ...data, overlay: { ...defaultTheme().overlay, ...(data.overlay || {}) } }
-
-      // Sanity check: si el theme persistido es trivial (solid + negro absoluto sin imagen/video),
-      // probablemente sea un theme antiguo o corrupto que da "pantalla negra" al abrir el proyector.
-      // Reseteamos a defaults visuales (gradiente azul) — el usuario puede cambiar el tema desde Proyección.
-      if (
-        currentTheme.bgType === 'solid' &&
-        currentTheme.bgColor === '#000000' &&
-        !currentTheme.bgImage &&
-        !currentTheme.bgVideo
-      ) {
-        const d = defaultTheme()
-        currentTheme.bgType = d.bgType
-        currentTheme.bgColor = d.bgColor
-        currentTheme.bgGradient = d.bgGradient
-      }
+      // Reparar estados de theme que dan "pantalla negra" al abrir el proyector.
+      currentTheme = sanitizeTheme(currentTheme, defaultTheme())
     }
   } catch (e) {
     console.warn('Could not load persisted theme:', e.message)
@@ -82,6 +70,14 @@ function defaultTheme() {
     transitionDuration: 500,
     transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
   }
+}
+
+/** Restablece el theme de proyección a los valores por defecto. */
+function resetTheme() {
+  currentTheme = defaultTheme()
+  persistTheme()
+  broadcast('projection:theme', currentTheme)
+  return currentTheme
 }
 
 function getDisplays() {
@@ -318,6 +314,6 @@ function getState() {
 
 module.exports = {
   openProjection, closeProjection, closeAll, setMainWindow,
-  setSlide, setTheme, setNotes, setCountdown, getState,
+  setSlide, setTheme, resetTheme, setNotes, setCountdown, getState,
   toggleOverlayVisible,
 }

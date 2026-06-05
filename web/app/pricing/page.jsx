@@ -14,7 +14,7 @@ const PLANS = [
     description: 'Perfecto para empezar y para iglesias pequeñas.',
     features: [
       '3 biblias (RVR 1960, NVI, RVR 1909)',
-      'Hasta 5 canciones',
+      'Canciones ilimitadas (en este PC)',
       'Proyección a pantalla completa',
       'Lista del día básica',
       'Tema visual claro/oscuro',
@@ -90,7 +90,7 @@ const FAQ_SCHEMA = [
   ['¿Puedo cancelar cuando quiera?',
     'Sí. Puedes cancelar desde tu panel de cuenta en un click. Mantienes acceso hasta el final del periodo pagado y luego pasas a Free automáticamente.'],
   ['¿Qué pasa con mis canciones si cancelo?',
-    'Tus canciones nunca desaparecen. Exporta tu biblioteca a JSON en cualquier momento desde Ajustes → Canciones. Si superas el límite de Free, las canciones quedan visibles pero solo puedes proyectar las 5 primeras hasta que vuelvas a Pro.'],
+    'Tus canciones son ilimitadas y siempre tuyas: se guardan en tu PC (no en la nube) y nunca desaparecen. Exporta toda tu biblioteca a JSON cuando quieras desde Ajustes → Canciones. El plan Pro añade backup automático en la nube; si cancelas, dejas de sincronizar pero conservas todas tus canciones en local.'],
   ['¿Cuántos PCs puedo usar?',
     'Free: 1 PC. Pro Mensual: 1 PC. Pro Anual y Lifetime: hasta 3 PCs simultáneos. Puedes desactivar uno y activar otro desde tu panel cuando cambies de equipo.'],
   ['¿Aceptan PayPal?',
@@ -269,9 +269,10 @@ export default function PricingPage() {
             del periodo pagado y luego pasas a Free automáticamente.
           </FaqItem>
           <FaqItem q="¿Qué pasa con mis canciones si cancelo?">
-            Tus canciones nunca desaparecen. Exporta tu biblioteca a JSON en cualquier momento desde
-            Ajustes → Canciones. Si superas el límite de Free, las canciones quedan visibles pero solo
-            puedes proyectar las 5 primeras hasta que vuelvas a Pro.
+            Tus canciones son <b>ilimitadas y siempre tuyas</b>: se guardan en tu PC (no en la nube) y
+            nunca desaparecen. Exporta toda tu biblioteca a JSON cuando quieras desde Ajustes → Canciones.
+            El plan Pro añade <b>backup automático en la nube</b>; si cancelas, dejas de sincronizar pero
+            conservas todas tus canciones en local.
           </FaqItem>
           <FaqItem q="¿Cuántos PCs puedo usar?">
             <b>Free</b>: 1 PC. <b>Pro Mensual</b>: 1 PC. <b>Pro Anual y Lifetime</b>: hasta 3 PCs

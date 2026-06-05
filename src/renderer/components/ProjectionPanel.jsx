@@ -3,7 +3,7 @@ import MediaPicker from './MediaPicker.jsx'
 import SlideRenderer from './SlideRenderer.jsx'
 import LowerThirdRenderer from './LowerThirdRenderer.jsx'
 import {
-  useTheme, setTheme as setStoredTheme, setOverlay, applyOverlayPreset, OVERLAY_PRESETS,
+  useTheme, setTheme as setStoredTheme, setOverlay, applyOverlayPreset, OVERLAY_PRESETS, resetTheme,
 } from '../services/themeStore.js'
 import { listSystemFonts } from '../services/systemFontsService.js'
 import {
@@ -239,7 +239,20 @@ function CustomizationGrid({ theme, updateTheme }) {
 
   return (
     <div>
-      <div className="section-h"><h3>Personalización avanzada</h3><span className="sub">en tiempo real</span></div>
+      <div className="section-h">
+        <h3>Personalización avanzada</h3>
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            if (confirm('¿Restablecer el tema de proyección a los valores por defecto?\n\nVuelve al degradado azul, fuente Cormorant, texto blanco y tamaño 64, y limpia fondos de imagen/vídeo. Útil si la proyección se ve negra.')) {
+              resetTheme()
+            }
+          }}
+          title="Vuelve el fondo, la fuente y los colores a los valores por defecto"
+          style={{ fontSize: 11, height: 28 }}>
+          ↺ Restablecer tema
+        </button>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
         <div className="field">
           <span className="label">Fondo</span>
@@ -267,7 +280,7 @@ function CustomizationGrid({ theme, updateTheme }) {
             {fonts.length === 0 && <option disabled>Cargando fuentes del sistema...</option>}
             {fonts.length > 0 && <optgroup label="── Sistema ──">
               {fonts.filter(f => !f.generic).map(f => (
-                <option key={f.family} value={f.family} style={{ fontFamily: f.family }}>
+                <option key={f.family} value={f.family}>
                   {f.family}
                 </option>
               ))}

@@ -236,6 +236,7 @@ ipcMain.handle('bglib:setStorageDir',  (_e, dir) => { backgroundLibrary.setStora
 ipcMain.handle('projection:open',  (_e, opts)   => projection.openProjection(opts))
 ipcMain.handle('projection:close', (_e, mode)   => projection.closeProjection(mode))
 ipcMain.handle('projection:theme', (_e, patch)  => { projection.setTheme(patch); return projection.getState().theme })
+ipcMain.handle('projection:resetTheme', ()      => projection.resetTheme())
 ipcMain.handle('projection:state', ()           => projection.getState())
 ipcMain.handle('projection:toggleOverlayVisible', (_e, visible) => projection.toggleOverlayVisible(visible))
 // Stage Display v2: notas del predicador + countdown integrado
@@ -437,6 +438,47 @@ ipcMain.handle('songs:import', async (_e, opts = {}) => {
   } catch (e) {
     return { ok: false, error: e.message }
   }
+})
+
+// --------- Songs import desde Holyrics (migración) ---------
+// Acepta uno o varios archivos exportados de Holyrics (JSON de su API o texto
+// plano con bloques separados por línea en blanco) y crea las canciones en local.
+const { parseHolyrics } = require('./holyricsImport')
+
+ipcMain.handle('songs:importHolyrics', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Importar canciones de Holyrics',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Holyrics (JSON o texto)', extensions: ['json', 'txt'] },
+      { name: 'Todos los archivos', extensions: ['*'] },
+    ],
+  })
+  if (result.canceled || !result.filePaths.length) return { canceled: true }
+
+  let created = 0, total = 0, files = 0
+  for (const fp of result.filePaths) {
+    try {
+      const content = fs.readFileSync(fp, 'utf8')
+      const songs = parseHolyrics(content, path.basename(fp))
+      total += songs.length
+      for (const s of songs) {
+        try { db.createSong(s); created++ }
+        catch (e) { console.warn('skip holyrics song:', e.message) }
+      }
+      files++
+    } catch (e) {
+      console.warn('holyrics file failed:', fp, e.message)
+    }
+  }
+  if (created > 0) {
+    try { syncSongsToServer() } catch {}
+    try { cloudSync.triggerSync() } catch {}
+  }
+  if (total === 0) {
+    return { ok: false, error: 'No se reconocieron canciones en el archivo. ¿Es un export de Holyrics (JSON o texto)?' }
+  }
+  return { ok: true, count: created, total, files }
 })
 
 // --------- Bibles import (XMM, JSON) ---------

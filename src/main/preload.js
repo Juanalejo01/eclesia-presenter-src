@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electron', {
     open:  (opts)  => ipcRenderer.invoke('projection:open', opts),
     close: (mode)  => ipcRenderer.invoke('projection:close', mode),
     theme: (patch) => ipcRenderer.invoke('projection:theme', patch),
+    resetTheme: () => ipcRenderer.invoke('projection:resetTheme'),
     state: ()      => ipcRenderer.invoke('projection:state'),
     toggleOverlayVisible: (visible) => ipcRenderer.invoke('projection:toggleOverlayVisible', visible),
     setNotes:     (text)  => ipcRenderer.invoke('projection:setNotes', text),
@@ -39,6 +40,7 @@ contextBridge.exposeInMainWorld('electron', {
     favorite: (id)         => ipcRenderer.invoke('songs:favorite', id),
     export:   ()           => ipcRenderer.invoke('songs:export'),
     import:   (opts)       => ipcRenderer.invoke('songs:import', opts),
+    importHolyrics: ()     => ipcRenderer.invoke('songs:importHolyrics'),
   },
 
   // Utilidades de la app (settings)

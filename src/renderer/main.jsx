@@ -22,3 +22,20 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <Router />
   </React.StrictMode>
 )
+
+// Pre-calentar la Biblia activa en segundo plano, en tiempo de inactividad.
+// El primer parseo del JSON (~4 MB) se hace ANTES de que el usuario entre al
+// panel Biblia, evitando el congelamiento en frío al navegar. No bloquea el
+// arranque: corre en requestIdleCallback (o un setTimeout de respaldo).
+if (!isOverlayMode) {
+  const warmBible = () => {
+    import('./services/bibleService.js')
+      .then(m => m.getBooks(m.getActiveVersion().id))
+      .catch(() => {})
+  }
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(warmBible, { timeout: 4000 })
+  } else {
+    setTimeout(warmBible, 1500)
+  }
+}

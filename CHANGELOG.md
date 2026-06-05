@@ -11,6 +11,40 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.11] — 2026-06-06
+
+Tanda centrada en la Biblia y en un fallo de proyección visto en uso real,
+más migración desde Holyrics.
+
+### Added
+- 📖 **Importar canciones de Holyrics** (Ajustes → Canciones): admite el JSON
+  de su biblioteca/API y texto plano (bloques separados por línea en blanco).
+  Mapea cada slide a una sección. Tests unitarios del parser incluidos.
+- 🕘 **Historial de la Biblia como botón desplegable** — ya no ocupa espacio fijo.
+- ↺ **"Restablecer tema"** en Proyección: vuelve el fondo/fuente/colores al
+  valor por defecto en un click (recupera de un tema oscuro/roto).
+- 🔎 El monitor en vivo vacío muestra "Sin contenido en vivo" (solo operador).
+
+### Changed
+- 📖 **Biblia rediseñada a 2 columnas**: navegación (libro → capítulo →
+  versículo) a la izquierda, texto seleccionable a la derecha.
+
+### Fixed
+- 🔴 **Proyección/preview en negro**: un theme guardado con fondo casi-negro o
+  restos de media huérfana se cargaba en cada arranque. Ahora el cargador
+  sanea esos estados (degradados/ sólidos casi-negros, imagen/vídeo sin
+  archivo, media huérfana) y existe el botón de restablecer.
+- 🧊 **Congelación al cambiar la fuente**: el selector pintaba cada opción con
+  su propia tipografía, forzando a cargar cientos de fuentes. Ya no.
+- 🧊 **Congelación al entrar a la Biblia**: el parseo del JSON (~4 MB) se
+  pre-calienta en segundo plano al arrancar.
+- 📐 **Desaparecía el buscador de libros** cuando el historial crecía (alturas
+  `calc(100vh - …)` rígidas) — sustituido por layout flex.
+- 🌐 **Web**: el plan Free decía "5 canciones" — son ilimitadas en local; el
+  límite de la nube (backup) es exclusivo de Pro.
+
+---
+
 ## [0.2.7] — 2026-05-31
 
 Fixes de 3 problemas reportados, uno de ellos crítico (visto en uso real).

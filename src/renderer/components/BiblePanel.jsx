@@ -245,11 +245,15 @@ export default function BiblePanel({ onSendSlide }) {
       e.preventDefault()
       if (parsedQuery.chapter || parsedQuery.verse) {
         goToReference(first.index, parsedQuery.chapter, parsedQuery.verse, parsedQuery.verseEnd)
-        setBookSearch('')
       } else {
         pickBook(first.index)
-        setBookSearch('')
       }
+      setBookSearch('')
+      // Soltar el foco del buscador: como ahora vive SIEMPRE en la columna
+      // izquierda (antes se desmontaba al salir de 'book'), si no lo soltamos
+      // los dígitos para salto de capítulo/versículo irían al input en vez de
+      // al buffer numérico.
+      e.target.blur()
     } else if (e.key === 'Escape' && bookSearch) {
       e.stopPropagation()
       setBookSearch('')
@@ -626,94 +630,104 @@ export default function BiblePanel({ onSendSlide }) {
       </div>
 
       <div className="ws-body">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {loadError && (
+        {loadError && (
+          <div style={{
+            background: 'rgba(244, 184, 64, 0.1)', border: '1px solid rgba(244, 184, 64, 0.4)',
+            borderRadius: 'var(--r-md)', padding: 12, fontSize: 13, color: 'var(--preview)',
+          }}>⚠️ {loadError}</div>
+        )}
+
+        {loading && <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '16px 0' }}>{t('bible.loadingBibles', { short: activeVersion?.short })}</div>}
+
+        {!loading && !loadError && books.length > 0 && (
+          // LAYOUT 2 COLUMNAS:
+          //  · IZQUIERDA = navegación: libros → capítulos → versículos (selección),
+          //    con historial desplegable y búsqueda por texto arriba.
+          //  · DERECHA   = texto del capítulo, seleccionable/clickable para proyectar.
+          // Cada columna scrollea independiente (flex + min-height:0, sin alturas
+          // mágicas calc(100vh - …)).
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(300px, 380px) minmax(0, 1fr)',
+            gap: 16,
+            height: '100%',
+            minHeight: 0,
+          }}>
+
+            {/* ═══════════ IZQUIERDA · NAVEGACIÓN ═══════════ */}
             <div style={{
-              background: 'rgba(244, 184, 64, 0.1)', border: '1px solid rgba(244, 184, 64, 0.4)',
-              borderRadius: 'var(--r-md)', padding: 12, fontSize: 13, color: 'var(--preview)',
-            }}>⚠️ {loadError}</div>
-          )}
-
-          {loading && <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '16px 0' }}>{t('bible.loadingBibles', { short: activeVersion?.short })}</div>}
-
-          {!loading && !loadError && books.length > 0 && (
-            <>
-              {/* Búsqueda de texto */}
-              {!isRemote && (
-                <div>
-                  <div className="input-wrap">
-                    <IconSearch size={15} className="input-icon" />
-                    <input placeholder={t('bible.searchText')}
-                      value={textSearch} onChange={e => setTextSearch(e.target.value)} />
-                    <span className="input-kbd"><span className="kbd">/</span></span>
-                  </div>
-                  {searchResults.length > 0 && (
-                    <div className="card" style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto', padding: 6 }}>
-                      {searchResults.map((r, i) => (
-                        <div key={i}
-                          onClick={async () => {
-                            setSelectedBookIndex(r.bookIndex)
-                            const count = await getChapterCount(r.bookIndex, versionId)
-                            setMaxChapters(count)
-                            setChapterNum(r.chapterNum)
-                            const c = await getChapter(r.bookIndex, r.chapterNum, versionId)
-                            setChapter(c)
-                            setSelectedVerses([r.verseNum])
-                            setStep('verse')
-                            setTextSearch('')
-                          }}
-                          style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <p style={{ fontSize: 11, color: 'var(--copper-200)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
-                            {r.reference}
-                          </p>
-                          <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '2px 0 0' }}>{r.text}</p>
-                        </div>
-                      ))}
+              display: 'flex', flexDirection: 'column', minHeight: 0,
+              borderRight: '1px solid var(--line-1)', paddingRight: 16,
+            }}>
+              {/* Barra superior compacta: historial (desplegable) + búsqueda + breadcrumb */}
+              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+                {verseHistory.length > 0 && (
+                  <VerseHistory
+                    entries={verseHistory}
+                    onPick={restoreFromHistory}
+                    onClear={clearHistory}
+                  />
+                )}
+                {!isRemote && (
+                  <div style={{ position: 'relative' }}>
+                    <div className="input-wrap">
+                      <IconSearch size={15} className="input-icon" />
+                      <input placeholder={t('bible.searchText')}
+                        value={textSearch} onChange={e => setTextSearch(e.target.value)} />
+                      <span className="input-kbd"><span className="kbd">/</span></span>
                     </div>
-                  )}
-                </div>
-              )}
-              {isRemote && (
-                <p className="empty-text" style={{ fontStyle: 'italic' }}>
-                  {t('bible.searchRemoteDisabled')}
-                </p>
-              )}
-
-              {/* Breadcrumb / navegación (clickable) */}
-              <Breadcrumb
-                step={step}
-                bookName={currentBook?.name}
-                chapterNum={chapterNum}
-                onBack={goBack}
-                onGoBooks={goToBooks}
-                onGoChapters={goToChapters}
-              />
-
-              {/* Historial de versículos proyectados durante esta sesión.
-                  Se muestra siempre que haya entradas, independiente del step. */}
-              {verseHistory.length > 0 && (
-                <VerseHistory
-                  entries={verseHistory}
-                  onPick={restoreFromHistory}
-                  onClear={clearHistory}
-                />
-              )}
-
-              {/* STEP: BOOKS */}
-              {step === 'book' && (
-                <div>
-                  <div className="section-h">
-                    <h3>{t('bible.books')}</h3>
-                    <span className="sub">{books.length} · {activeVersion?.short}</span>
+                    {searchResults.length > 0 && (
+                      <div className="card" style={{ position: 'absolute', left: 0, right: 0, top: 46, zIndex: 40, maxHeight: 300, overflowY: 'auto', padding: 6 }}>
+                        {searchResults.map((r, i) => (
+                          <div key={i}
+                            onClick={async () => {
+                              setSelectedBookIndex(r.bookIndex)
+                              const count = await getChapterCount(r.bookIndex, versionId)
+                              setMaxChapters(count)
+                              setChapterNum(r.chapterNum)
+                              const c = await getChapter(r.bookIndex, r.chapterNum, versionId)
+                              setChapter(c)
+                              setSelectedVerses([r.verseNum])
+                              setStep('verse')
+                              setTextSearch('')
+                            }}
+                            style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <p style={{ fontSize: 11, color: 'var(--copper-200)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
+                              {r.reference}
+                            </p>
+                            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '2px 0 0' }}>{r.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="input-wrap" style={{ marginBottom: 10 }}>
+                )}
+                {isRemote && (
+                  <p className="empty-text" style={{ fontStyle: 'italic', margin: 0 }}>
+                    {t('bible.searchRemoteDisabled')}
+                  </p>
+                )}
+                <Breadcrumb
+                  step={step}
+                  bookName={currentBook?.name}
+                  chapterNum={chapterNum}
+                  onBack={goBack}
+                  onGoBooks={goToBooks}
+                  onGoChapters={goToChapters}
+                />
+              </div>
+
+              {/* ── PASO: LIBROS ── */}
+              {step === 'book' && (
+                <>
+                  <div className="input-wrap" style={{ marginBottom: 10, flexShrink: 0 }}>
                     <IconSearch size={14} className="input-icon" />
                     <input
                       ref={bookSearchRef}
                       autoFocus
-                      placeholder='ej: "sal", "salmos 22", "salmos 22:1", "juan 3 16"'
+                      placeholder='ej: "sal", "salmos 22", "juan 3 16"'
                       value={bookSearch}
                       onChange={e => setBookSearch(e.target.value)}
                       onKeyDown={onBookSearchKey}
@@ -731,16 +745,20 @@ export default function BiblePanel({ onSendSlide }) {
                       </span>
                     )}
                   </div>
-                  <div className="book-grid" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}>
+                  <div className="book-grid" style={{
+                    flex: 1, minHeight: 0, overflowY: 'auto', alignContent: 'start',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(116px, 1fr))', paddingRight: 4,
+                  }}>
                     {filteredBooks.map((book, i) => {
                       // Antiguo Testamento: index 0-38. Nuevo: 39-65.
                       const isOT = book.index < 39
                       const isSuggested = i === 0 && bookSearch
+                      const isCurrent = selectedBookIndex === book.index
                       return (
                         <div key={book.index}
                           className={
                             'book-item ' + (isOT ? 'book-ot' : 'book-nt') +
-                            (isSuggested ? ' book-item-suggested active' : '')
+                            ((isSuggested || isCurrent) ? ' book-item-suggested active' : '')
                           }
                           onClick={() => pickBook(book.index)}
                           title={isOT ? 'Antiguo Testamento' : 'Nuevo Testamento'}>
@@ -750,61 +768,73 @@ export default function BiblePanel({ onSendSlide }) {
                       )
                     })}
                   </div>
-                </div>
+                </>
               )}
 
-              {/* STEP: CHAPTERS */}
+              {/* ── PASO: CAPÍTULOS ── */}
               {step === 'chapter' && currentBook && (
-                <div>
-                  <div className="section-h">
+                <>
+                  <div className="section-h" style={{ flexShrink: 0 }}>
                     <h3>{currentBook.name}</h3>
-                    <span className="sub">{maxChapters} {t('bible.chapters')} · {t('bible.escBack')}</span>
+                    <span className="sub">{maxChapters} {t('bible.chapters')}</span>
                   </div>
-                  <NumberGrid
-                    count={maxChapters}
-                    onPick={pickChapter}
-                  />
-                </div>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
+                    <NumberGrid count={maxChapters} onPick={pickChapter} />
+                  </div>
+                </>
               )}
 
-              {/* STEP: VERSES */}
+              {/* ── PASO: VERSÍCULOS (selección) ── */}
               {step === 'verse' && chapter && (
-                <div>
-                  <div className="section-h" style={{ alignItems: 'center' }}>
+                <>
+                  <div className="section-h" style={{ flexShrink: 0 }}>
+                    <h3>{currentBook?.name} {chapter.chapterNum}</h3>
+                    <span className="sub">{chapter.verses.length} {t('bible.verses')}</span>
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
+                    <NumberGrid
+                      count={chapter.verses.length}
+                      selectedNumbers={selectedVerses}
+                      onPick={(n, e) => toggleVerse(n, e)}
+                    />
+                  </div>
+                  {/* Acciones de selección */}
+                  <div style={{ flexShrink: 0, display: 'flex', gap: 6, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 'auto' }}>
+                      {selectedVerses.length > 0
+                        ? t(selectedVerses.length === 1 ? 'bible.selectedCount' : 'bible.selectedCountPlural', { n: selectedVerses.length })
+                        : t('bible.selectionInfo')}
+                    </span>
+                    <button className="btn btn-ghost" onClick={() => setSelectedVerses([])} disabled={!selectedVerses.length}>{t('common.clear')}</button>
+                    <button className="btn" onClick={() => setSelectedVerses(chapter.verses.map(v => v.verseNum))}>{t('common.all')}</button>
+                    <button className="btn" onClick={addCurrentToList} disabled={!selectedVerses.length}>
+                      <IconPlus size={12} /> {t('songs.list')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ═══════════ DERECHA · TEXTO SELECCIONABLE ═══════════ */}
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
+              {step === 'verse' && chapter ? (
+                <>
+                  <div className="section-h" style={{ flexShrink: 0, alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                       <h3>{currentBook?.name} {chapter.chapterNum}</h3>
-                      <span className="sub">{chapter.verses.length} {t('bible.verses')}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 6 }}>
+                      <span className="sub">
                         {selectedVerses.length > 0
                           ? t(selectedVerses.length === 1 ? 'bible.selectedCount' : 'bible.selectedCountPlural', { n: selectedVerses.length })
-                          : t('bible.selectionInfo')}
+                          : `${chapter.verses.length} ${t('bible.verses')}`}
                       </span>
-                      <button className="btn btn-ghost" onClick={() => setSelectedVerses([])} disabled={!selectedVerses.length}>{t('common.clear')}</button>
-                      <button className="btn" onClick={() => setSelectedVerses(chapter.verses.map(v => v.verseNum))}>{t('common.all')}</button>
-                      <button className="btn" onClick={addCurrentToList} disabled={!selectedVerses.length}>
-                        <IconPlus size={12} /> {t('songs.list')}
-                      </button>
                     </div>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                      Click para proyectar · Shift/Ctrl para varios
+                    </span>
                   </div>
-
-                  {/* Grid numérico de versículos (jump rápido) */}
-                  <NumberGrid
-                    count={chapter.verses.length}
-                    selectedNumbers={selectedVerses}
-                    onPick={(n, e) => toggleVerse(n, e)}
-                  />
-
-                  {/* Lista COMPLETA de versículos con texto — clickable, scrollable.
-                      Antes solo se mostraban los seleccionados (perdías el contexto).
-                      Ahora ves todo el capítulo y puedes clickar/Shift-clickar/Ctrl-clickar
-                      cualquier versículo igual que en el NumberGrid. */}
+                  {/* Texto del capítulo — clickable/seleccionable, scroll propio */}
                   <div className="card" style={{
-                    marginTop: 12, padding: 12,
-                    maxHeight: 'calc(100vh - 480px)',
-                    minHeight: 200,
-                    overflowY: 'auto',
+                    flex: 1, minHeight: 0, padding: 12, overflowY: 'auto',
                   }}>
                     {chapter.verses.map(v => {
                       const isSelected = selectedVerses.includes(v.verseNum)
@@ -813,7 +843,7 @@ export default function BiblePanel({ onSendSlide }) {
                           key={v.verseNum}
                           onClick={(e) => toggleVerse(v.verseNum, e)}
                           style={{
-                            display: 'flex', gap: 14, padding: '8px 12px',
+                            display: 'flex', gap: 14, padding: '10px 14px',
                             cursor: 'pointer',
                             borderRadius: 8,
                             background: isSelected
@@ -837,17 +867,26 @@ export default function BiblePanel({ onSendSlide }) {
                           }}>{v.verseNum}</span>
                           <span className="verse-text" style={{
                             color: isSelected ? 'var(--text-1)' : 'var(--text-2)',
-                            fontSize: 14, lineHeight: 1.6,
+                            fontSize: 15, lineHeight: 1.65,
                           }}>{v.text}</span>
                         </div>
                       )
                     })}
                   </div>
+                </>
+              ) : (
+                <div className="empty-text" style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', gap: 6,
+                  alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-3)', fontStyle: 'italic', textAlign: 'center', padding: 24,
+                }}>
+                  <span style={{ fontSize: 15 }}>Selecciona libro → capítulo → versículo</span>
+                  <span style={{ fontSize: 12 }}>El texto aparecerá aquí, listo para proyectar.</span>
                 </div>
               )}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -915,81 +954,73 @@ function Breadcrumb({ step, bookName, chapterNum, onBack, onGoBooks, onGoChapter
 // proyectados. Click para volver a uno anterior.
 // ============================================================
 function VerseHistory({ entries, onPick, onClear }) {
-  const [expanded, setExpanded] = useState(false)
-  // Mostrar 6 visibles, los demás bajo expand
-  const VISIBLE = 6
-  const visible = expanded ? entries : entries.slice(0, VISIBLE)
-  const hidden  = entries.length - visible.length
-
+  // Botón desplegable: colapsado no ocupa espacio; al abrir muestra un popover
+  // (absolute, no empuja el layout) con todos los versículos del historial.
+  const [open, setOpen] = useState(false)
   return (
-    <div className="card" style={{ padding: '8px 10px' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 6,
-      }}>
-        <span style={{
-          fontSize: 10, color: 'var(--text-3)',
-          fontFamily: 'var(--font-mono)', letterSpacing: '0.1em',
-          textTransform: 'uppercase',
+    <div style={{ position: 'relative' }}>
+      <button
+        className="btn btn-ghost"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          height: 34, fontSize: 12,
         }}>
-          Historial · {entries.length}
-        </span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {entries.length > VISIBLE && (
-            <button
-              className="btn btn-ghost"
-              onClick={() => setExpanded(v => !v)}
-              style={{ fontSize: 10, height: 22, padding: '0 8px' }}>
-              {expanded ? 'Colapsar' : `+ ${hidden}`}
-            </button>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)' }}>
+            Historial
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--copper-200)' }}>{entries.length}</span>
+          {entries[0] && (
+            <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              · {entries[0].reference}
+            </span>
           )}
-          <button
-            className="btn btn-ghost"
-            onClick={onClear}
-            title="Limpiar historial"
-            style={{ fontSize: 10, height: 22, padding: '0 8px', color: 'var(--text-3)' }}>
-            Limpiar
-          </button>
+        </span>
+        <span style={{ color: 'var(--text-3)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+      </button>
+
+      {open && (
+        <div className="card" style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 50,
+          padding: 8, maxHeight: 320, overflowY: 'auto',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              {entries.length} {entries.length === 1 ? 'versículo' : 'versículos'}
+            </span>
+            <button className="btn btn-ghost" onClick={onClear} title="Limpiar historial"
+              style={{ fontSize: 10, height: 22, padding: '0 8px', color: 'var(--text-3)' }}>
+              Limpiar
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {entries.map((entry, i) => (
+              <button
+                key={entry.timestamp}
+                onClick={() => { onPick(entry); setOpen(false) }}
+                title={entry.preview}
+                style={{
+                  all: 'unset', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '7px 10px', borderRadius: 6,
+                  background: i === 0 ? 'rgba(168, 95, 51, 0.16)' : 'var(--bg-3)',
+                  border: '1px solid ' + (i === 0 ? 'rgba(232, 181, 145, 0.30)' : 'var(--line-1)'),
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168, 95, 51, 0.24)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = i === 0 ? 'rgba(168, 95, 51, 0.16)' : 'var(--bg-3)' }}>
+                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: i === 0 ? 'var(--copper-100)' : 'var(--text-1)', whiteSpace: 'nowrap' }}>
+                  {entry.reference}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {entry.preview}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-      <div style={{
-        display: 'flex', gap: 6, flexWrap: expanded ? 'wrap' : 'nowrap',
-        overflowX: expanded ? 'visible' : 'auto',
-        paddingBottom: 4,
-      }}>
-        {visible.map((entry, i) => (
-          <button
-            key={entry.timestamp}
-            onClick={() => onPick(entry)}
-            title={entry.preview}
-            style={{
-              all: 'unset',
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '5px 10px',
-              borderRadius: 6,
-              background: i === 0 ? 'rgba(168, 95, 51, 0.16)' : 'var(--bg-3)',
-              border: '1px solid ' + (i === 0 ? 'rgba(232, 181, 145, 0.30)' : 'var(--line-1)'),
-              fontSize: 11, fontFamily: 'var(--font-mono)',
-              color: i === 0 ? 'var(--copper-100)' : 'var(--text-2)',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              transition: 'background 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(168, 95, 51, 0.22)'
-              e.currentTarget.style.borderColor = 'rgba(232, 181, 145, 0.35)'
-              e.currentTarget.style.color = 'var(--copper-100)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = i === 0 ? 'rgba(168, 95, 51, 0.16)' : 'var(--bg-3)'
-              e.currentTarget.style.borderColor = i === 0 ? 'rgba(232, 181, 145, 0.30)' : 'var(--line-1)'
-              e.currentTarget.style.color = i === 0 ? 'var(--copper-100)' : 'var(--text-2)'
-            }}>
-            {entry.reference}
-          </button>
-        ))}
-      </div>
+      )}
     </div>
   )
 }

@@ -576,6 +576,21 @@ function SectionCanciones({ onUpdate }) {
     }
   }
 
+  const handleImportHolyrics = async () => {
+    if (!window.electron?.songs?.importHolyrics) return
+    setBusy(true); setMsg(null)
+    const r = await window.electron.songs.importHolyrics()
+    setBusy(false)
+    if (r.canceled) return
+    if (r.ok) {
+      const fileStr = r.files ? ` · ${r.files} archivo${r.files === 1 ? '' : 's'}` : ''
+      setMsg({ ok: true, text: `✓ ${r.count} de ${r.total} canciones importadas desde Holyrics${fileStr}` })
+      onUpdate?.()
+    } else {
+      setMsg({ ok: false, text: r.error || 'No se pudo importar de Holyrics' })
+    }
+  }
+
   return (
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 6px' }}>
@@ -591,6 +606,9 @@ function SectionCanciones({ onUpdate }) {
         </button>
         <button className="btn" onClick={handleImport} disabled={busy}>
           <IconUpload size={14} /> Importar desde JSON
+        </button>
+        <button className="btn" onClick={handleImportHolyrics} disabled={busy} title="Migra tu biblioteca desde Holyrics (JSON o texto exportado)">
+          <IconUpload size={14} /> Importar de Holyrics
         </button>
       </div>
 
@@ -608,6 +626,11 @@ function SectionCanciones({ onUpdate }) {
         <p style={{ margin: 0 }}>
           El JSON exportado incluye título, autor, etiquetas, todas las secciones (con su tipo, label y letra) y la
           configuración de auto-split. Es un formato legible — puedes abrirlo en cualquier editor de texto.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          <b style={{ color: 'var(--text-2)' }}>Migrar de Holyrics:</b> usa “Importar de Holyrics” y selecciona uno o
+          varios archivos exportados de Holyrics (JSON de su biblioteca o texto plano, con los bloques separados por
+          una línea en blanco). Cada bloque se convierte en una sección de la canción.
         </p>
       </div>
 
@@ -952,7 +975,7 @@ function SectionAcerca() {
         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
           <span style={{ color: 'var(--text-3)' }}>Versión</span>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-1)' }}>
-            {info?.version || upd?.currentVersion || '0.2.10'}
+            {info?.version || upd?.currentVersion || '0.2.11'}
             {isPortable && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)' }}>(portable)</span>}
           </span>
           <span style={{ color: 'var(--text-3)' }}>Datos del usuario</span>
