@@ -15,6 +15,7 @@ import CommandPalette from './components/CommandPalette.jsx'
 import Settings from './components/Settings.jsx'
 import SplashScreen from './components/SplashScreen.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import ResizableDivider from './components/ResizableDivider.jsx'
 import { useGlobalShortcuts, subscribe, emit } from './hooks/useShortcuts.js'
 import { selectSlide, setLive, useSlideStore } from './services/slideStore.js'
 import { syncFromMain } from './services/themeStore.js'
@@ -35,6 +36,23 @@ const PANELS = {
 const BLANK_SLIDE    = { type: 'blank', text: '', reference: '' }
 const BLACKOUT_SLIDE = { type: 'blackout', text: '', reference: '' }
 
+// Constantes para el divider principal entre el panel y el monitor.
+const MAIN_MONITOR_MIN = 280
+const MAIN_MONITOR_MAX = 700
+const MAIN_MONITOR_DEFAULT = 380
+const MAIN_MONITOR_STORAGE_KEY = 'eclesia.layout.monitorWidth'
+
+function loadMonitorWidth() {
+  try {
+    const raw = localStorage.getItem(MAIN_MONITOR_STORAGE_KEY)
+    const n = parseInt(raw || '', 10)
+    if (Number.isFinite(n)) {
+      return Math.max(MAIN_MONITOR_MIN, Math.min(MAIN_MONITOR_MAX, n))
+    }
+  } catch {}
+  return MAIN_MONITOR_DEFAULT
+}
+
 export default function App() {
   const [activePanel, setActivePanel] = useState('bible')
   const [settingsRev, setSettingsRev] = useState(0)
@@ -42,7 +60,12 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialSection, setSettingsInitialSection] = useState(null)
   const [splashDone, setSplashDone] = useState(false)
+  const [monitorWidth, setMonitorWidth] = useState(loadMonitorWidth)
   const { live } = useSlideStore()
+
+  const persistMonitorWidth = (w) => {
+    try { localStorage.setItem(MAIN_MONITOR_STORAGE_KEY, String(w)) } catch {}
+  }
 
   useEffect(() => {
     syncFromMain()
@@ -140,7 +163,9 @@ export default function App() {
           onSettingsChange={() => setSettingsRev(r => r + 1)}
           onOpenSettings={() => setSettingsOpen(true)}
         />
-        <div className="main-grid">
+        <div
+          className="main-grid"
+          style={{ gridTemplateColumns: `64px 1fr 6px ${monitorWidth}px` }}>
           <Sidebar active={activePanel} onChange={setActivePanel} />
           {/* Cada panel envuelto: si uno crashea, el resto de la app sigue
               usable (no pantalla negra total). key=activePanel resetea el
@@ -148,6 +173,17 @@ export default function App() {
           <ErrorBoundary key={activePanel + ':' + settingsRev}>
             <Panel key={settingsRev} onSendSlide={selectSlide} slide={live} />
           </ErrorBoundary>
+          {/* Divider arrastrable entre el panel y el monitor de previsualización.
+              Drag a la izquierda → monitor más ancho; doble click → reset. */}
+          <ResizableDivider
+            size={monitorWidth}
+            onResize={setMonitorWidth}
+            onCommit={persistMonitorWidth}
+            direction="right"
+            min={MAIN_MONITOR_MIN}
+            max={MAIN_MONITOR_MAX}
+            variant="main"
+          />
           <ErrorBoundary>
             <SlidePreview />
           </ErrorBoundary>

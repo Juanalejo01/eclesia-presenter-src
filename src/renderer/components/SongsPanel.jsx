@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   listSongs, createSong, updateSong, deleteSong, toggleFavorite, isUsingSQLite,
+  songMatchesQuery, findLyricSnippet,
 } from '../services/songsService.js'
+import { normalizeText } from '../services/textUtils.js'
 import SongEditor from './SongEditor.jsx'
+import ResizableDivider from './ResizableDivider.jsx'
 import { subscribe, emit } from '../hooks/useShortcuts.js'
 import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
 import { getSongsCache, updateSongsCache } from '../services/panelStateCache.js'
@@ -28,6 +31,34 @@ const saveServiceOrder = (ids) => {
   try { localStorage.setItem(SERVICE_ORDER_KEY, JSON.stringify(ids)) } catch {}
 }
 
+// Persistencia del toggle "Ocultar referencia" (título · sección en
+// proyección). Por defecto se muestra (referencia visible).
+const HIDE_REF_KEY = 'eclesia.songs.hideReference'
+const loadHideRef = () => {
+  try { return localStorage.getItem(HIDE_REF_KEY) === '1' } catch { return false }
+}
+const saveHideRef = (v) => {
+  try { localStorage.setItem(HIDE_REF_KEY, v ? '1' : '0') } catch {}
+}
+
+// Persistencia del ANCHO de la columna 1 (Biblioteca) en el split de Canciones.
+const SONGS_COL1_KEY = 'eclesia.layout.songsCol1'
+const SONGS_COL1_MIN = 240
+const SONGS_COL1_MAX = 900
+const SONGS_COL1_DEFAULT = 420
+const loadSongsCol1 = () => {
+  try {
+    const n = parseInt(localStorage.getItem(SONGS_COL1_KEY) || '', 10)
+    if (Number.isFinite(n)) {
+      return Math.max(SONGS_COL1_MIN, Math.min(SONGS_COL1_MAX, n))
+    }
+  } catch {}
+  return SONGS_COL1_DEFAULT
+}
+const saveSongsCol1 = (w) => {
+  try { localStorage.setItem(SONGS_COL1_KEY, String(w)) } catch {}
+}
+
 export default function SongsPanel({ onSendSlide }) {
   const t = useT()
   // Restaurar estado de sesión previa al volver al panel
@@ -39,6 +70,18 @@ export default function SongsPanel({ onSendSlide }) {
   const [sectionIndex, setSectionIndex] = useState(_restore.sectionIndex || 0)
   const [editing, setEditing]     = useState(null)
   const [serviceOrderIds, setServiceOrderIds] = useState(loadServiceOrder())
+  // Ancho de la columna 1 (Biblioteca) — divisor arrastrable
+  const [col1Width, setCol1Width] = useState(loadSongsCol1)
+  // Toggle "Ocultar referencia": cuando está activo, los slides de canción
+  // se proyectan SIN la línea "Título · Sección". Se mantiene en localStorage.
+  const [hideReference, setHideReferenceState] = useState(loadHideRef)
+  const toggleHideReference = () => {
+    setHideReferenceState(v => {
+      const next = !v
+      saveHideRef(next)
+      return next
+    })
+  }
   // Drag&drop visual feedback
   const [dragOverId, setDragOverId] = useState(null)  // id sobre el que está hovering
   const [dropZone, setDropZone]     = useState(null)  // 'service-empty' | 'service-end' | null
@@ -49,6 +92,14 @@ export default function SongsPanel({ onSendSlide }) {
   }
 
   useEffect(() => { refresh() }, [])
+
+  // Ctrl+F global → enfoca el buscador de canciones.
+  const searchRef = useRef(null)
+  useEffect(() => {
+    return subscribe('search:focus', () => {
+      requestAnimationFrame(() => searchRef.current?.focus())
+    })
+  }, [])
 
   // Tras cargar songs, restaurar la canción seleccionada de la sesión previa
   useEffect(() => {
@@ -87,19 +138,19 @@ export default function SongsPanel({ onSendSlide }) {
     }
   }, [songs])
 
-  // Cancion filtrada por búsqueda (col 1)
+  // Cancion filtrada por búsqueda (col 1).
+  // Usa songMatchesQuery del service para que la búsqueda sea consistente
+  // y SIN tildes — fundamental para letras en español ("corazon" debe
+  // encontrar "corazón"). Busca en título, autor, etiquetas Y letra
+  // completa de cada sección.
+  const normalizedQuery = useMemo(() => {
+    return search.trim() ? normalizeText(search.trim()) : ''
+  }, [search])
+
   const allSongsFiltered = useMemo(() => {
-    if (!search) return songs
-    const q = search.trim().toLowerCase()
-    return songs.filter(s => {
-      if ((s.title || '').toLowerCase().includes(q)) return true
-      if ((s.author || '').toLowerCase().includes(q)) return true
-      if ((s.tags || '').toLowerCase().includes(q)) return true
-      // Buscar en el texto de las secciones
-      const sections = Array.isArray(s.sections) ? s.sections : []
-      return sections.some(sec => (sec.text || '').toLowerCase().includes(q))
-    })
-  }, [songs, search])
+    if (!normalizedQuery) return songs
+    return songs.filter(s => songMatchesQuery(s, normalizedQuery))
+  }, [songs, normalizedQuery])
 
   // Canciones del servicio (col 2) en el orden del servicio
   const serviceSongs = useMemo(() => {
@@ -226,10 +277,13 @@ export default function SongsPanel({ onSendSlide }) {
 
   // Helper: añade las claves del theme_override de la canción al slide.
   // SlideRenderer.mergeThemeWithSlide las aplicará automáticamente.
+  // Si el usuario activó "Ocultar referencia" en el header, forzamos
+  // referenceVisible:false en el slide — SlideRenderer ya respeta este flag.
   const slideWithOverride = (slide, song) => ({
     ...slide,
     type: 'song',
     ...(song?.theme_override || {}),
+    ...(hideReference ? { referenceVisible: false } : null),
   })
 
   const sendSlide = (idx) => {
@@ -338,6 +392,22 @@ export default function SongsPanel({ onSendSlide }) {
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {/* Toggle global "Ocultar referencia" — afecta TODOS los slides de
+              canción mientras esté activo. La referencia (Título · Sección)
+              se omite en proyección y en preview. Persistido en localStorage. */}
+          <button
+            className="btn"
+            onClick={toggleHideReference}
+            title={hideReference
+              ? 'Volver a mostrar el título · sección en la proyección'
+              : 'Ocultar el título · sección en la proyección (solo letra)'}
+            style={hideReference ? {
+              borderColor: 'rgba(232, 181, 145, 0.45)',
+              background: 'linear-gradient(180deg, rgba(168, 95, 51, 0.18), rgba(128, 64, 18, 0.08))',
+              color: 'var(--copper-100)',
+            } : null}>
+            {hideReference ? '🏷️ Referencia oculta' : '🏷️ Ocultar referencia'}
+          </button>
           <button
             className="btn"
             onClick={() => emit('settings:open', { section: 'canciones' })}
@@ -358,8 +428,10 @@ export default function SongsPanel({ onSendSlide }) {
             ═══════════════════════════════════════════════════ */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-          gap: 14,
+          // Layout con divisor arrastrable: [col1] [6px divider] [col2].
+          // col1 toma el ancho persistido; col2 ocupa lo que queda.
+          gridTemplateColumns: `${col1Width}px 6px minmax(0, 1fr)`,
+          gap: 8,
           height: '100%',
           minHeight: 0,
         }}>
@@ -373,6 +445,7 @@ export default function SongsPanel({ onSendSlide }) {
             <div className="input-wrap">
               <IconSearch size={15} className="input-icon" />
               <input
+                ref={searchRef}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder={t('songs.searchPlaceholder')} />
@@ -387,32 +460,56 @@ export default function SongsPanel({ onSendSlide }) {
               </div>
             ) : (
               <div style={{ overflowY: 'auto', flex: 1, paddingRight: 4 }}>
-                {allSongsFiltered.map(song => (
-                  <SongCard
-                    key={song.id}
-                    song={song}
-                    expanded={selected?.id === song.id}
-                    column="col1"
-                    inService={serviceOrderIds.includes(song.id)}
-                    sectionIndex={sectionIndex}
-                    onSelect={() => setSelected(s => s?.id === song.id ? null : song)}
-                    onFavorite={() => handleToggleFavorite(song.id)}
-                    onAddToList={() => addToSchedule({
-                      type: 'song', title: song.title,
-                      text: song.sections?.[0]?.text || song.title,
-                      reference: song.author || '',
-                      meta: { songId: song.id, sections: song.sections },
-                    })}
-                    onEdit={() => setEditing(song)}
-                    onDelete={() => handleDelete(song.id)}
-                    onSendSection={(sec, i) => handleSendSection(song, sec, i)}
-                    onDragStart={(e) => onDragStart(e, song, 'col1')}
-                    t={t}
-                  />
-                ))}
+                {allSongsFiltered.map(song => {
+                  // Si el match fue por letra (no por título/autor/tag),
+                  // mostramos un snippet bajo el título — así el usuario
+                  // entiende POR QUÉ aparece esa canción al buscar un
+                  // fragmento de letra.
+                  const isTitleMatch = normalizedQuery && normalizeText(song.title).includes(normalizedQuery)
+                  const isAuthorMatch = normalizedQuery && normalizeText(song.author || '').includes(normalizedQuery)
+                  const isTagMatch = normalizedQuery && normalizeText(song.tags || '').includes(normalizedQuery)
+                  const lyricMatch = (normalizedQuery && !isTitleMatch && !isAuthorMatch && !isTagMatch)
+                    ? findLyricSnippet(song, normalizedQuery)
+                    : null
+                  return (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      expanded={selected?.id === song.id}
+                      column="col1"
+                      inService={serviceOrderIds.includes(song.id)}
+                      sectionIndex={sectionIndex}
+                      lyricMatch={lyricMatch}
+                      onSelect={() => setSelected(s => s?.id === song.id ? null : song)}
+                      onFavorite={() => handleToggleFavorite(song.id)}
+                      onAddToList={() => addToSchedule({
+                        type: 'song', title: song.title,
+                        text: song.sections?.[0]?.text || song.title,
+                        reference: song.author || '',
+                        meta: { songId: song.id, sections: song.sections },
+                      })}
+                      onEdit={() => setEditing(song)}
+                      onDelete={() => handleDelete(song.id)}
+                      onSendSection={(sec, i) => handleSendSection(song, sec, i)}
+                      onDragStart={(e) => onDragStart(e, song, 'col1')}
+                      t={t}
+                    />
+                  )
+                })}
               </div>
             )}
           </div>
+
+          {/* Divisor arrastrable entre Biblioteca y Servicio del día */}
+          <ResizableDivider
+            size={col1Width}
+            onResize={setCol1Width}
+            onCommit={saveSongsCol1}
+            direction="left"
+            min={SONGS_COL1_MIN}
+            max={SONGS_COL1_MAX}
+            variant="inner"
+          />
 
           {/* ─── COLUMNA 2: Servicio del día ─── */}
           <div
@@ -530,11 +627,21 @@ export default function SongsPanel({ onSendSlide }) {
 // La columna ('col1' | 'col2') decide qué acciones se muestran:
 //   col1 → favorito (estrella), añadir lista, editar, borrar
 //   col2 → número de orden, quitar del servicio, editar
+//
+// LAYOUT (rediseñado para portátiles estrechos):
+//   ┌──────────────────────────────────────────────┐
+//   │ [⠿] [♪]  TÍTULO DE LA CANCIÓN  ⭐ [tags...]    │   ← fila 1: título completo
+//   │         Autor · 4 secciones                  │   ← fila 2: metadata
+//   │         [«lyric snippet» si matchea letra]    │   ← fila 3 opcional
+//   │                          [acciones]          │   ← fila 4: botones
+//   └──────────────────────────────────────────────┘
+//   El título YA NO se solapa con los botones — siempre toma toda
+//   la fila. Los botones están debajo, alineados a la derecha.
 // ============================================================
 function SongCard({
   song, expanded, column, inService, serviceIndex, sectionIndex,
   onSelect, onFavorite, onAddToList, onEdit, onDelete, onRemove,
-  onSendSection, onDragStart, t,
+  onSendSection, onDragStart, t, lyricMatch,
 }) {
   return (
     <div style={{ marginBottom: 6 }}>
@@ -551,7 +658,7 @@ function SongCard({
         onMouseUp={e => e.currentTarget.style.cursor = 'grab'}>
 
         {column === 'col2' ? (
-          <span style={{
+          <span className="song-row-handle" style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             minWidth: 26, height: 26, borderRadius: '50%',
             background: 'rgba(168, 95, 51, 0.18)',
@@ -560,7 +667,7 @@ function SongCard({
             fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700,
           }}>{serviceIndex}</span>
         ) : (
-          <span className="drag-handle">
+          <span className="drag-handle song-row-handle">
             <span className="dot" /><span className="dot" />
             <span className="dot" /><span className="dot" />
             <span className="dot" /><span className="dot" />
@@ -570,15 +677,17 @@ function SongCard({
         <span className="song-icon"><IconMusic size={16} /></span>
 
         <div className="song-info" onClick={onSelect}>
+          {/* Fila 1: título (ocupa todo el ancho disponible) */}
           <div className="song-title">
-            {song.title}
+            <span className="song-title-text">{song.title}</span>
             {column === 'col1' && song.is_favorite && (
-              <span style={{ color: 'var(--copper-200)' }}><IconStarFill size={11} /></span>
+              <span style={{ color: 'var(--copper-200)', flexShrink: 0 }}><IconStarFill size={11} /></span>
             )}
             {song.tags && song.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 3).map(t => (
               <span key={t} className="song-tag">{t}</span>
             ))}
           </div>
+          {/* Fila 2: autor + cuenta de secciones */}
           <div className="song-meta">
             <span className="author">{song.author || t('songs.noAuthor')}</span>
             {song.sections?.length > 0 && (
@@ -588,40 +697,47 @@ function SongCard({
               </>
             )}
           </div>
+          {/* Fila 3 opcional: fragmento de letra que matcheó la búsqueda */}
+          {lyricMatch && (
+            <div className="song-lyric-match" title="Coincide con tu búsqueda en la letra">
+              <span className="song-lyric-label">{lyricMatch.label}</span>
+              <span className="song-lyric-snippet">«{lyricMatch.snippet}»</span>
+            </div>
+          )}
+          {/* Fila 4: acciones (alineadas a la derecha, DEBAJO del título) */}
+          <span className="song-actions">
+            {column === 'col1' && (
+              <>
+                <button className="btn btn-ghost" onClick={(e) => { e.stopPropagation(); onFavorite() }}
+                  title={song.is_favorite ? 'Quitar del servicio' : 'Añadir al servicio del día'}>
+                  {song.is_favorite
+                    ? <span style={{ color: 'var(--copper-200)' }}><IconStarFill size={13} /></span>
+                    : <IconStar size={13} />}
+                </button>
+                <button className="btn btn-ghost" onClick={(e) => { e.stopPropagation(); onAddToList() }} title={t('songs.addToList')}>
+                  <IconPlus size={13} /> {t('songs.list')}
+                </button>
+                <button className="btn btn-ghost" onClick={(e) => { e.stopPropagation(); onEdit() }} title="Editar">
+                  <IconEdit size={13} />
+                </button>
+                <button className="btn btn-ghost btn-danger" onClick={(e) => { e.stopPropagation(); onDelete() }} title="Eliminar">
+                  <IconTrash size={13} />
+                </button>
+              </>
+            )}
+            {column === 'col2' && (
+              <>
+                <button className="btn btn-ghost" onClick={(e) => { e.stopPropagation(); onEdit() }} title="Editar">
+                  <IconEdit size={13} />
+                </button>
+                <button className="btn btn-ghost btn-danger" onClick={(e) => { e.stopPropagation(); onRemove() }}
+                  title="Quitar del servicio del día (la canción no se borra)">
+                  <IconX size={13} />
+                </button>
+              </>
+            )}
+          </span>
         </div>
-
-        <span className="song-actions">
-          {column === 'col1' && (
-            <>
-              <button className="btn btn-ghost" onClick={onFavorite}
-                title={song.is_favorite ? 'Quitar del servicio' : 'Añadir al servicio del día'}>
-                {song.is_favorite
-                  ? <span style={{ color: 'var(--copper-200)' }}><IconStarFill size={13} /></span>
-                  : <IconStar size={13} />}
-              </button>
-              <button className="btn btn-ghost" onClick={onAddToList} title={t('songs.addToList')}>
-                <IconPlus size={13} /> {t('songs.list')}
-              </button>
-              <button className="btn btn-ghost" onClick={onEdit} title="Editar">
-                <IconEdit size={13} />
-              </button>
-              <button className="btn btn-ghost btn-danger" onClick={onDelete} title="Eliminar">
-                <IconTrash size={13} />
-              </button>
-            </>
-          )}
-          {column === 'col2' && (
-            <>
-              <button className="btn btn-ghost" onClick={onEdit} title="Editar">
-                <IconEdit size={13} />
-              </button>
-              <button className="btn btn-ghost btn-danger" onClick={onRemove}
-                title="Quitar del servicio del día (la canción no se borra)">
-                <IconX size={13} />
-              </button>
-            </>
-          )}
-        </span>
       </div>
 
       {expanded && song.sections?.length > 0 && (

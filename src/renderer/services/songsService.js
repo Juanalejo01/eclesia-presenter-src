@@ -48,14 +48,41 @@ function seedLSIfEmpty() {
 /**
  * Comprueba si una canción coincide con la query normalizada.
  * Busca en: título, autor, etiquetas, y el texto de todas las secciones.
+ *
+ * Exportada para que el SongsPanel use exactamente la misma lógica que el
+ * service y el comportamiento sea consistente — incluido el matching sin
+ * tildes (importante para letras en español: "corazon" debe encontrar
+ * "corazón", "cancion" → "canción", etc).
  */
-function songMatchesQuery(song, q) {
+export function songMatchesQuery(song, q) {
   if (normalizeText(song.title).includes(q)) return true
   if (normalizeText(song.author || '').includes(q)) return true
   if (normalizeText(song.tags || '').includes(q)) return true
   // Buscar en el texto de cada sección
   const sections = Array.isArray(song.sections) ? song.sections : []
   return sections.some(sec => normalizeText(sec.text || '').includes(q))
+}
+
+/**
+ * Devuelve un fragmento del texto de la primera sección que coincide con q,
+ * con la query resaltada. Útil para mostrar al usuario por qué una canción
+ * matcheó por LETRA (no por título), p. ej. cuando busca "yo te alabaré".
+ * Devuelve null si el match no fue en la letra (fue por título/autor/tag).
+ */
+export function findLyricSnippet(song, q, around = 30) {
+  const sections = Array.isArray(song.sections) ? song.sections : []
+  for (const sec of sections) {
+    const txt = sec.text || ''
+    const idx = normalizeText(txt).indexOf(q)
+    if (idx >= 0) {
+      const start = Math.max(0, idx - around)
+      const end = Math.min(txt.length, idx + q.length + around)
+      const prefix = start > 0 ? '…' : ''
+      const suffix = end < txt.length ? '…' : ''
+      return { label: sec.label, snippet: prefix + txt.slice(start, end).trim() + suffix }
+    }
+  }
+  return null
 }
 
 // --------- API pública ---------

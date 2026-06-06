@@ -61,7 +61,7 @@ export default function Footer() {
 
         <div className="mt-12 pt-6 border-t border-copper-300/10 flex flex-col md:flex-row justify-between gap-3 text-xs text-ink-3">
           <p>© {new Date().getFullYear()} EclesiaPresenter · Hecho con cariño para la iglesia.</p>
-          <p className="font-mono">v 0.2.11</p>
+          <p className="font-mono">v 0.2.12</p>
         </div>
       </div>
     </footer>

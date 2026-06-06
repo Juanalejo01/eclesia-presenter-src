@@ -10,6 +10,25 @@ import { getBibleCache, updateBibleCache, resetBibleCache } from '../services/pa
 import { useT } from '../services/i18n.js'
 import { useLicense, isPro } from '../services/licenseStore.js'
 import { IconSearch, IconPlus, IconArrowRight } from './Icons.jsx'
+import ResizableDivider from './ResizableDivider.jsx'
+
+// Persistencia del ANCHO de la columna izquierda (navegación) en Biblia.
+const BIBLE_NAV_KEY = 'eclesia.layout.bibleNav'
+const BIBLE_NAV_MIN = 260
+const BIBLE_NAV_MAX = 560
+const BIBLE_NAV_DEFAULT = 340
+const loadBibleNav = () => {
+  try {
+    const n = parseInt(localStorage.getItem(BIBLE_NAV_KEY) || '', 10)
+    if (Number.isFinite(n)) {
+      return Math.max(BIBLE_NAV_MIN, Math.min(BIBLE_NAV_MAX, n))
+    }
+  } catch {}
+  return BIBLE_NAV_DEFAULT
+}
+const saveBibleNav = (w) => {
+  try { localStorage.setItem(BIBLE_NAV_KEY, String(w)) } catch {}
+}
 
 /**
  * Flujo de navegación:
@@ -57,6 +76,9 @@ export default function BiblePanel({ onSendSlide }) {
   // porque el useEffect de persistencia lo usa antes — moverlo evita
   // un ReferenceError TDZ.
   const [verseHistory, setVerseHistory] = useState(_restore.verseHistory || [])
+
+  // Ancho de la columna IZQUIERDA (navegación). Arrastrable.
+  const [navColWidth, setNavColWidth] = useState(loadBibleNav)
 
   // Cambio de versión
   useEffect(() => {
@@ -152,11 +174,22 @@ export default function BiblePanel({ onSendSlide }) {
 
   // Auto-focus de los buscadores al entrar en cada step
   const bookSearchRef = useRef(null)
+  const textSearchRef = useRef(null)
   useEffect(() => {
     if (step === 'book') {
       // pequeño delay para que el input ya esté en DOM
       requestAnimationFrame(() => bookSearchRef.current?.focus())
     }
+  }, [step])
+
+  // Ctrl+F global → enfocar el buscador más útil del panel.
+  // En step='book' enfocamos el buscador de libros; en chapter/verse
+  // enfocamos el buscador de texto (siempre visible arriba).
+  useEffect(() => {
+    return subscribe('search:focus', () => {
+      const ref = step === 'book' ? bookSearchRef : textSearchRef
+      requestAnimationFrame(() => ref.current?.focus())
+    })
   }, [step])
 
   // Parser del query del buscador. Acepta:
@@ -436,16 +469,10 @@ export default function BiblePanel({ onSendSlide }) {
   // ════════════════════════════════════════════════════════════
   useEffect(() => {
     const onKey = (e) => {
-      // Ignorar si el usuario está escribiendo en otro input/textarea
+      // Ignorar si el usuario está escribiendo en otro input/textarea.
+      // Ctrl+F YA NO se captura aquí — ahora es un atajo global que emite
+      // 'search:focus' y enfocamos el buscador del panel sin reset.
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        // Excepción: Ctrl+F debe funcionar incluso desde dentro del input
-        // (recarga el foco y permite empezar nueva búsqueda).
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-          e.preventDefault()
-          goToBooks()
-          setBookSearch('')
-          requestAnimationFrame(() => bookSearchRef.current?.focus())
-        }
         return
       }
 
@@ -457,15 +484,6 @@ export default function BiblePanel({ onSendSlide }) {
         } else {
           goBack()
         }
-        return
-      }
-
-      // Ctrl/Cmd + F → vuelve a la selección de libros
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        goToBooks()
-        setBookSearch('')
-        requestAnimationFrame(() => bookSearchRef.current?.focus())
         return
       }
 
@@ -491,9 +509,12 @@ export default function BiblePanel({ onSendSlide }) {
           e.key.length === 1 && /[a-zñáéíóú ]/i.test(e.key)) {
         e.preventDefault()
         if (step !== 'book') {
-          // Volvemos a libros con esa letra como inicio de búsqueda
-          setBookSearch(e.key)
+          // IMPORTANTE el orden: goToBooks() llama setBookSearch(''),
+          // así que setBookSearch(e.key) tiene que ir DESPUÉS. Si va antes,
+          // React batchea ambos updates y la limpieza pisa la letra
+          // (causa del bug "Romanos" → "omanos": primera letra perdida).
           goToBooks()
+          setBookSearch(e.key)
         } else {
           // Ya estamos en libros — añade al filtro existente
           setBookSearch(prev => prev + e.key)
@@ -648,8 +669,10 @@ export default function BiblePanel({ onSendSlide }) {
           // mágicas calc(100vh - …)).
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(300px, 380px) minmax(0, 1fr)',
-            gap: 16,
+            // [navegación] [divider 6px] [texto]. La columna de navegación
+            // tiene ancho arrastrable persistido en localStorage.
+            gridTemplateColumns: `${navColWidth}px 6px minmax(0, 1fr)`,
+            gap: 0,
             height: '100%',
             minHeight: 0,
           }}>
@@ -657,7 +680,7 @@ export default function BiblePanel({ onSendSlide }) {
             {/* ═══════════ IZQUIERDA · NAVEGACIÓN ═══════════ */}
             <div style={{
               display: 'flex', flexDirection: 'column', minHeight: 0,
-              borderRight: '1px solid var(--line-1)', paddingRight: 16,
+              paddingRight: 16,
             }}>
               {/* Barra superior compacta: historial (desplegable) + búsqueda + breadcrumb */}
               <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
@@ -672,7 +695,7 @@ export default function BiblePanel({ onSendSlide }) {
                   <div style={{ position: 'relative' }}>
                     <div className="input-wrap">
                       <IconSearch size={15} className="input-icon" />
-                      <input placeholder={t('bible.searchText')}
+                      <input ref={textSearchRef} placeholder={t('bible.searchText')}
                         value={textSearch} onChange={e => setTextSearch(e.target.value)} />
                       <span className="input-kbd"><span className="kbd">/</span></span>
                     </div>
@@ -815,8 +838,19 @@ export default function BiblePanel({ onSendSlide }) {
               )}
             </div>
 
+            {/* Divisor arrastrable entre navegación y texto */}
+            <ResizableDivider
+              size={navColWidth}
+              onResize={setNavColWidth}
+              onCommit={saveBibleNav}
+              direction="left"
+              min={BIBLE_NAV_MIN}
+              max={BIBLE_NAV_MAX}
+              variant="inner"
+            />
+
             {/* ═══════════ DERECHA · TEXTO SELECCIONABLE ═══════════ */}
-            <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, paddingLeft: 16 }}>
               {step === 'verse' && chapter ? (
                 <>
                   <div className="section-h" style={{ flexShrink: 0, alignItems: 'center' }}>

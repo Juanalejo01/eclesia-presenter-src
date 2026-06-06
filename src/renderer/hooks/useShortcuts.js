@@ -75,6 +75,7 @@ export const SHORTCUT_LIST = [
   { keys: ['Ctrl', 'M'], action: 'Abrir Menú',       category: 'global' },
   { keys: ['Ctrl', 'A'], action: 'Abrir Ajustes',    category: 'global' },
   { keys: ['Ctrl', 'P'], action: 'Toggle proyector', category: 'global' },
+  { keys: ['Ctrl', 'F'], action: 'Enfocar búsqueda', category: 'global' },
   { keys: ['→'],         action: 'Siguiente slide',  category: 'live' },
   { keys: ['←'],         action: 'Slide anterior',   category: 'live' },
   { keys: ['Espacio'],   action: 'Pantalla blanco',  category: 'live' },
@@ -114,6 +115,15 @@ export function useGlobalShortcuts({ onPanelChange, onBlank, onClearSlide, onOpe
         if (key === 'p') {
           e.preventDefault()
           emit('projection:toggle-fullscreen')
+          return
+        }
+
+        // Enfocar el buscador del panel actual (sin resetear estado).
+        // Cada panel (Biblia, Canciones, …) escucha 'search:focus' y
+        // pone foco en su input de búsqueda más adecuado.
+        if (key === 'f') {
+          e.preventDefault()
+          emit('search:focus')
           return
         }
 

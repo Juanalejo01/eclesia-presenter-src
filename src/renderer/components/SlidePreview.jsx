@@ -153,7 +153,11 @@ function ZoomModal({ slide, theme, isLive, onClose, t }) {
         position: 'fixed', inset: 0, zIndex: 10000,
         background: 'rgba(0,0,0,0.92)',
         display: 'flex', flexDirection: 'column',
-        padding: 24,
+        // padding-top mayor para que el botón "Cerrar" del header quede
+        // claramente por debajo de la hover-zone de los controles de la
+        // ventana (top 0-40 px). Sin esto, los dos elementos podrían
+        // solapar y dejar el "Cerrar" parcialmente no-clickable.
+        padding: '54px 24px 24px 24px',
       }}>
       {/* Header */}
       <div style={{
@@ -194,25 +198,32 @@ function ZoomModal({ slide, theme, isLive, onClose, t }) {
         </button>
       </div>
 
-      {/* Slide a 16:9 ocupando el espacio disponible */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          flex: 1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          minHeight: 0,
-        }}>
-        <div style={{
-          position: 'relative',
-          width: '100%', maxWidth: 'calc((100vh - 120px) * 16 / 9)',
-          aspectRatio: '16 / 9',
-          border: '1px solid ' + (isLive ? 'rgba(255,90,90,0.4)' : 'rgba(232,181,145,0.25)'),
-          borderRadius: 12,
-          overflow: 'hidden',
-          boxShadow: isLive
-            ? '0 0 60px rgba(255,90,90,0.25), 0 12px 60px rgba(0,0,0,0.7)'
-            : '0 0 40px rgba(232,181,145,0.15), 0 12px 60px rgba(0,0,0,0.7)',
-        }}>
+      {/* Slide a 16:9 ocupando el espacio disponible.
+          IMPORTANTE: el wrapper NO tiene stopPropagation — clic en el área
+          oscura a los lados del slide propaga al backdrop y cierra el modal.
+          stopPropagation vive solo en la caja del slide para que clicar el
+          contenido NO cierre por error. Antes el stopPropagation estaba en
+          el wrapper, que ocupaba toda la zona disponible, y "clic fuera"
+          (lo que promete el header) no cerraba nunca. */}
+      <div style={{
+        flex: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: 0,
+      }}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'relative',
+            width: '100%', maxWidth: 'calc((100vh - 120px) * 16 / 9)',
+            aspectRatio: '16 / 9',
+            border: '1px solid ' + (isLive ? 'rgba(255,90,90,0.4)' : 'rgba(232,181,145,0.25)'),
+            borderRadius: 12,
+            overflow: 'hidden',
+            boxShadow: isLive
+              ? '0 0 60px rgba(255,90,90,0.25), 0 12px 60px rgba(0,0,0,0.7)'
+              : '0 0 40px rgba(232,181,145,0.15), 0 12px 60px rgba(0,0,0,0.7)',
+            cursor: 'default',
+          }}>
           <SlideRenderer slide={slide} theme={theme} isBlackout={slide?.type === 'blackout'} />
         </div>
       </div>

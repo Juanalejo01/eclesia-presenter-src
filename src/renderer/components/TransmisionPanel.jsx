@@ -212,6 +212,13 @@ function RemoteSection() {
   const [qrDataUrl, setQrDataUrl] = useState(null)
   const [qrError, setQrError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  // Revisión del QR — se incrementa cada vez que llamamos loadInfo().
+  // SIN este contador, si el usuario refresca con el mismo WiFi (misma IP →
+  // misma remoteUrl), el useEffect que depende de info?.remoteUrl NO se
+  // vuelve a ejecutar (React compara string por valor) y el QR queda
+  // congelado en "generando QR…" para siempre. El contador rompe ese
+  // empate forzando que la dependencia del effect cambie.
+  const [qrRev, setQrRev] = useState(0)
 
   // Carga inicial + handler de refresh manual. La IP cambia cuando el usuario
   // alterna entre WiFi/LAN/hotspot y necesitamos re-detectarla para regenerar
@@ -221,10 +228,20 @@ function RemoteSection() {
     setRefreshing(true)
     try {
       const fresh = await window.electron.server.info()
+      if (!fresh || !fresh.remoteUrl) {
+        // El server aún no está listo o devolvió algo inesperado.
+        throw new Error('server info incompleto')
+      }
       setInfo(fresh)
       setQrError(false)
-      setQrDataUrl(null)  // forzará la re-generación del QR via useEffect
-    } catch {} finally {
+      setQrDataUrl(null)            // vuelve al estado "generando…" mientras regeneramos
+      setQrRev(r => r + 1)          // fuerza re-ejecución del useEffect del QR
+    } catch (e) {
+      console.warn('[Remote] server.info falló:', e?.message)
+      // Mostramos el aviso "QR no disponible" para que el usuario tenga
+      // feedback en vez de un spinner eterno. Puede usar la URL textual.
+      setQrError(true)
+    } finally {
       setTimeout(() => setRefreshing(false), 350)  // mínimo visible
     }
   }
@@ -234,6 +251,8 @@ function RemoteSection() {
   // Generar QR LOCALMENTE (sin depender de API externa). Negro sobre blanco
   // para máximo contraste — algunas cámaras móviles fallan con colores
   // personalizados aunque tengan contraste suficiente.
+  // Dependencias: info.remoteUrl Y qrRev. El segundo es el que hace que un
+  // refresh con la misma URL TAMBIÉN dispare la regeneración.
   useEffect(() => {
     if (!info?.remoteUrl) return
     let cancelled = false
@@ -249,7 +268,8 @@ function RemoteSection() {
         if (!cancelled) setQrError(true)
       })
     return () => { cancelled = true }
-  }, [info?.remoteUrl])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [info?.remoteUrl, qrRev])
 
   if (!info) return null
 

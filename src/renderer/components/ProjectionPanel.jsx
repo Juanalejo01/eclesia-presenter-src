@@ -115,6 +115,16 @@ export default function ProjectionPanel({ slide }) {
     if (!isOpen('overlay')) await open('overlay')
   }
 
+  // Si ambas ventanas (background + overlay) están abiertas, el botón
+  // grande del header pasa a "Cerrar todas" — pulsándolo se cierran las
+  // dos. Así el mismo botón sirve para abrir Y cerrar (toggle real).
+  const allOpen = isOpen('background') && isOpen('overlay')
+  const closeAll = async () => {
+    if (isOpen('overlay')) await close('overlay')
+    if (isOpen('background')) await close('background')
+  }
+  const toggleAll = () => allOpen ? closeAll() : openAll()
+
   return (
     <div className="workspace">
       <div className="ws-header">
@@ -127,8 +137,11 @@ export default function ProjectionPanel({ slide }) {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={cyclePreview}><IconRefresh size={14} /> Probar transición</button>
-          <button className="btn btn-primary" onClick={openAll}>
-            <IconExternal size={14} /> Abrir todas
+          <button
+            className={allOpen ? 'btn btn-danger' : 'btn btn-primary'}
+            onClick={toggleAll}
+            title={allOpen ? 'Cerrar el proyector y el overlay' : 'Abrir el proyector y el overlay'}>
+            <IconExternal size={14} /> {allOpen ? 'Cerrar todas' : 'Abrir todas'}
           </button>
         </div>
       </div>

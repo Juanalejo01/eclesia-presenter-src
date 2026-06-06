@@ -11,6 +11,57 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.12] — 2026-06-06
+
+Tanda centrada en bugs reportados al usar la app y polish de UX.
+
+### Added
+- 🎵 **Canciones: búsqueda por LETRA además de título/autor/etiqueta**.
+  El filtro ahora es accent-insensitive ("corazon" encuentra "corazón")
+  y si la coincidencia fue en la letra, la card muestra un fragmento
+  resaltado debajo del título para que sepas POR QUÉ aparece esa canción.
+- 🎵 **Canciones: botón "Ocultar referencia"** en el header. Cuando está
+  activo, los slides de canción se proyectan SIN la línea
+  "Título · Sección" (solo letra). Persistido en localStorage.
+- 📑 **Layout: 3 columnas redimensionables** con divisores arrastrables:
+  panel ⟷ monitor (App), biblioteca ⟷ servicio (Canciones), navegación
+  ⟷ texto (Biblia). Doble click en el divisor resetea. Anchos persistidos.
+- 🎬 **Proyección: botón "Abrir/Cerrar todas" inteligente**. Si ambas
+  ventanas (background + overlay) están abiertas, el botón cambia a
+  "Cerrar todas" y al pulsarlo cierra ambas. Mismo botón, dos
+  comportamientos según estado.
+- ⌨️ **Ctrl+F repurposeado**: ya no resetea el panel Biblia. Ahora
+  enfoca el buscador del panel actual (libros o texto en Biblia, songs
+  search en Canciones). Más cercano al "find" estándar.
+
+### Changed
+- 🎵 **Cards de canciones rediseñadas** para portátiles estrechos. El
+  título ya no comparte fila con los botones — siempre toma toda la fila,
+  y las acciones (favorito, lista, editar, borrar) viven en una fila por
+  debajo. Sin ellipsis a mitad del título.
+
+### Fixed
+- 📖 **CRÍTICO: Biblia omitía la primera letra** al teclear ("Romanos"
+  → "omanos"). Causa: en el handler de letra al cambiar de step, se
+  llamaba `setBookSearch(letra)` ANTES de `goToBooks()` que internamente
+  llama `setBookSearch('')` — React batchea y la limpieza pisa la letra.
+  Fix: invertir el orden.
+- 📱 **QR del control remoto se quedaba en "Generando QR…"** al
+  refrescar con la misma WiFi. El `useEffect` que generaba el QR
+  dependía de `info?.remoteUrl` y como esa URL no cambiaba (misma IP),
+  React no re-ejecutaba el effect. Añadido un contador `qrRev` que
+  bumpa en cada refresh para forzar la regeneración.
+- 🔍 **Preview en modal de zoom: "click fuera para cerrar" no funcionaba**.
+  El `e.stopPropagation()` estaba en el wrapper que ocupaba toda la zona,
+  bloqueando el cierre por click en el fondo. Movido al recuadro del
+  slide únicamente.
+- 🔍 **Preview en modal de zoom: botón "✕ Cerrar" solo clicable abajo**.
+  Los botones del SO (Windows 11 titleBarOverlay) tienen una capa de
+  captura que solapaba la mitad superior del botón. Fix: padding-top
+  del modal a 54 px para que el botón quede debajo de la zona del SO.
+
+---
+
 ## [0.2.11] — 2026-06-06
 
 Tanda centrada en la Biblia y en un fallo de proyección visto en uso real,

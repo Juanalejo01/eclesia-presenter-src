@@ -222,7 +222,10 @@ input, textarea, select { font-family: inherit; color: inherit; }
   height: 100vh; width: 100vw;
 }
 .main-grid {
-  display: grid; grid-template-columns: 64px 1fr 380px;
+  display: grid;
+  /* grid-template-columns se setea inline desde App.jsx, con un divider
+     entre el panel y el monitor: "64px 1fr 6px <monitorWidth>px". */
+  grid-template-columns: 64px 1fr 6px 380px;
   height: 100%; min-height: 0;
 }
 
@@ -656,13 +659,28 @@ textarea.field-input {
 
 /* Songs / list rows */
 .song-row, .list-row {
-  display: grid; align-items: center; gap: 14px;
-  padding: 14px 16px; background: var(--bg-2);
+  background: var(--bg-2);
   border: 1px solid var(--line-1); border-radius: var(--r-md);
   transition: all 0.15s ease; cursor: pointer;
 }
-.song-row { grid-template-columns: auto 36px 1fr auto; }
-.list-row { grid-template-columns: auto 28px 36px 1fr auto; }
+/* .song-row: rediseñado para portátiles estrechos.
+   El título YA NO comparte fila con los botones — siempre toma todo el
+   ancho de su columna, y las acciones viven en una fila por debajo. */
+.song-row {
+  display: grid;
+  grid-template-columns: auto 36px 1fr;
+  align-items: start;
+  gap: 8px 12px;
+  padding: 12px 14px;
+}
+/* .list-row se mantiene como antes — la Lista del día usa otro layout. */
+.list-row {
+  display: grid; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  grid-template-columns: auto 28px 36px 1fr auto;
+}
+.song-row-handle { align-self: center; }
+.song-row .song-icon { align-self: center; }
 .song-row:hover, .list-row:hover {
   border-color: var(--line-2); background: var(--bg-3);
   transform: translateY(-1px); box-shadow: var(--shadow-1);
@@ -685,19 +703,49 @@ textarea.field-input {
   background: linear-gradient(180deg, rgba(85, 87, 72, 0.2), rgba(47, 58, 50, 0.15));
   border-color: rgba(85, 87, 72, 0.3); color: var(--copper-200);
 }
-.song-info { min-width: 0; }
+.song-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .song-title {
   display: flex; align-items: center; gap: 8px;
   font-size: 14px; font-weight: 600; color: var(--text-1); letter-spacing: -0.005em;
+  min-width: 0; flex-wrap: wrap;
+}
+.song-title-text {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
 .song-tag {
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--text-3);
   padding: 2px 6px; border: 1px solid var(--line-1); border-radius: 3px;
+  flex-shrink: 0;
 }
-.song-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.song-meta {
+  font-size: 12px; color: var(--text-3); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .song-meta .author { color: var(--copper-200); }
-.song-actions { display: flex; gap: 4px; opacity: 0.65; transition: opacity 0.15s ease; }
+/* Hint de la letra cuando el match fue por fragmento del cuerpo */
+.song-lyric-match {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-3); min-width: 0;
+  padding: 2px 0;
+  border-top: 1px dashed rgba(232, 181, 145, 0.18);
+  margin-top: 2px;
+}
+.song-lyric-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--copper-200);
+  flex-shrink: 0;
+}
+.song-lyric-snippet {
+  color: var(--text-2); font-style: italic;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.song-actions {
+  display: flex; gap: 4px; opacity: 0.7;
+  transition: opacity 0.15s ease;
+  justify-content: flex-end; flex-wrap: wrap;
+  margin-top: 2px;
+}
 .song-row:hover .song-actions, .list-row:hover .song-actions { opacity: 1; }
 .seq-num {
   font-family: var(--font-mono); font-size: 12px; color: var(--text-4);
