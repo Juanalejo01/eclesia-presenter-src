@@ -5,9 +5,10 @@
  * @capacitor/preferences. En Android usa SharedPreferences nativo; en
  * el browser (PWA) usa localStorage como fallback automático.
  *
- * Por qué existe: necesitamos auto-reconnect al reabrir la app sin
- * forzar al usuario a re-emparejar. Token va aparte y se borra al
- * desconectar intencionalmente o ante un AUTH_ERROR del server.
+ * Por qué un único blob JSON: dos `Preferences.set` separados pueden
+ * dejar storage inconsistente si la app muere entre la primera y la
+ * segunda escritura (token sin url o viceversa). Un solo set es atómico
+ * y, al leer, o tenemos el par completo o no tenemos nada.
  *
  * Ejemplo:
  *   const creds = await loadCredentials()
@@ -17,12 +18,13 @@
  *   - Si Preferences falla (storage corrupto, permisos), `loadCredentials`
  *     devuelve null en vez de propagar. El flujo upstream simplemente
  *     mostrará la pantalla de emparejamiento.
+ *   - `saveCredentials` devuelve `true`/`false` para que el caller pueda
+ *     loguear sin romperse.
  *   - `clearCredentials` no lanza nunca.
  */
 import { Preferences } from '@capacitor/preferences'
 
-const KEY_URL = 'eclesia.transport.url'
-const KEY_TOKEN = 'eclesia.transport.token'
+const KEY = 'eclesia.transport.credentials'
 
 /**
  * Carga credenciales persistidas (url + token).
@@ -30,11 +32,12 @@ const KEY_TOKEN = 'eclesia.transport.token'
  */
 export async function loadCredentials() {
   try {
-    const urlRes = await Preferences.get({ key: KEY_URL })
-    const tokenRes = await Preferences.get({ key: KEY_TOKEN })
-    const url = urlRes?.value
-    const token = tokenRes?.value
-    if (url && token) return { url, token }
+    const { value } = await Preferences.get({ key: KEY })
+    if (!value) return null
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed.url === 'string' && typeof parsed.token === 'string') {
+      return { url: parsed.url, token: parsed.token }
+    }
     return null
   } catch {
     return null
@@ -42,13 +45,21 @@ export async function loadCredentials() {
 }
 
 /**
- * Persiste credenciales. Ambas claves van por separado.
+ * Persiste credenciales como un único blob JSON (escritura atómica).
  * @param {{url: string, token: string}} creds
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} true si la escritura fue OK.
  */
 export async function saveCredentials({ url, token }) {
-  await Preferences.set({ key: KEY_URL, value: url })
-  await Preferences.set({ key: KEY_TOKEN, value: token })
+  try {
+    await Preferences.set({
+      key: KEY,
+      value: JSON.stringify({ url, token }),
+    })
+    return true
+  } catch (e) {
+    console.warn('[transport] saveCredentials failed:', e?.message || e)
+    return false
+  }
 }
 
 /**
@@ -57,8 +68,7 @@ export async function saveCredentials({ url, token }) {
  */
 export async function clearCredentials() {
   try {
-    await Preferences.remove({ key: KEY_URL })
-    await Preferences.remove({ key: KEY_TOKEN })
+    await Preferences.remove({ key: KEY })
   } catch {
     // swallow — borrar lo inexistente no debe romper el flujo
   }

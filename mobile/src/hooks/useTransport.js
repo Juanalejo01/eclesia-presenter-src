@@ -1,32 +1,41 @@
 /**
  * useTransport.js
  *
- * Hook reactivo que devuelve el snapshot completo del transport y
- * re-renderiza al componente cuando cualquier campo cambia (status,
- * latencyMs, queueSize, ...).
+ * Hook reactivo que devuelve un snapshot del transport singleton usando
+ * `useSyncExternalStore` (React 18 nativo, sin tearing, perfecto para
+ * stores externos imperativos).
  *
- * Por qué existe: el transport es un singleton imperativo; este hook
- * es el puente al modelo reactivo de React sin meter Redux.
+ * Acepta un `selector` opcional para suscribirse SOLO a una slice del
+ * estado: el componente se re-renderiza únicamente cuando esa slice
+ * cambia (comparación `===`). Esto evita el "re-render storm" cuando
+ * `sentCount` se incrementa por cada `send()` rápido (p.ej. next/prev
+ * en sucesión) y solo necesitas leer `status` o `queueSize`.
  *
  * Ejemplo:
- *   function StatusBar() {
- *     const { status, latencyMs } = useTransport()
- *     return <div>{status} {latencyMs}ms</div>
- *   }
+ *   const status = useTransport(s => s.status)   // recomendado
+ *   const all    = useTransport()                // snapshot completo
  *
  * Edge cases:
- *   - Si el componente se desmonta durante una transición, el
- *     unsubscribe del effect previene setState-on-unmounted.
+ *   - El selector se lee de un ref para no romper la suscripción si
+ *     el caller pasa un selector inline distinto en cada render.
+ *   - `transport.subscribeState` NO emite snapshot inicial síncrono;
+ *     React invoca `getSnapshot` por sí mismo en el primer render.
+ *   - El selector DEBE devolver primitivos o referencias estables.
+ *     Devolver un objeto literal nuevo cada vez (p.ej. `s => ({a:s.a})`)
+ *     dispara bucles infinitos porque la comparación `===` siempre
+ *     detecta cambio. Si necesitas varias slices, usa varias llamadas
+ *     a `useTransport` o combina con `useMemo` aguas abajo.
  */
-import { useEffect, useState } from 'react'
+import { useRef, useSyncExternalStore } from 'react'
 import { transport } from '../services/transport.js'
 
-export function useTransport() {
-  const [state, setState] = useState(() => transport.getState())
-  useEffect(() => {
-    // Snapshot inicial por si cambió entre el mount y el primer render
-    setState(transport.getState())
-    return transport.subscribeState(setState)
-  }, [])
-  return state
+export function useTransport(selector) {
+  const selectorRef = useRef(selector)
+  selectorRef.current = selector
+
+  const getSnapshot = () => {
+    const s = transport.getState()
+    return selectorRef.current ? selectorRef.current(s) : s
+  }
+  return useSyncExternalStore(transport.subscribeState, getSnapshot, getSnapshot)
 }

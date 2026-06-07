@@ -11,6 +11,13 @@
  * exponen T3-T7 es disparar comandos imperativos. Un store reactivo añade
  * peso sin ventaja.
  *
+ * Lifecycle wake-up: el módulo instala listeners para `online`,
+ * `visibilitychange` y `appStateChange` (Capacitor App). Cuando el
+ * sistema avisa de que la red volvió o la app pasó a foreground,
+ * cancelamos el backoff pendiente y reintentamos al instante; así
+ * después de un cambio de WiFi o de un retorno desde background el
+ * usuario no espera hasta 30 s.
+ *
  * Ejemplo:
  *   import { transport, TransportStatus } from './transport.js'
  *   await transport.connect('ws://192.168.1.10:7777', 'abc123')
@@ -50,6 +57,10 @@ const BACKOFF_CAP_MS        = 30_000
 const BACKOFF_JITTER_MS     = 1_000
 const AUTH_ERROR_CODE       = 4001     // close code custom del server para 401
 const NORMAL_CLOSE_CODE     = 1000
+
+// readyState OPEN según WebSocket API. Definido a mano por si en SSR
+// (o tests Node sin polyfill) `WebSocket` es undefined al evaluar el módulo.
+const WS_OPEN = 1
 
 /* ============================================================== */
 /* Estado interno (única fuente de verdad)                        */
@@ -105,7 +116,8 @@ function snapshot() {
 /* ============================================================== */
 function setStatus(next, extra = {}) {
   const prev = _state.status
-  if (prev === next && Object.keys(extra).length === 0) return
+  const hasExtras = Object.keys(extra).length > 0
+  if (prev === next && !hasExtras) return
   _state.status = next
   if ('lastError' in extra) _state.lastError = extra.lastError
   if ('latencyMs' in extra) _state.latencyMs = extra.latencyMs
@@ -151,7 +163,7 @@ function flushQueue() {
 /* Envío crudo (asume socket OPEN)                                */
 /* ============================================================== */
 function rawSend(cmd) {
-  if (!_ws || _ws.readyState !== 1 /* OPEN */) return false
+  if (!_ws || _ws.readyState !== WS_OPEN) return false
   try {
     _ws.send(JSON.stringify(cmd))
     if (cmd.type !== ClientCommand.PING) {
@@ -172,7 +184,7 @@ function rawSend(cmd) {
 function startHeartbeat() {
   stopHeartbeat()
   _heartbeatTimer = setInterval(() => {
-    if (!_ws || _ws.readyState !== 1) return
+    if (!_ws || _ws.readyState !== WS_OPEN) return
     const ts = Date.now()
     rawSend({ type: ClientCommand.PING, payload: { ts } })
     // armar timeout: si en 10 s no hay pong → zombie
@@ -253,7 +265,10 @@ function openSocket(url, token) {
       return
     }
     _reconnectAttempt = 0
-    setStatus(TransportStatus.OPEN)
+    // Reset de campos de "salud" — un reconnect OK debe borrar el error
+    // que dejó el ciclo anterior y arrancar latencyMs en null hasta el
+    // primer pong.
+    setStatus(TransportStatus.OPEN, { lastError: null, latencyMs: null })
     startHeartbeat()
     flushQueue()
     resolvePendingConnect()
@@ -280,8 +295,9 @@ function openSocket(url, token) {
   socket.onerror = (ev) => {
     if (generation !== _connectGeneration) return
     error('socket error:', ev?.message || ev)
-    _state.lastError = ev?.message || 'socket-error'
-    // onerror suele ir seguido de onclose; dejamos que onclose decida.
+    // Anota el error y notifica vía setStatus (no mutación directa).
+    // Mantenemos el status actual — onclose decidirá la transición.
+    setStatus(_state.status, { lastError: ev?.message || 'socket-error' })
   }
 
   socket.onclose = (ev) => {
@@ -527,6 +543,66 @@ export function __resetForTests() {
   _state.sentCount  = 0
   _state.recvCount  = 0
 }
+
+/* ============================================================== */
+/* Lifecycle wake-up: red/visibilidad/Capacitor App                */
+/* ============================================================== */
+/**
+ * Cancela el backoff pendiente y reconecta YA si estábamos esperando.
+ * Idempotente y silenciosa si no procede (no hay credenciales, o ya
+ * estamos OPEN, ERROR o CLOSED).
+ */
+function _wakeUpAndReconnect(reason) {
+  if (_state.status === TransportStatus.OPEN)    return
+  if (_state.status === TransportStatus.ERROR)   return
+  if (_state.status === TransportStatus.CLOSED)  return
+  if (!_state.url || !_token)                    return
+  log('wake-up reconnect triggered by', reason)
+  if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
+  _reconnectAttempt = 0
+  openSocket(_state.url, _token)
+}
+
+/**
+ * Instala una sola vez los listeners de red/visibilidad/Capacitor App.
+ * En entornos sin DOM (Node/Jest) sale silencioso — los tests no
+ * dependen de estos hooks, así que no hace falta exponerlos.
+ */
+function _installLifecycleListeners() {
+  if (typeof window === 'undefined') return
+
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('online', () => _wakeUpAndReconnect('online'))
+    window.addEventListener('offline', () => {
+      // No forzamos disconnect: si el offline es transitorio (1-2 s)
+      // mantener el socket evita un ciclo de reconnect innecesario.
+      // Heartbeat detectará el zombie y disparará reconnect si toca.
+      log('browser reports offline')
+    })
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        _wakeUpAndReconnect('visibility')
+      }
+    })
+  }
+
+  // Capacitor App lifecycle (iOS/Android background/foreground).
+  // Import dinámico con catch para que en web pura (sin Capacitor)
+  // no rompa: el módulo no existe en bundle y `import()` rechaza.
+  import('@capacitor/app').then(({ App }) => {
+    try {
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) _wakeUpAndReconnect('app-foreground')
+      })
+    } catch { /* ignore — plugin no disponible en este runtime */ }
+  }).catch(() => {
+    // No estamos en Capacitor (web puro). Silencioso.
+  })
+}
+
+_installLifecycleListeners()
 
 // Re-export útil para los consumers
 export { ClientCommand, ServerEvent, isValidCommand } from './transportEvents.js'
