@@ -19,6 +19,7 @@ export default function BigButton({
   variant = 'primary',
   type = 'button',
   children,
+  ...rest
 }) {
   const cls = {
     primary: 'bg-copper-200 hover:bg-copper-100 active:bg-copper-300 text-bg-1',
@@ -34,6 +35,7 @@ export default function BigButton({
       className={`w-full min-h-[56px] px-6 rounded-xl font-semibold text-base
                   transition active:scale-[0.98] disabled:opacity-50
                   disabled:active:scale-100 ${cls}`}
+      {...rest}
     >
       {loading ? '...' : children}
     </button>
