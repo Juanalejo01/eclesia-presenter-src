@@ -11,85 +11,18 @@ const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
 const os = require('os')
-const crypto = require('crypto')
+const pairing = require('./pairing')
+const { attachWsRemote } = require('./wsRemote')
 
 const PORT = 3434  // movido del clásico 3000 para evitar choque con otros dev servers
 
 // Estado del slide actual (lo mantiene el server para enviarlo a clientes nuevos)
 let currentSlide = { text: '', reference: '', type: 'blank' }
 let currentTheme = null
+let currentSchedule = []
 
-// PIN de pairing — 6 dígitos generados al arrancar la app.
-// El móvil tiene que escribirlo para poder ENVIAR comandos.
-// Sin PIN solo puede VER el slide actual (modo read-only).
-// El operador del PC ve el PIN en el panel Transmisión.
-const PAIRING_PIN = String(crypto.randomInt(100000, 1000000))
-// Map en vez de Set para asociar TTL. Sin esto, en una instalación 24/7
-// (iglesia con la app abierta meses) los tokens se acumulan sin tope.
-// TTL: 24 horas tras emisión.
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
-const authorizedTokens = new Map()  // token → { issuedAt }
-
-// Rate limit por IP en /api/pair contra brute-force del PIN (1M combos).
-// Sin esto, un atacante en la misma WiFi puede probar todos los PINs en
-// segundos. Con esto: 5 intentos por minuto por IP, bloqueo 15 min tras 5.
-const PIN_ATTEMPTS_WINDOW_MS = 60_000
-const PIN_LOCKOUT_MS = 15 * 60_000
-const PIN_MAX_ATTEMPTS = 5
-const pinAttempts = new Map()  // ip → { count, firstAttempt, lockedUntil }
-
-function checkPinRateLimit(ip) {
-  const now = Date.now()
-  const record = pinAttempts.get(ip)
-  if (!record) {
-    pinAttempts.set(ip, { count: 1, firstAttempt: now, lockedUntil: 0 })
-    return { allowed: true }
-  }
-  if (record.lockedUntil > now) {
-    return { allowed: false, retryAfterMs: record.lockedUntil - now }
-  }
-  // Si la ventana expiró, reset
-  if (now - record.firstAttempt > PIN_ATTEMPTS_WINDOW_MS) {
-    record.count = 1; record.firstAttempt = now; record.lockedUntil = 0
-    return { allowed: true }
-  }
-  record.count++
-  if (record.count > PIN_MAX_ATTEMPTS) {
-    record.lockedUntil = now + PIN_LOCKOUT_MS
-    return { allowed: false, retryAfterMs: PIN_LOCKOUT_MS }
-  }
-  return { allowed: true }
-}
-
-function issueToken() {
-  const token = crypto.randomBytes(24).toString('hex')
-  authorizedTokens.set(token, { issuedAt: Date.now() })
-  return token
-}
-
-function isTokenValid(token) {
-  const rec = authorizedTokens.get(token)
-  if (!rec) return false
-  if (Date.now() - rec.issuedAt > TOKEN_TTL_MS) {
-    authorizedTokens.delete(token)
-    return false
-  }
-  return true
-}
-
-// Limpieza periódica: cada hora, borrar tokens expirados + IPs viejas
-setInterval(() => {
-  const now = Date.now()
-  for (const [token, rec] of authorizedTokens) {
-    if (now - rec.issuedAt > TOKEN_TTL_MS) authorizedTokens.delete(token)
-  }
-  for (const [ip, rec] of pinAttempts) {
-    // Limpia registros antiguos sin lockout activo
-    if (rec.lockedUntil < now && now - rec.firstAttempt > 24 * 60 * 60_000) {
-      pinAttempts.delete(ip)
-    }
-  }
-}, 60 * 60_000).unref()
+// PIN, tokens y rate-limit viven en src/server/pairing.js (módulo aparte
+// para tests aislados + reutilización desde el WS raw del mobile).
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces()
@@ -118,15 +51,41 @@ function onRemoteEvent(fn) {
 let _io = null
 let _songsCache = null
 
+// Canal de broadcast simple para sincronizar pushSlide/pushTheme/pushSchedule
+// entre Socket.IO (legacy /remote HTML) y el WS raw (/ws/remote para mobile).
+// Cada subscriber recibe (type, payload) cuando se publica un evento.
+const _broadcastSubscribers = new Set()
+const broadcastChannel = {
+  subscribe(fn) {
+    _broadcastSubscribers.add(fn)
+    return () => _broadcastSubscribers.delete(fn)
+  },
+  publish(type, payload) {
+    for (const fn of _broadcastSubscribers) {
+      try { fn(type, payload) } catch (e) {
+        console.warn('[server] broadcast subscriber error:', e?.message || e)
+      }
+    }
+  },
+}
+
 /** Llamar desde main.js cuando el slide cambie en la app, para empujar a los móviles. */
 function pushSlide(slide) {
   currentSlide = slide || { text: '', reference: '', type: 'blank' }
-  if (_io) _io.emit('slide:update', currentSlide)
+  if (_io) _io.emit('slide:update', currentSlide)            // legacy Socket.IO
+  broadcastChannel.publish('pgm-update', currentSlide)        // mobile WS raw
 }
 
 function pushTheme(theme) {
   currentTheme = theme
   if (_io) _io.emit('theme:update', currentTheme)
+  broadcastChannel.publish('pgm-update-theme', currentTheme)
+}
+
+/** Push del schedule (lista del día) a los móviles. */
+function pushSchedule(items) {
+  currentSchedule = Array.isArray(items) ? items : []
+  broadcastChannel.publish('schedule-update', currentSchedule)
 }
 
 /** Push de la lista de canciones a los móviles conectados. */
@@ -135,9 +94,19 @@ function pushSongs(songs) {
     id: s.id, title: s.title, author: s.author, tags: s.tags,
   })) : []
   if (_io) _io.emit('songs:list', _songsCache)
+  broadcastChannel.publish('songs-list', _songsCache)
 }
 
-function startServer() {
+function getCurrentSlide() { return currentSlide }
+function getCurrentTheme() { return currentTheme }
+function getCurrentSchedule() { return currentSchedule }
+
+/**
+ * Arranca el servidor HTTP + Socket.IO + WS raw.
+ * @param {{ port?: number }} [opts] — port=0 elige uno random (útil en tests)
+ */
+function startServer(opts = {}) {
+  const listenPort = Number.isInteger(opts.port) ? opts.port : PORT
   const app = express()
   const httpServer = http.createServer(app)
   // CORS restringido a same-origin + cualquier IP local (no '*').
@@ -177,9 +146,12 @@ function startServer() {
 
   // Endpoint para que el móvil valide el PIN y reciba un token de autorización.
   // Rate-limited por IP para prevenir brute-force del PIN de 6 dígitos.
+  // Body: { pin, deviceId?, deviceName? }
+  //   - deviceId/Name son opcionales (compat con el remote HTML legacy que solo
+  //     manda { pin }). Si vienen, se asocian al token para listado/revocación.
   app.post('/api/pair', (req, res) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown'
-    const rate = checkPinRateLimit(ip)
+    const rate = pairing.checkPinRateLimit(ip)
     if (!rate.allowed) {
       res.setHeader('Retry-After', Math.ceil(rate.retryAfterMs / 1000))
       return res.status(429).json({
@@ -189,10 +161,57 @@ function startServer() {
       })
     }
     const submitted = String(req.body?.pin || '').trim()
-    if (submitted !== PAIRING_PIN) {
+    if (submitted !== pairing.PAIRING_PIN) {
       return res.status(401).json({ ok: false, error: 'pin_incorrecto' })
     }
-    res.json({ ok: true, token: issueToken() })
+    const deviceId = String(req.body?.deviceId || '').slice(0, 64) || 'unknown'
+    const deviceName = String(req.body?.deviceName || '').slice(0, 64) || 'Cliente sin nombre'
+    const token = pairing.issueToken({ deviceId, deviceName })
+    res.json({
+      ok: true,
+      token,
+      serverInfo: {
+        version: require('../../package.json').version,
+        // Usamos el puerto real del listener (no la constante PORT) por si
+        // en tests/dev se levantó en un puerto distinto.
+        wsUrl: `ws://${getLocalIP()}:${httpServer.address()?.port || PORT}/ws/remote`,
+      },
+    })
+  })
+
+  // ---- Endpoints de gestión de dispositivos (protegidos por Bearer token) ----
+  //
+  // Middleware mínimo: lee 'Authorization: Bearer <token>' y verifica que
+  // el token sea válido. Reutiliza el mismo Map de pairing.
+  const requireBearer = (req, res, next) => {
+    const auth = String(req.headers['authorization'] || '')
+    const m = auth.match(/^Bearer\s+(.+)$/i)
+    if (!m) return res.status(401).json({ ok: false, error: 'token_requerido' })
+    const v = pairing.validateToken(m[1])
+    if (!v.valid) return res.status(401).json({ ok: false, error: 'token_invalido' })
+    req.deviceInfo = { token: m[1], deviceId: v.deviceId, deviceName: v.deviceName }
+    next()
+  }
+
+  // Lista dispositivos pareados (sin exponer el token completo en respuesta:
+  // se ofusca dejando solo los últimos 8 chars para identificación visual).
+  app.get('/api/pair/devices', requireBearer, (_req, res) => {
+    const devices = pairing.listDevices().map(d => ({
+      tokenTail: d.token.slice(-8),
+      deviceId: d.deviceId,
+      deviceName: d.deviceName,
+      issuedAt: d.issuedAt,
+      lastUsedAt: d.lastUsedAt,
+    }))
+    res.json({ ok: true, devices })
+  })
+
+  // Revoca un token específico. El propio dispositivo puede auto-revocarse
+  // (útil para "cerrar sesión") y el admin puede revocar a otros.
+  app.delete('/api/pair/:token', requireBearer, (req, res) => {
+    const target = String(req.params.token || '')
+    const existed = pairing.revokeToken(target)
+    res.json({ ok: true, revoked: existed })
   })
 
   io.on('connection', (socket) => {
@@ -204,8 +223,9 @@ function startServer() {
     // Endpoint para autenticarse via socket con un token previamente emitido
     let isAuthorized = false
     socket.on('auth:token', (token) => {
-      if (typeof token === 'string' && isTokenValid(token)) {
+      if (typeof token === 'string' && pairing.validateToken(token).valid) {
         isAuthorized = true
+        pairing.touchToken(token)
         socket.emit('auth:ok')
       } else {
         socket.emit('auth:fail')
@@ -231,18 +251,44 @@ function startServer() {
     socket.on('remote:song',      requireAuth((p) => emitRemoteEvent('song', p || {})))
   })
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  // Endpoint WS raw para el mobile (Capacitor + React).
+  // Coexiste con Socket.IO en el mismo puerto gracias al evento 'upgrade'.
+  const wsRemoteHandle = attachWsRemote(httpServer, {
+    pairing,
+    getCurrentSlide,
+    getCurrentSchedule,
+    getCurrentTheme,
+    onRemoteEvent: emitRemoteEvent,
+    broadcastChannel,
+  })
+
+  // En tests pasamos port=0 → Node escoge uno random; el caller lo lee de
+  // address().port después de listen.
+  const isTestMode = listenPort === 0
+  httpServer.listen(listenPort, '0.0.0.0', () => {
     const ip = getLocalIP()
-    console.log(`[EclesiaPresenter] server activo en http://${ip}:${PORT}`)
-    console.log(`  Página inicio:    http://${ip}:${PORT}/`)
-    console.log(`  Control móvil:    http://${ip}:${PORT}/remote`)
-    console.log(`  OBS overlay:      http://${ip}:${PORT}/overlay`)
+    const actualPort = httpServer.address()?.port || listenPort
+    if (!isTestMode) {
+      console.log(`[EclesiaPresenter] server activo en http://${ip}:${actualPort}`)
+      console.log(`  Página inicio:    http://${ip}:${actualPort}/`)
+      console.log(`  Control móvil:    http://${ip}:${actualPort}/remote`)
+      console.log(`  OBS overlay:      http://${ip}:${actualPort}/overlay`)
+      console.log(`  Mobile WS:        ws://${ip}:${actualPort}/ws/remote`)
+    }
   })
 
   return {
-    io, getLocalIP, port: PORT,
-    pushSlide, pushTheme, pushSongs, onRemoteEvent,
-    getPairingPin: () => PAIRING_PIN,
+    io, httpServer, getLocalIP,
+    get port() { return httpServer.address()?.port || listenPort },
+    pushSlide, pushTheme, pushSongs, pushSchedule, onRemoteEvent,
+    getCurrentSlide, getCurrentSchedule, getCurrentTheme,
+    getPairingPin: () => pairing.PAIRING_PIN,
+    // Cierre ordenado (útil para tests)
+    close: async () => {
+      try { await wsRemoteHandle.close() } catch {}
+      try { io.close() } catch {}
+      await new Promise(resolve => httpServer.close(() => resolve()))
+    },
   }
 }
 
