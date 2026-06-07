@@ -11,6 +11,99 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.14] — 2026-06-07
+
+Tanda grande de UX + refactor. Editor reinventado al estilo Canva, botón
+de actualización persistente, sistema de diálogos acorde al brand, y
+limpieza de la biblioteca interna de fondos (que ahora vive en la web).
+
+### Added
+- 🎨 **Panel Edición rediseñado al estilo Canva/Procreate**:
+  - Layout 2 columnas: canvas central 16:9 (preview) + property panel
+    derecho con secciones plegables (acordeón con estado persistido en
+    localStorage).
+  - Tabs Pantalla completa / Lower-third en la cinta superior.
+  - 5 secciones por tab: FONDO/BANDA · TIPOGRAFÍA · EFECTOS · POSICIÓN ·
+    TRANSICIÓN/REFERENCIA. Header con botones Restablecer · Probar · Abrir
+    todas / Cerrar todas.
+  - Mini-cards de "Estilos predefinidos" con preview visual + label.
+  - Sección **"Mis presets"** con botón `＋ Guardar`: el usuario captura
+    el estilo actual como preset propio, con renombrar (✎) y eliminar (×)
+    al hover. Persistido en localStorage por kind (fullscreen/overlay).
+- 🔤 **FontPicker custom con preview en vivo** (sustituye al `<select>`
+  nativo que congelaba el navegador con 100+ fuentes):
+  - Popover con buscador instantáneo.
+  - **Virtual scroll**: solo se renderizan ~12 opciones visibles a la
+    vez, cada una con su `fontFamily` aplicada → ves cómo se vería cada
+    tipografía sin freeze.
+  - A11y completa (role=listbox, aria-haspopup, focus-visible).
+- 🔔 **Botón "Actualizar EclesiaPresenter" en la Topbar** (a la izquierda
+  de Ajustes), con 4 estados:
+  - Update disponible → cobre con pulse sutil + "↑ Actualizar
+    EclesiaPresenter vX.X.X"
+  - Descargando → barra de progreso interna + "Descargando NN%"
+  - Descargado → verde + "↻ Reiniciar e instalar vX.X.X"
+  - Error → tooltip con el mensaje + retry al click
+  - En modo portable: enlace al GitHub Release
+  - El estado se hidrata al abrir la app, así que si la sesión anterior
+    detectó la actualización el botón aparece de inmediato.
+- 💬 **Sistema de diálogos custom** acorde al brand cobre:
+  - Nuevo `dialogService` con API `confirm()` / `alert()` / `prompt()`
+    que devuelven Promesa.
+  - Componente `<AppDialog>` con backdrop blur, card cobre con fade-in,
+    icono según variante (`default` · `danger` · `info`) y animación
+    de entrada cinematográfica.
+  - A11y: focus trap, Esc cancela, Enter confirma, body-scroll-lock con
+    refcount, aria-modal/role=dialog/aria-labelledby.
+  - Reemplaza TODAS las llamadas `window.confirm`/`alert`/`prompt`
+    nativas del navegador (18 sitios en total) y también el
+    `dialog.showMessageBoxSync` nativo de Windows del cierre de app
+    (vía flujo IPC main↔renderer con fallback de seguridad por timeout).
+- 🌐 **Nueva sección `/recursos` en la web** (`eclesia-presenter.vercel.app/recursos`):
+  - Catálogo de vídeos de fondo agrupados por categoría con thumbnails
+    + duración + tamaño + botón "Descargar" directo a Pexels.
+  - Tarjetas "Próximamente" para Canciones, Tutoriales e Imágenes.
+  - Añadido a Navbar, MobileMenu y sitemap.xml.
+
+### Changed
+- 🧹 **Eliminada la biblioteca interna de fondos preset**
+  (`backgroundLibrary.js` + 7 IPC handlers + 222 líneas de UI en Ajustes):
+  los vídeos viven ahora en `/recursos` en la web — el usuario descarga
+  lo que quiere y lo carga vía MediaPicker como cualquier archivo.
+  Se mantiene el resolver `preset://` mínimo para que los vídeos ya
+  descargados en versiones anteriores sigan funcionando.
+
+### Fixed
+- 🐛 **Editor: secciones del panel se compactaban** al abrir varias a la
+  vez (flex repartía la altura). Añadido `flex-shrink: 0` y el panel se
+  ensanchó a 400 px (responsive a 360/320 según viewport).
+- 🐛 **Segmented controls truncados** ("Tra..." en lugar de "Transp."):
+  añadido `cols={n}` y `small` para distribuir tabs con padding chico.
+- 🐛 **Slider de blur cortado horizontalmente** dentro del grid de 2
+  columnas: `min-width: 0` y `max-width: 100%` en `.prop-section`.
+- 🐛 **Animación de secciones plegables truncaba contenido** con
+  `max-height: 2000px` fijo: sustituida por la técnica
+  `grid-template-rows: 0fr → 1fr` que anima a la altura real.
+- 🐛 **TDZ en `<input>` del prompt**: pulsar Enter para aceptar el
+  `defaultValue` devolvía `null` (el ref espejo no se inicializaba). Lee
+  ahora `inputRef.current?.value` del DOM.
+- 🐛 **Conflictos de Esc/Enter** entre AppDialog y otros listeners en
+  capture phase (SongEditor, CommandPalette): `stopImmediatePropagation`
+  en el handler global.
+- 🐛 **Race del cierre de app**: si el renderer no ha montado aún el
+  listener del `app:request-quit-confirm`, fallback al dialog nativo
+  tras 2 s en lugar de dejar al usuario atrapado.
+
+### Accessibility
+- `:focus-visible` cobre + halo en tabs, headers, presets, reset button,
+  selects, sliders, color pickers y checkboxes del editor.
+- Tap targets ≥36 px en tabs, headers y reset button.
+- Capa oscura debajo del label de los presets → contraste WCAG AA.
+- `useId()` para `aria-labelledby` en cada diálogo.
+- Focus trap real con Tab/Shift+Tab en AppDialog.
+
+---
+
 ## [0.2.13] — 2026-06-07
 
 Tanda centrada en rendimiento para máquinas modestas (Intel HD Graphics,
