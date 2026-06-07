@@ -69,7 +69,7 @@ export default function PgmPreview({ slide }) {
       role="img"
       aria-label={`Proyectando: ${slide.text || ''}${slide.reference ? ` (${slide.reference})` : ''}`.trim()}
     >
-      <p className="text-ink-1 font-display text-lg leading-snug line-clamp-3 max-w-full">
+      <p className="text-ink-1 font-display text-lg leading-snug line-clamp-3 max-w-full break-words">
         {slide.text || '…'}
       </p>
       {slide.reference && (

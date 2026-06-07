@@ -19,34 +19,38 @@
  *     sin Capacitor: lo capturamos y degradamos a vibrate().
  *   - `navigator.vibrate` lanza si el documento no tiene user gesture
  *     reciente: lo envolvemos en try/catch silencioso.
- *   - El init se memoiza: primer call paga el dynamic import, llamadas
- *     siguientes son síncronas (módulo ya en memoria).
+ *   - El init memoiza la PROMESA (no el resultado): si dos callers
+ *     entran en paralelo en el primer tap, ambos reciben la misma
+ *     promesa y el dynamic import sólo se ejecuta una vez. Memoizar
+ *     el resultado dejaría una ventana en la que dos imports salen
+ *     a la vez antes de que el primero asigne la variable.
  */
 
-// 'capacitor' | 'web' | 'none' | null=lazy (primer call resuelve)
-let _hapticsImpl = null
+// Promesa cacheada con la implementación resuelta.
+// null = aún no inicializada; Promise = en vuelo o ya resuelta.
+let _hapticsPromise = null
 
-async function _initHaptics() {
-  if (_hapticsImpl !== null) return _hapticsImpl
-  try {
-    const mod = await import('@capacitor/haptics')
-    if (mod && mod.Haptics) {
-      _hapticsImpl = {
-        type: 'capacitor',
-        Haptics: mod.Haptics,
-        ImpactStyle: mod.ImpactStyle,
+function _initHaptics() {
+  if (_hapticsPromise) return _hapticsPromise
+  _hapticsPromise = (async () => {
+    try {
+      const mod = await import('@capacitor/haptics')
+      if (mod && mod.Haptics) {
+        return {
+          type: 'capacitor',
+          Haptics: mod.Haptics,
+          ImpactStyle: mod.ImpactStyle,
+        }
       }
-      return _hapticsImpl
+    } catch {
+      // No estamos en Capacitor o el plugin no se pudo cargar.
     }
-  } catch {
-    // No estamos en Capacitor o el plugin no se pudo cargar.
-  }
-  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-    _hapticsImpl = { type: 'web' }
-  } else {
-    _hapticsImpl = { type: 'none' }
-  }
-  return _hapticsImpl
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      return { type: 'web' }
+    }
+    return { type: 'none' }
+  })()
+  return _hapticsPromise
 }
 
 /**
@@ -84,5 +88,5 @@ export async function tapMedium() {
  * NO usar en código de producción.
  */
 export function __resetHapticsForTests() {
-  _hapticsImpl = null
+  _hapticsPromise = null
 }

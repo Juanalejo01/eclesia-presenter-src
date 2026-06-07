@@ -12,7 +12,7 @@
  *   - `pgm-update-theme` → guarda `serverVersion` para mostrarlo en el
  *     subtítulo del header. Lo emite el server en el handshake y cuando
  *     cambia el tema.
- *   - `auth-error` → setea flag → effect navega a /pair.
+ *   - `auth-error` → disconnect + nav /pair (guarded por mountedRef).
  *
  * Estados visuales:
  *   - Sin conexión: banner gris debajo del preview + botones gris.
@@ -25,7 +25,7 @@
  * en el monitor. Mejor que vea que no puede operar y reaccione (mire
  * la WiFi, abra Ajustes → Transmisión, etc.).
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../components/BigButton.jsx'
 import CommandButton from '../components/CommandButton.jsx'
@@ -35,21 +35,51 @@ import { transport, ClientCommand, ServerEvent } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
 import { tapLight, tapMedium } from '../services/haptics.js'
 
+// Logger DEV-only para eventos de alta frecuencia (pgm-update). Vite
+// expone `import.meta.env.DEV`; en Jest CJS `import.meta` es un error
+// de parseo (no de runtime), así que NO podemos escribir `import.meta`
+// literalmente. Lo accedemos via `new Function` que sólo se evalúa una
+// vez al cargar el módulo en un entorno que soporte ESM. En Jest la
+// función lanza al construirse o al ejecutarse y `_isDev` cae a false.
+const _isDev = (() => {
+  try {
+    // eslint-disable-next-line no-new-func
+    const env = new Function('try { return import.meta.env } catch { return undefined }')()
+    return !!(env && env.DEV)
+  } catch {
+    return false
+  }
+})()
+
+function _debug(...args) {
+  if (_isDev) console.log(...args)
+}
+
 export default function ServiceScreen() {
   const nav = useNavigate()
   const { isConnected, isConnecting } = useConnection()
   const [slide, setSlide] = useState(null)
   const [serverVersion, setServerVersion] = useState(null)
-  const [authError, setAuthError] = useState(false)
+  // Flag para evitar setState/nav después del unmount: si el server
+  // emite AUTH_ERROR justo cuando la screen ya está desmontándose,
+  // queremos que el handler sea no-op en vez de tocar React/router.
+  const mountedRef = useRef(true)
 
   // Suscripciones a eventos del server. Cada subscribe devuelve su
   // unsubscribe — los limpiamos en cleanup para no acumular handlers
   // si la screen se monta y desmonta varias veces (p.ej. navegando
   // por la BottomNav).
+  //
+  // El handler de AUTH_ERROR llama a `transport.disconnect()` y navega
+  // directamente. Es seguro hacerlo dentro del callback del subscribe
+  // porque `disconnect()` NO muta `_eventSubs` (sólo invalida
+  // `_connectGeneration`, para el heartbeat y cierra el socket); el
+  // dispatcher de eventos sigue iterando el Set actual sin riesgo.
   useEffect(() => {
+    mountedRef.current = true
     const offs = [
       transport.subscribe(ServerEvent.PGM_UPDATE, (payload) => {
-        console.log('[service] pgm-update', payload)
+        _debug('[service] pgm-update', payload?.text?.slice(0, 40))
         setSlide(payload || null)
       }),
       // El server emite `pgm-update-theme` en el handshake y al cambiar
@@ -62,54 +92,45 @@ export default function ServiceScreen() {
         }
       }),
       transport.subscribe(ServerEvent.AUTH_ERROR, () => {
-        console.warn('[service] auth-error recibido, navegando a /pair')
-        setAuthError(true)
+        if (!mountedRef.current) return
+        console.warn('[service] auth-error → desconectando + nav /pair')
+        transport.disconnect()
+        nav('/pair', { replace: true })
       }),
     ]
     return () => {
+      mountedRef.current = false
       for (const off of offs) {
         try { off() } catch { /* ignore */ }
       }
     }
-  }, [])
-
-  // Auth-error: limpia el transport y desplaza a /pair. Lo hacemos en
-  // un effect aparte para que el `transport.disconnect()` ocurra fuera
-  // del callback del subscribe (el disconnect invalida generations y
-  // emitEvent recorre el Set actual; mejor no mutarlo dentro).
-  useEffect(() => {
-    if (!authError) return
-    console.log('[service] disconnect + nav /pair por auth-error')
-    transport.disconnect()
-    nav('/pair', { replace: true })
-  }, [authError, nav])
+  }, [nav])
 
   // Disabled global de los comandos cuando no estamos OPEN. El transport
   // los encolaría igual, pero preferimos comunicar al operador que no
   // hay conexión a fingir que el comando salió.
   const cmdDisabled = !isConnected
 
-  function send(type) {
+  function handleNav(type) {
     if (cmdDisabled) return
+    tapLight()
     transport.send({ type })
   }
 
-  function handleNav(type) {
-    tapLight()
-    send(type)
-  }
-
   function handleSecondary(type) {
+    if (cmdDisabled) return
     tapMedium()
-    send(type)
+    transport.send({ type })
   }
 
   function handleUnpair() {
+    // (T9+) Migrar a un AppDialog mobile cuando exista — el window.confirm
+    // nativo del WebView ignora el tema cobre y se ve fuera del brand.
     const ok = window.confirm(
       '¿Desemparejar este mando? Tendrás que volver a escanear el PIN del PC.',
     )
     if (!ok) return
-    console.log('[service] desemparejado por el usuario')
+    console.warn('[service] desemparejado por el usuario')
     transport.disconnect()
     nav('/pair', { replace: true })
   }

@@ -26,6 +26,9 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 const mockSubscribers = {}
 const mockSend = jest.fn(() => true)
 const mockDisconnect = jest.fn()
+// Recolectamos cada unsubscribe devuelta por subscribe() como jest.fn()
+// para poder afirmar que el cleanup del effect las invocó todas en unmount.
+const mockUnsubscribes = []
 
 jest.mock('../src/services/transport.js', () => {
   return {
@@ -36,9 +39,11 @@ jest.mock('../src/services/transport.js', () => {
       subscribe: (eventType, handler) => {
         if (!mockSubscribers[eventType]) mockSubscribers[eventType] = new Set()
         mockSubscribers[eventType].add(handler)
-        return () => {
+        const off = jest.fn(() => {
           mockSubscribers[eventType]?.delete(handler)
-        }
+        })
+        mockUnsubscribes.push(off)
+        return off
       },
       // No-ops para no romper si algo los toca.
       connect: jest.fn(() => Promise.resolve()),
@@ -112,6 +117,7 @@ beforeEach(() => {
   for (const key of Object.keys(mockSubscribers)) {
     delete mockSubscribers[key]
   }
+  mockUnsubscribes.length = 0
   mockSend.mockClear()
   mockDisconnect.mockClear()
   mockTapLight.mockClear()
@@ -291,4 +297,33 @@ test('9. NOT OPEN → click en Prev no envía ni vibra', () => {
   // Banner reconectando aparece (junto al subtítulo del header, por eso
   // usamos getAllByText: hay >=1 nodo con ese texto en pantalla).
   expect(screen.getAllByText(/Reconectando con el PC/i).length).toBeGreaterThan(0)
+})
+
+// ──────────────────────────────────────────────────────────────────────
+// 10. Unmount llama a TODAS las unsubscribes devueltas por subscribe()
+//    Regresión contra leaks de handlers cuando la screen se monta/desmonta
+//    en navegaciones de BottomNav.
+// ──────────────────────────────────────────────────────────────────────
+test('10. unmount → cleanup invoca cada unsubscribe registrada', () => {
+  const { unmount } = render(<ServiceScreen />)
+  // El componente subscribe a 3 eventos: PGM_UPDATE, pgm-update-theme,
+  // AUTH_ERROR. Cada uno devuelve su propia jest.fn() unsubscribe.
+  expect(mockUnsubscribes).toHaveLength(3)
+  for (const off of mockUnsubscribes) {
+    expect(off).not.toHaveBeenCalled()
+  }
+  unmount()
+  for (const off of mockUnsubscribes) {
+    expect(off).toHaveBeenCalledTimes(1)
+  }
+})
+
+// ──────────────────────────────────────────────────────────────────────
+// 11. pgm-update con type='blackout' → PgmPreview muestra "Blackout"
+// ──────────────────────────────────────────────────────────────────────
+test('11. pgm-update {type:"blackout"} → preview muestra "Blackout"', () => {
+  render(<ServiceScreen />)
+  emit('pgm-update', { type: 'blackout' })
+  expect(screen.getByText(/Blackout/i)).toBeTruthy()
+  expect(screen.queryByText(/Sin contenido proyectado/i)).toBeNull()
 })

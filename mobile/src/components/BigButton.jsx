@@ -32,6 +32,7 @@ export default function BigButton({
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
+      aria-disabled={(disabled || loading) || undefined}
       className={`w-full min-h-[56px] px-6 rounded-xl font-semibold text-base
                   transition active:scale-[0.98] disabled:opacity-50
                   disabled:active:scale-100 ${cls}`}

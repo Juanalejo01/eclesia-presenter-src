@@ -39,6 +39,7 @@ export default function CommandButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-disabled={disabled || undefined}
       className={`flex-1 min-h-[52px] px-3 rounded-lg border font-medium text-sm
                   transition active:scale-[0.97] disabled:opacity-40
                   disabled:active:scale-100 ${cls}`}
