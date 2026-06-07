@@ -149,20 +149,24 @@ export default function App() {
     // Confirmación de cierre de la app: el main process pide al renderer
     // que muestre el AppDialog custom (en lugar del dialog nativo Win11)
     // y luego responde con true/false para que main decida cerrar.
+    // try/catch defensivo: si dialogConfirm rechaza por algún motivo
+    // inesperado (boundary explota, store corrupto, etc.) igual mandamos
+    // respondQuitConfirm(false) para que el main no quede atrapado
+    // esperando con el timer en vuelo y el user no quede preso.
     const offQuit = window.electron?.app?.onRequestQuitConfirm?.(async () => {
-      const ok = await dialogConfirm({
-        title: 'Cerrar EclesiaPresenter',
-        message: '¿Seguro que quieres cerrar la aplicación?',
-        detail: 'Se cerrarán también las ventanas de proyección y overlay que estén abiertas.',
-        confirmLabel: 'Cerrar EclesiaPresenter',
-        cancelLabel: 'Cancelar',
-        variant: 'danger',
-      })
       try {
+        const ok = await dialogConfirm({
+          title: 'Cerrar EclesiaPresenter',
+          message: '¿Seguro que quieres cerrar la aplicación?',
+          detail: 'Se cerrarán también las ventanas de proyección y overlay que estén abiertas.',
+          confirmLabel: 'Cerrar EclesiaPresenter',
+          cancelLabel: 'Cancelar',
+          variant: 'danger',
+        })
         await window.electron.app.respondQuitConfirm(!!ok)
       } catch {
-        // Si la respuesta falla, no podemos hacer mucho — el usuario
-        // todavía puede pulsar el botón nativo de cerrar de la ventana.
+        // Defensa: si algo falla, respondemos false para no atrapar al main
+        try { await window.electron.app.respondQuitConfirm(false) } catch {}
       }
     })
 

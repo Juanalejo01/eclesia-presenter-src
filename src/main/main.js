@@ -76,7 +76,9 @@ const db = require('./database')
 const projection = require('./projection')
 const license = require('./license')
 const cloudSync = require('./cloudSync')
-const backgroundLibrary = require('./backgroundLibrary')
+// (backgroundLibrary eliminado en v0.2.14 — los vídeos de fondo viven
+// ahora en el apartado /recursos de la web, donde el usuario los descarga
+// manualmente y los usa como archivos normales vía MediaPicker.)
 const autoUpdater = require('./autoUpdater')
 
 // app.isPackaged es true cuando se ejecuta el .exe instalado, false en `npm run dev`.
@@ -163,14 +165,36 @@ function createMainWindow() {
   // otro IPC, decidir cerrar o cancelar. Si el renderer aún no está vivo
   // (caso edge — el close se dispara antes del did-finish-load) caemos al
   // dialog nativo como fallback para no dejar al usuario atrapado.
+  //
+  // Race que defendemos con el timeout: entre did-finish-load y el momento
+  // en que React monta el useEffect que registra onRequestQuitConfirm, el
+  // listener no existe. Si el user pulsa X en esa ventana, el send() se
+  // descarta silenciosamente y e.preventDefault() deja al user atrapado.
+  // Mismo problema si el renderer está freezed (loop infinito). Por eso si
+  // en 2s no llega respuesta del renderer, caemos al dialog nativo (NO
+  // _quitNow directo — seguimos pidiendo confirmación).
   mainWindow.on('close', (e) => {
     if (_isQuitting) return  // ya confirmado, dejar cerrar
     e.preventDefault()
-    if (mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-      mainWindow.webContents.send('app:request-quit-confirm')
-    } else {
-      _quitNow()
+
+    // Fallback si webContents está roto antes incluso de intentar el IPC
+    if (!mainWindow.webContents || mainWindow.webContents.isDestroyed()) {
+      return _confirmQuitNativeAndMaybeClose()
     }
+
+    // Si ya hay un request pendiente, no spamear más eventos. Cubre el
+    // doble-click rápido en X.
+    if (_pendingQuitTimer) return
+
+    mainWindow.webContents.send('app:request-quit-confirm')
+
+    // Guard: si el renderer no responde en 2s, asumimos que el listener
+    // no está montado (race con el splash/mount) o el renderer está freezed.
+    // Fallback al dialog nativo para no atrapar al usuario.
+    _pendingQuitTimer = setTimeout(() => {
+      _pendingQuitTimer = null
+      _confirmQuitNativeAndMaybeClose()
+    }, 2000)
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
@@ -186,9 +210,32 @@ function _quitNow() {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close()
 }
 
+// Helper: dialog nativo como fallback de emergencia. NO es el flujo
+// principal — solo cuando el renderer no responde (race del listener no
+// montado o webContents destruido). Seguimos pidiendo confirmación al
+// usuario para no cerrarle la app sin querer.
+function _confirmQuitNativeAndMaybeClose() {
+  if (!mainWindow || mainWindow.isDestroyed()) return _quitNow()
+  const choice = dialog.showMessageBoxSync(mainWindow, {
+    type: 'question',
+    buttons: ['Cancelar', 'Cerrar EclesiaPresenter'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+    title: 'Cerrar EclesiaPresenter',
+    message: '¿Seguro que quieres cerrar la aplicación?',
+    detail: 'Se cerrarán también las ventanas de proyección y overlay que estén abiertas.',
+  })
+  if (choice === 1) _quitNow()
+}
+
 // El renderer responde al request-quit-confirm con true/false. Registrado
 // UNA sola vez (fuera de createMainWindow) para no acumular handlers.
 ipcMain.handle('app:respond-quit-confirm', (_e, ok) => {
+  if (_pendingQuitTimer) {
+    clearTimeout(_pendingQuitTimer)
+    _pendingQuitTimer = null
+  }
   if (ok === true) _quitNow()
   // si ok=false, no hacemos nada — la ventana se queda abierta
 })
@@ -196,6 +243,10 @@ ipcMain.handle('app:respond-quit-confirm', (_e, ok) => {
 // Flag para distinguir el cierre confirmado del primer intento (que muestra
 // el diálogo). También lo activan before-quit / window-all-closed.
 let _isQuitting = false
+
+// Timer del fallback "renderer no responde". Si es no-null hay un request
+// en vuelo y los siguientes intentos de close se ignoran (anti-spam X).
+let _pendingQuitTimer = null
 
 // Server local: se inicializa en app.whenReady. Lo guardamos en closure para
 // poder llamar a pushSlide / onRemoteEvent desde los handlers IPC.
@@ -235,13 +286,6 @@ ipcMain.handle('cloud-sync:setEnabled',(_e, on)  => cloudSync.setEnabled(on))
 ipcMain.handle('cloud-sync:syncNow',   ()        => cloudSync.syncOnce())
 
 // IPC: biblioteca de fondos preset (catálogo + descargas)
-ipcMain.handle('bglib:state',          ()        => backgroundLibrary.getState())
-ipcMain.handle('bglib:refresh',        ()        => backgroundLibrary.fetchCatalog({ force: true }))
-ipcMain.handle('bglib:download',       (_e, id)  => backgroundLibrary.downloadItem(id))
-ipcMain.handle('bglib:cancel',         (_e, id)  => backgroundLibrary.cancelDownload(id))
-ipcMain.handle('bglib:delete',         (_e, id)  => backgroundLibrary.deleteLocal(id))
-ipcMain.handle('bglib:localPath',      (_e, id)  => backgroundLibrary.localPath(id))
-ipcMain.handle('bglib:setStorageDir',  (_e, dir) => { backgroundLibrary.setStorageDir(dir); return { ok: true } })
 
 // IPC: proyección externa (overlay/background sin red, capturable por OBS)
 ipcMain.handle('projection:open',  (_e, opts)   => projection.openProjection(opts))
@@ -707,18 +751,23 @@ app.whenReady().then(() => {
     callback({ path: safePath })
   })
 
-  // Protocolo preset://<id>.mp4 → resuelve via backgroundLibrary.localPath().
-  // VALIDACIÓN: el id solo puede contener caracteres seguros (alfanuméricos,
-  // guiones, underscores). Cualquier otro carácter → reject.
+  // Protocolo preset://<id>.mp4 — compatibilidad con temas guardados antes
+  // de v0.2.14. La biblioteca interna de descargas se eliminó (los vídeos
+  // viven ahora en /recursos en la web), pero los archivos que el usuario
+  // ya bajó en versiones anteriores siguen en disco y este resolver les
+  // permite seguir funcionando. Si no existe, el <video> simplemente fallará
+  // y el usuario verá un fondo negro — entonces puede elegir otro fondo.
+  // VALIDACIÓN: el id solo puede contener caracteres seguros.
   protocol.registerFileProtocol('preset', (request, callback) => {
     const fileName = decodeURI(request.url.replace(/^preset:\/\//, ''))
     const id = fileName.replace(/\.mp4$/, '')
-    // ID debe ser seguro — sin / ni .. ni caracteres exóticos
     if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
       console.warn('[security] preset id inválido:', id)
       return callback({ error: -10 })
     }
-    const fullPath = backgroundLibrary.localPath(id)
+    // Sólo carpeta histórica (preset-backgrounds en userData) — no buscamos
+    // en la carpeta custom de videos porque ya no la sincronizamos aquí.
+    const fullPath = path.join(app.getPath('userData'), 'preset-backgrounds', `${id}.mp4`)
     callback({ path: fullPath })
   })
 
@@ -741,7 +790,6 @@ app.whenReady().then(() => {
   createMainWindow()
   // Una vez la ventana existe, dar a los servicios una referencia para emitir eventos
   cloudSync.setMainWindow(mainWindow)
-  backgroundLibrary.setMainWindow(mainWindow)
   autoUpdater.setMainWindow(mainWindow)
   projection.setMainWindow(mainWindow)
   autoUpdater.init()  // arranca check inicial 30s después
