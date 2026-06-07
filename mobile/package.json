@@ -15,9 +15,18 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["<rootDir>/__tests__/**/*.test.js"],
+    "testMatch": [
+      "<rootDir>/__tests__/**/*.test.js"
+    ],
     "transform": {
-      "^.+\\.jsx?$": ["babel-jest", { "presets": ["@babel/preset-env"] }]
+      "^.+\\.jsx?$": [
+        "babel-jest",
+        {
+          "presets": [
+            "@babel/preset-env"
+          ]
+        }
+      ]
     },
     "moduleNameMapper": {
       "^@capacitor/preferences$": "<rootDir>/__tests__/__mocks__/capacitor-preferences.js"
@@ -30,6 +39,7 @@
     "@capacitor/haptics": "^6.0.1",
     "@capacitor/preferences": "^6.0.2",
     "@capacitor/status-bar": "^6.0.1",
+    "jsqr": "^1.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0"
