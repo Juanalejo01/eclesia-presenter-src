@@ -8,10 +8,9 @@
  * justo debajo.
  *
  * Cableado al transport:
- *   - `pgm-update` → estado local `slide`, renderiza PgmPreview.
- *   - `pgm-update-theme` → guarda `serverVersion` para mostrarlo en el
- *     subtítulo del header. Lo emite el server en el handshake y cuando
- *     cambia el tema.
+ *   - `usePgmState` (T6) suscribe a `pgm-update` y `pgm-update-theme` y
+ *     devuelve `{ slide, theme, serverVersion }`. PgmPreview pinta el
+ *     slide con el tema real del PC.
  *   - `auth-error` → disconnect + nav /pair (guarded por mountedRef).
  *
  * Estados visuales:
@@ -25,7 +24,7 @@
  * en el monitor. Mejor que vea que no puede operar y reaccione (mire
  * la WiFi, abra Ajustes → Transmisión, etc.).
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../components/BigButton.jsx'
 import CommandButton from '../components/CommandButton.jsx'
@@ -33,76 +32,35 @@ import StatusPill from '../components/StatusPill.jsx'
 import PgmPreview from '../components/PgmPreview.jsx'
 import { transport, ClientCommand, ServerEvent } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
+import { usePgmState } from '../hooks/usePgmState.js'
 import { tapLight, tapMedium } from '../services/haptics.js'
-
-// Logger DEV-only para eventos de alta frecuencia (pgm-update). Vite
-// expone `import.meta.env.DEV`; en Jest CJS `import.meta` es un error
-// de parseo (no de runtime), así que NO podemos escribir `import.meta`
-// literalmente. Lo accedemos via `new Function` que sólo se evalúa una
-// vez al cargar el módulo en un entorno que soporte ESM. En Jest la
-// función lanza al construirse o al ejecutarse y `_isDev` cae a false.
-const _isDev = (() => {
-  try {
-    // eslint-disable-next-line no-new-func
-    const env = new Function('try { return import.meta.env } catch { return undefined }')()
-    return !!(env && env.DEV)
-  } catch {
-    return false
-  }
-})()
-
-function _debug(...args) {
-  if (_isDev) console.log(...args)
-}
 
 export default function ServiceScreen() {
   const nav = useNavigate()
   const { isConnected, isConnecting } = useConnection()
-  const [slide, setSlide] = useState(null)
-  const [serverVersion, setServerVersion] = useState(null)
-  // Flag para evitar setState/nav después del unmount: si el server
-  // emite AUTH_ERROR justo cuando la screen ya está desmontándose,
-  // queremos que el handler sea no-op en vez de tocar React/router.
+  // T6: slide + theme + serverVersion centralizados en usePgmState.
+  // Mantiene esta screen enfocada en UX (botones, layout, navegación);
+  // si en T11 hace falta el slide en otra parte se promueve a Context.
+  const { slide, theme, serverVersion } = usePgmState()
+  // Flag para evitar nav después del unmount: si el server emite
+  // AUTH_ERROR justo cuando la screen ya está desmontándose, queremos
+  // que el handler sea no-op en vez de tocar el router.
   const mountedRef = useRef(true)
 
-  // Suscripciones a eventos del server. Cada subscribe devuelve su
-  // unsubscribe — los limpiamos en cleanup para no acumular handlers
-  // si la screen se monta y desmonta varias veces (p.ej. navegando
-  // por la BottomNav).
-  //
-  // El handler de AUTH_ERROR llama a `transport.disconnect()` y navega
-  // directamente. Es seguro hacerlo dentro del callback del subscribe
-  // porque `disconnect()` NO muta `_eventSubs` (sólo invalida
-  // `_connectGeneration`, para el heartbeat y cierra el socket); el
-  // dispatcher de eventos sigue iterando el Set actual sin riesgo.
+  // Suscripción a AUTH_ERROR — el resto (PGM_UPDATE, pgm-update-theme)
+  // las gestiona usePgmState. Aquí solo navegamos a /pair si el server
+  // expulsa el token.
   useEffect(() => {
     mountedRef.current = true
-    const offs = [
-      transport.subscribe(ServerEvent.PGM_UPDATE, (payload) => {
-        _debug('[service] pgm-update', payload?.text?.slice(0, 40))
-        setSlide(payload || null)
-      }),
-      // El server emite `pgm-update-theme` en el handshake y al cambiar
-      // el tema. Sólo nos interesa la versión por ahora. Lo suscribimos
-      // por literal porque T2 no lo expuso en ServerEvent (es un evento
-      // de tema-de-presentación, no de slide en vivo).
-      transport.subscribe('pgm-update-theme', (payload) => {
-        if (payload && typeof payload.version === 'string') {
-          setServerVersion(payload.version)
-        }
-      }),
-      transport.subscribe(ServerEvent.AUTH_ERROR, () => {
-        if (!mountedRef.current) return
-        console.warn('[service] auth-error → desconectando + nav /pair')
-        transport.disconnect()
-        nav('/pair', { replace: true })
-      }),
-    ]
+    const offAuth = transport.subscribe(ServerEvent.AUTH_ERROR, () => {
+      if (!mountedRef.current) return
+      console.warn('[service] auth-error → desconectando + nav /pair')
+      transport.disconnect()
+      nav('/pair', { replace: true })
+    })
     return () => {
       mountedRef.current = false
-      for (const off of offs) {
-        try { off() } catch { /* ignore */ }
-      }
+      try { offAuth() } catch { /* ignore */ }
     }
   }, [nav])
 
@@ -155,8 +113,8 @@ export default function ServiceScreen() {
         <StatusPill />
       </header>
 
-      {/* PGM preview */}
-      <PgmPreview slide={slide} />
+      {/* PGM preview — renderer fiel al PC con theme del server */}
+      <PgmPreview slide={slide} theme={theme} />
 
       {/* Banner reconectando / offline */}
       {!isConnected && (
