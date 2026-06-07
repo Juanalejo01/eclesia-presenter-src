@@ -18,11 +18,21 @@ import jsQR from 'jsqr'
  * Props:
  *   onScan(text)  — callback con el contenido del QR. Solo se llama UNA VEZ
  *                   por vida del componente; reactivar el scanner pasa por
- *                   desmontarlo o togglear `active`.
+ *                   desmontarlo (recomendado: cambiar `key` desde el padre)
+ *                   o togglear `active`.
  *   onError(err)  — si la cámara falla (permiso denegado, no hay cámara…)
  *   active        — bool. Si false, libera la cámara y deja de scanear.
  *                   Útil para apagar el scanner mientras hay un dialog,
  *                   el pareo está en vuelo, etc.
+ *
+ * Notas internas:
+ *   - `onScan` y `onError` se guardan en refs para que cambiar su
+ *     identidad (cosa habitual en React si el padre no memoiza) NO
+ *     re-ejecute el efecto que abre la cámara. El único disparador del
+ *     ciclo de vida del stream es `active`.
+ *   - Tras `await video.play()` re-chequeamos `cancelled` para no dejar
+ *     un stream zombi si el componente se desmontó o pasó a active=false
+ *     mientras el play estaba pendiente.
  */
 export default function QrScanner({ onScan, onError, active = true }) {
   const videoRef = useRef(null)
@@ -30,7 +40,14 @@ export default function QrScanner({ onScan, onError, active = true }) {
   const rafRef = useRef(null)
   const streamRef = useRef(null)
   const scannedRef = useRef(false)
+  const onScanRef = useRef(onScan)
+  const onErrorRef = useRef(onError)
   const [status, setStatus] = useState('idle')  // idle | requesting | scanning | error
+
+  // Refs siempre apuntando a la última versión del callback. Permite que
+  // el padre pase funciones inline sin reabrir la cámara en cada render.
+  useEffect(() => { onScanRef.current = onScan }, [onScan])
+  useEffect(() => { onErrorRef.current = onError }, [onError])
 
   useEffect(() => {
     if (!active) {
@@ -72,12 +89,21 @@ export default function QrScanner({ onScan, onError, active = true }) {
         video.srcObject = stream
         video.setAttribute('playsinline', 'true')
         await video.play()
+        // Re-chequear cancelación tras el await: el unmount o un toggle
+        // a active=false pudo ocurrir mientras el play estaba pendiente.
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          try { video.srcObject = null } catch { /* ignore */ }
+          streamRef.current = null
+          return
+        }
         setStatus('scanning')
         loop()
       } catch (e) {
         if (!cancelled) {
           setStatus('error')
-          onError?.(e)
+          console.warn('[qr-scanner] cámara falló:', e?.message || e)
+          onErrorRef.current?.(e)
         }
       }
     })()
@@ -100,7 +126,7 @@ export default function QrScanner({ onScan, onError, active = true }) {
           })
           if (code?.data && !scannedRef.current) {
             scannedRef.current = true
-            onScan?.(code.data)
+            onScanRef.current?.(code.data)
             return  // No seguir loop: el componente decidirá si rearmar
           }
         }
@@ -127,7 +153,7 @@ export default function QrScanner({ onScan, onError, active = true }) {
       cancelled = true
       _releaseStream()
     }
-  }, [active, onScan, onError])
+  }, [active])
 
   return (
     <div className="relative w-full aspect-square overflow-hidden rounded-xl bg-bg-3 border border-line-1">

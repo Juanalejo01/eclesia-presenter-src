@@ -214,3 +214,39 @@ test('8. Status 500 con json → PairingError(unknown)', async () => {
     pairWithDesktop({ url: 'http://1.2.3.4:3434', pin: '123456' }),
   ).rejects.toMatchObject({ code: 'unknown' })
 })
+
+test('9. fetch AbortError (timeout 10s) → PairingError(no_alcanzable)', async () => {
+  // Simulamos lo que el browser lanza cuando AbortController.abort() dispara
+  // mientras un fetch está pendiente: una DOMException con name='AbortError'.
+  global.fetch = jest.fn(() => {
+    const err = new Error('The operation was aborted.')
+    err.name = 'AbortError'
+    return Promise.reject(err)
+  })
+  await expect(
+    pairWithDesktop({ url: 'http://1.2.3.4:3434', pin: '123456' }),
+  ).rejects.toMatchObject({
+    code: 'no_alcanzable',
+    message: expect.stringMatching(/demasiado en responder/i),
+  })
+})
+
+test('9b. fetch recibe AbortSignal (verifica wiring del timeout)', async () => {
+  // Garantía estructural: el fetch DEBE recibir un `signal` para que el
+  // timeout pueda cancelarlo. Si alguien borra el wiring por accidente,
+  // este test falla.
+  mockFetchOnce(
+    makeRes({
+      status: 200,
+      json: {
+        ok: true,
+        token: 't',
+        serverInfo: { version: '1', wsUrl: 'ws://x' },
+      },
+    }),
+  )
+  await pairWithDesktop({ url: 'http://1.2.3.4:3434', pin: '123456' })
+  const callArgs = global.fetch.mock.calls[0][1]
+  expect(callArgs.signal).toBeDefined()
+  expect(typeof callArgs.signal.aborted).toBe('boolean')
+})

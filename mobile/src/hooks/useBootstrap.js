@@ -29,9 +29,10 @@ export function useBootstrap() {
       let hasCreds = false
       try {
         hasCreds = await transport.restore()
-      } catch {
+      } catch (e) {
         // restore() jamás debería lanzar (catchea internamente), pero
         // si lo hace caemos al estado "sin credenciales" sin romper.
+        console.warn('[bootstrap] restore failed:', e?.message || e)
       }
       if (!cancelled) {
         setState({ ready: true, hasCredentials: !!hasCreds })

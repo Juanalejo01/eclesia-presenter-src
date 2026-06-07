@@ -84,18 +84,33 @@ export async function pairWithDesktop({ url, pin, deviceName }) {
     deviceName: deviceName || _detectDeviceName(),
   })
 
+  // Timeout duro de 10s para que el usuario vea "no_alcanzable" en vez
+  // de quedarse pegado en "Emparejando…" indefinido si el server cuelga.
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10_000)
   let res
   try {
     res = await fetch(`${baseUrl}/api/pair`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body,
+      signal: controller.signal,
     })
   } catch (e) {
+    if (e?.name === 'AbortError') {
+      console.warn('[pairing] timeout 10s sin respuesta del server')
+      throw new PairingError(
+        'no_alcanzable',
+        'El servidor tardó demasiado en responder. ¿IP correcta?',
+      )
+    }
+    console.warn('[pairing] fetch falló:', e?.message || e)
     throw new PairingError(
       'no_alcanzable',
       e?.message || 'No se pudo conectar al servidor',
     )
+  } finally {
+    clearTimeout(timeoutId)
   }
 
   let json

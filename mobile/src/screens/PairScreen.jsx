@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import QrScanner from '../components/QrScanner.jsx'
 import BigButton from '../components/BigButton.jsx'
@@ -33,8 +33,19 @@ export default function PairScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [scannerActive, setScannerActive] = useState(true)
+  // scanAttempt incrementa cada vez que necesitamos remontar el QrScanner
+  // (tras un QR inválido o un pairing fallido). React 18 batchea setState
+  // del mismo tick: si solo togglearamos `scannerActive` de false→true,
+  // el useEffect del scanner no se re-ejecutaría y `scannedRef` quedaría
+  // a true para siempre, dejando el scanner mudo. El cambio de `key`
+  // fuerza unmount+mount → estado interno limpio.
+  const [scanAttempt, setScanAttempt] = useState(0)
+  // Guard contra double-tap del submit y simultáneos QR-scan + manual.
+  const inFlightRef = useRef(false)
 
   async function handlePair({ url, pin }) {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     setLoading(true)
     setError(null)
     try {
@@ -45,11 +56,14 @@ export default function PairScreen() {
       if (e instanceof PairingError) {
         setError(_humanError(e))
       } else {
+        console.warn('[pairing] error inesperado:', e?.message || e)
         setError({ message: 'Error inesperado. Intenta de nuevo.' })
       }
-      // Re-armar el scanner para permitir un nuevo intento
+      // Re-armar el scanner y forzar remount para permitir un nuevo intento
       setScannerActive(true)
+      setScanAttempt((n) => n + 1)
     } finally {
+      inFlightRef.current = false
       setLoading(false)
     }
   }
@@ -78,6 +92,7 @@ export default function PairScreen() {
         message: 'QR no válido. Usa el modo manual o vuelve a intentar.',
       })
       setScannerActive(true)
+      setScanAttempt((n) => n + 1)
     }
   }
 
@@ -85,7 +100,12 @@ export default function PairScreen() {
     if (loading || m === mode) return
     setError(null)
     setMode(m)
-    if (m === 'qr') setScannerActive(true)
+    if (m === 'qr') {
+      // Volvemos a modo QR: scanner limpio (clave nueva → estado interno
+      // del componente reseteado independientemente de scannerActive).
+      setScannerActive(true)
+      setScanAttempt((n) => n + 1)
+    }
   }
 
   const manualDisabled = loading || !url.trim() || pin.length !== 6
@@ -109,6 +129,7 @@ export default function PairScreen() {
             key={m}
             onClick={() => onModeChange(m)}
             disabled={loading}
+            aria-pressed={mode === m}
             className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition ${
               mode === m
                 ? 'bg-copper-300 text-bg-1'
@@ -124,6 +145,7 @@ export default function PairScreen() {
       {mode === 'qr' && (
         <div className="space-y-4">
           <QrScanner
+            key={scanAttempt}
             active={scannerActive && !loading}
             onScan={onQrScan}
             onError={(e) =>
