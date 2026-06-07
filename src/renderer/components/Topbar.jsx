@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LogoMonogram, IconSettings } from './Icons.jsx'
 import { useT } from '../services/i18n.js'
+import UpdateButton from './UpdateButton.jsx'
 
 export default function Topbar({ onSettingsChange, onOpenSettings }) {
   const t = useT()
@@ -67,6 +68,7 @@ export default function Topbar({ onSettingsChange, onOpenSettings }) {
         </div>
 
         <div className="header-actions" style={noDragStyle}>
+          <UpdateButton />
           <button className="btn" onClick={() => onOpenSettings?.()} title={t('topbar.settings') + ' (Ctrl+A)'}>
             <IconSettings size={14} /> {t('topbar.settings')}
           </button>

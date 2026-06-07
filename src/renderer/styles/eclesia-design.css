@@ -382,6 +382,461 @@ input, textarea, select { font-family: inherit; color: inherit; }
 .ws-sub { font-size: 12px; color: var(--text-3); margin-top: 6px; letter-spacing: 0.01em; }
 .ws-body { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 28px 32px; }
 
+/* ============================================================
+   EDITOR (Panel Edición — Canva/Procreate-style layout)
+   ============================================================ */
+
+/* Layout 2 columnas: canvas (izq) | propiedades (der).
+   Panel a 400px para que sliders + segmented controls de 5 opciones
+   quepan sin truncamiento de labels ni overflow de sliders. */
+.editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 1366px) {
+  .editor-grid { grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; }
+}
+@media (max-width: 1200px) {
+  .editor-grid { grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; }
+}
+
+/* === Tabs del editor (cinta superior) === */
+.editor-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-md);
+  margin-bottom: 18px;
+  width: max-content;
+}
+.editor-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px;          /* +2px alto/lado → tap target 40px */
+  min-height: 40px;
+  border: 0; background: transparent;
+  color: var(--text-3);
+  font-size: 13px; font-weight: 500;
+  border-radius: calc(var(--r-md) - 4px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.editor-tab:hover { color: var(--text-2); background: var(--bg-2); }
+.editor-tab.active {
+  background: linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
+  color: var(--copper-100);
+  box-shadow: inset 0 0 0 1px rgba(232, 181, 145, 0.18);
+}
+
+/* === Canvas (columna izquierda) === */
+.editor-canvas-col {
+  display: flex; flex-direction: column; gap: 18px;
+  min-width: 0;
+}
+.editor-canvas-wrap {
+  position: relative;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-1);
+}
+.editor-canvas-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #000;
+  /* Tablero ajedrez sutil detrás (solo se ve si el slide es transparente) */
+  background-image:
+    linear-gradient(45deg, #1a1410 25%, transparent 25%),
+    linear-gradient(-45deg, #1a1410 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1a1410 75%),
+    linear-gradient(-45deg, transparent 75%, #1a1410 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-color: #0e0a08;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(232, 181, 145, 0.12);
+}
+.editor-canvas-caption {
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  text-align: center;
+}
+
+/* === Presets row === */
+.editor-presets {
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+}
+.editor-presets-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.editor-presets-title {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 600;
+  color: var(--text-2); letter-spacing: 0.04em; text-transform: uppercase;
+}
+.editor-presets-sub {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-3);
+  letter-spacing: 0.06em;
+}
+.editor-presets-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px;
+}
+.editor-preset {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 0;
+  transition: all 0.18s ease;
+  box-shadow: var(--shadow-1);
+}
+/* Capa oscura inferior para garantizar contraste del label sobre presets
+   claros (Mármol cobre, Vitral con dorados). WCAG AA exige 4.5:1 a 11px. */
+.editor-preset::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 24px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+  pointer-events: none;
+  z-index: 1;
+}
+.editor-preset:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(232, 181, 145, 0.30);
+}
+.editor-preset.active {
+  border-color: var(--copper-200);
+  box-shadow: 0 0 0 2px rgba(232, 181, 145, 0.32), 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.editor-preset-aa {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px; font-weight: 600;
+  color: #fff; line-height: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  position: relative; z-index: 2;
+}
+.editor-preset-label {
+  position: absolute;
+  bottom: 4px; left: 0; right: 0;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  color: #ffffff;
+  text-align: center;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 0 4px;
+  z-index: 2;
+}
+
+/* === User presets — wrap con acciones (rename/delete) al hover === */
+.editor-user-preset-wrap {
+  position: relative;
+  display: contents;     /* el botón hijo participa directamente del grid */
+}
+.editor-user-preset-wrap .editor-preset { width: 100%; }
+.editor-user-preset-wrap .editor-user-preset-actions {
+  position: absolute;
+  top: 4px; right: 4px;
+  display: flex; gap: 3px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 3;
+}
+.editor-user-preset-wrap:hover .editor-user-preset-actions,
+.editor-user-preset-wrap:focus-within .editor-user-preset-actions {
+  opacity: 1;
+}
+.editor-user-preset-act {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(20, 16, 13, 0.85);
+  color: #fff;
+  font-size: 12px; line-height: 1;
+  cursor: pointer;
+  display: grid; place-items: center;
+  backdrop-filter: blur(6px);
+  transition: all 0.12s ease;
+}
+.editor-user-preset-act:hover { background: rgba(40, 28, 20, 0.95); border-color: rgba(232,181,145,0.45); }
+.editor-user-preset-act.delete:hover { background: rgba(196, 52, 52, 0.95); border-color: rgba(255, 90, 90, 0.6); }
+
+/* === Botón "+" Guardar preset === */
+.editor-preset.editor-preset-add {
+  background: var(--bg-1) !important;
+  border: 1px dashed var(--line-2);
+  box-shadow: none;
+  color: var(--text-3);
+}
+.editor-preset.editor-preset-add::after { display: none; }    /* sin gradient overlay */
+.editor-preset.editor-preset-add:hover {
+  border-color: var(--copper-200);
+  background: var(--bg-2) !important;
+  color: var(--copper-100);
+}
+.editor-preset-plus {
+  font-size: 28px; font-weight: 300; line-height: 1;
+  color: currentColor;
+}
+.editor-preset.editor-preset-add .editor-preset-label {
+  color: currentColor;
+  text-shadow: none;
+}
+
+/* === Property panel (columna derecha) === */
+.editor-prop-panel {
+  position: sticky; top: 0;
+  display: flex; flex-direction: column;
+  gap: 8px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-lg);
+  padding: 8px;
+  /* Altura controlada para que tenga scroll propio sin pelearse con .ws-body */
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+/* === Property Section (accordion) === */
+.prop-section {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  /* CRÍTICO: sin flex-shrink:0, cuando varias secciones se abren a la vez,
+     flex repartía el espacio y comprimía cada sección, escondiendo los
+     controles inferiores (BANDA mostraba solo 3 filas en vez de 10). */
+  flex-shrink: 0;
+}
+/* Sliders e inputs no deben desbordar su cell del grid 1fr 1fr */
+.prop-section .slider, .prop-section .select { min-width: 0; max-width: 100%; }
+.prop-section input[type="range"] { min-width: 0; width: 100%; box-sizing: border-box; }
+.prop-section .input-wrap { min-width: 0; }
+.prop-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 13px 14px;     /* +4px → tap target 40px */
+  min-height: 40px;
+  background: transparent; border: 0; cursor: pointer;
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  transition: background 0.15s ease;
+}
+.prop-section-header:hover { background: var(--bg-3); }
+.prop-section-title { display: inline-flex; align-items: center; gap: 8px; }
+.prop-section-icon { color: var(--copper-200); display: inline-flex; }
+.prop-section-right { display: inline-flex; align-items: center; gap: 10px; }
+.prop-section-sub {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.08em; text-transform: none;
+}
+.prop-section-chev {
+  color: var(--text-3); display: inline-flex;
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+}
+.prop-section-chev.open { transform: rotate(0deg); }
+/* Body de la sección plegable.
+   Técnica grid-template-rows: 0fr → 1fr — anima a la altura REAL del contenido
+   sin cap fijo de max-height (que truncaría contenidos muy altos como
+   Tipografía con select de fuentes + Banda con bgEnabled y borde activados). */
+.prop-section-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
+}
+.prop-section-body.open { grid-template-rows: 1fr; }
+.prop-section-body > .prop-section-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.prop-section-body-inner {
+  padding: 0 14px;       /* sin padding vertical cuando está cerrada para que mida 0 limpio */
+  border-top: 1px solid transparent;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  transition: padding 0.22s ease, border-color 0.22s ease;
+}
+.prop-section-body.open > .prop-section-body-inner {
+  padding: 14px 14px 16px;
+  border-top-color: var(--line-1);
+}
+/* Algunos campos ocupan toda la fila — usamos la utility span-2 */
+.prop-section .field.span-2 { grid-column: span 2; }
+
+/* === Header del panel: acciones rápidas === */
+.editor-header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.editor-reset-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 14px; font-size: 12px;       /* +2px tap target → 36px */
+  min-height: 36px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--text-2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.editor-reset-btn:hover { background: var(--bg-2); color: var(--copper-200); border-color: var(--copper-300); }
+
+/* === FontPicker (custom dropdown con preview + virtual scroll) === */
+.font-picker { position: relative; width: 100%; }
+.font-picker-trigger {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; min-height: 40px;
+  padding: 8px 12px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-md);
+  color: var(--text-1);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.font-picker-trigger:hover { border-color: var(--line-2); background: var(--bg-2); }
+.font-picker-trigger:focus-visible {
+  outline: 2px solid var(--copper-200);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(232, 181, 145, 0.22);
+}
+.font-picker-current {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: left;
+}
+.font-picker-chev {
+  color: var(--text-3); font-size: 14px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.font-picker-popover {
+  position: absolute; left: 0; right: 0;
+  top: calc(100% + 4px);
+  z-index: 100;
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.font-picker-search {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-2);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  outline: none;
+}
+.font-picker-search::placeholder { color: var(--text-3); }
+.font-picker-list {
+  overflow-y: auto;
+}
+.font-picker-empty {
+  padding: 20px; text-align: center;
+  color: var(--text-3); font-size: 12px; font-style: italic;
+}
+.font-picker-option {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 6px 12px;
+  border: 0; background: transparent;
+  color: var(--text-1);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  border-left: 2px solid transparent;
+  text-align: left;
+}
+.font-picker-option:hover { background: var(--bg-3); }
+.font-picker-option.active {
+  background: linear-gradient(180deg, rgba(168,95,51,0.22), rgba(128,64,18,0.10));
+  border-left-color: var(--copper-200);
+  color: var(--copper-100);
+}
+.font-picker-option:focus-visible {
+  outline: none;
+  background: var(--bg-3);
+  box-shadow: inset 0 0 0 2px var(--copper-200);
+}
+.font-picker-option-name {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.font-picker-option-sample {
+  color: var(--text-3);
+  font-size: 16px;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+.font-picker-option-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+.font-picker-footer {
+  padding: 6px 12px;
+  border-top: 1px solid var(--line-1);
+  background: var(--bg-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 0.06em;
+}
+
+/* ============================================================
+   FOCUS-VISIBLE — accesibilidad por teclado para todo el editor
+   WCAG 2.1 SC 2.4.7 (Focus Visible, A). Operador con teclado en
+   medio de un culto necesita ver dónde está. Outline cobre + halo.
+   ============================================================ */
+.editor-tab:focus-visible,
+.prop-section-header:focus-visible,
+.editor-preset:focus-visible,
+.editor-reset-btn:focus-visible {
+  outline: 2px solid var(--copper-200);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(232, 181, 145, 0.22);
+}
+/* Inputs nativos del editor con focus-visible coherente */
+.editor-prop-panel .select:focus-visible,
+.editor-prop-panel .slider:focus-visible,
+.editor-prop-panel input[type="color"]:focus-visible,
+.editor-prop-panel input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--copper-200);
+  outline-offset: 2px;
+}
+
+
 /* Cards */
 .card {
   background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
@@ -851,6 +1306,111 @@ textarea.field-input {
   transition: box-shadow 0.15s;
 }
 .slider::-webkit-slider-thumb:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 0 0 4px rgba(200, 121, 74, 0.2); }
+
+/* ===================================================================
+   Update button (Topbar) — botón persistente de "Actualizar EclesiaPresenter"
+   que aparece a la izquierda de Ajustes cuando hay update detectada.
+   Estados: available / downloading / downloaded / error (con tooltip).
+   =================================================================== */
+.btn-update {
+  position: relative; overflow: hidden;
+  height: 32px; padding: 0 12px; border-radius: var(--r-md);
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 600;
+  letter-spacing: 0.005em; white-space: nowrap; cursor: pointer;
+  text-decoration: none;
+  transition: all 0.18s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.btn-update .btn-update-icon {
+  font-size: 13px; line-height: 1; display: inline-block;
+  transform: translateY(-0.5px);
+}
+.btn-update .btn-update-warn {
+  display: inline-grid; place-items: center;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(0,0,0,0.25); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 1;
+  margin-left: 2px;
+}
+
+/* Estado 1 — available (cobre primario) */
+.btn-update-available {
+  color: #1a0e08;
+  background: linear-gradient(180deg, var(--copper-200) 0%, var(--copper-300) 100%);
+  border: 1px solid rgba(0,0,0,0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.4), inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 4px 12px rgba(168, 95, 51, 0.35), 0 0 0 1px rgba(200, 121, 74, 0.4);
+}
+.btn-update-available:hover {
+  background: linear-gradient(180deg, var(--copper-100) 0%, var(--copper-200) 100%);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.5), inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 6px 16px rgba(168, 95, 51, 0.5), 0 0 0 1px rgba(232, 181, 145, 0.5);
+}
+.btn-update-available:active { transform: translateY(0); }
+
+/* Estado 2 — downloading (cobre con barra de progreso superpuesta) */
+.btn-update-downloading {
+  color: #1a0e08;
+  background: linear-gradient(180deg, var(--copper-300) 0%, var(--copper-400) 100%);
+  border: 1px solid rgba(0,0,0,0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.25), inset 0 -1px 0 rgba(0,0,0,0.2),
+    0 2px 8px rgba(168, 95, 51, 0.25);
+  cursor: default;
+  opacity: 0.95;
+}
+.btn-update-downloading .btn-update-progress {
+  position: absolute; inset: 0 auto 0 0;
+  background: linear-gradient(180deg, var(--copper-100) 0%, var(--copper-200) 100%);
+  opacity: 0.45; pointer-events: none;
+  transition: width 0.25s ease;
+}
+.btn-update-downloading .btn-update-label {
+  position: relative; z-index: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Estado 3 — downloaded (verde "ready") */
+.btn-update-ready {
+  color: #0a1a10;
+  background: linear-gradient(180deg, var(--ready) 0%, #4eb371 100%);
+  border: 1px solid rgba(0,0,0,0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 4px 12px rgba(78, 179, 113, 0.4), 0 0 0 1px rgba(107, 207, 142, 0.45);
+}
+.btn-update-ready:hover {
+  background: linear-gradient(180deg, #8be0a8 0%, var(--ready) 100%);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 6px 16px rgba(78, 179, 113, 0.55), 0 0 0 1px rgba(139, 224, 168, 0.55);
+}
+.btn-update-ready:active { transform: translateY(0); }
+
+/* Estado 4 — error (mismo cobre, indicador "!" en la esquina) */
+.btn-update.has-error {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.4), inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 4px 12px rgba(168, 95, 51, 0.35),
+    0 0 0 1px rgba(255, 138, 138, 0.55);
+}
+
+/* Pulse sutil al aparecer (solo los primeros ~8s, luego se queda quieto). */
+.pulse-on-mount {
+  animation: update-pulse 1.6s ease-in-out 0s 5;
+}
+@keyframes update-pulse {
+  0%, 100% { box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.4), inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 4px 12px rgba(168, 95, 51, 0.35), 0 0 0 1px rgba(200, 121, 74, 0.4); }
+  50% { box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.5), inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 6px 22px rgba(232, 181, 145, 0.7), 0 0 0 3px rgba(232, 181, 145, 0.25); }
+}
 
 /* Projection preview */
 .projection-preview {
