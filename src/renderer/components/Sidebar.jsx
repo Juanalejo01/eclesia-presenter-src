@@ -1,5 +1,5 @@
 import {
-  IconBible, IconMusic, IconList, IconProjector,
+  IconBible, IconMusic, IconList, IconEdit,
   IconImage, IconVideo, IconType, IconBroadcast, IconTools,
 } from './Icons.jsx'
 import { useT } from '../services/i18n.js'
@@ -15,7 +15,7 @@ const NAV = [
   { id: 'video',       i18nKey: 'nav.video',       Icon: IconVideo,                shortcut: '5' },
   { id: 'text',        i18nKey: 'nav.text',        Icon: IconType,                 shortcut: '6' },
   { id: 'tools',       label: 'Herramientas',      Icon: IconTools,                shortcut: 'T' },
-  { id: 'projection',  i18nKey: 'nav.projection',  Icon: IconProjector,            shortcut: '7' },
+  { id: 'projection',  i18nKey: 'nav.projection',  Icon: IconEdit,                 shortcut: '7' },
   { id: 'transmision', i18nKey: 'nav.transmision', Icon: IconBroadcast,            shortcut: '8' },
 ]
 

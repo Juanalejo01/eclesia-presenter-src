@@ -4,7 +4,7 @@ import {
   listAvailableBibles, getEnabledBibles, setEnabledBibles,
 } from '../services/apiBible.js'
 import { useAppSettings, setSettings, pickDirectory } from '../services/appSettingsService.js'
-import { setTheme as setStoredTheme } from '../services/themeStore.js'
+import { setTheme as setStoredTheme, useTheme } from '../services/themeStore.js'
 import { refreshImportedVersions } from '../services/bibleService.js'
 import { AVAILABLE_LOCALES } from '../services/i18n.js'
 import {
@@ -402,15 +402,40 @@ function SectionAudio() {
 // ---------- VIDEO ----------
 function SectionVideo() {
   const settings = useAppSettings()
+  const theme = useTheme()
+  const lowPower = !!theme?.lowPower
 
   return (
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 6px' }}>
-        Video
+        Video y rendimiento
       </h2>
       <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 24px' }}>
         Calidad y rendimiento de la reproducción de video proyectado.
       </p>
+
+      {/* ─── Modo bajo rendimiento (movido aquí desde Edición) ─── */}
+      <div className="card" style={{
+        padding: 14, marginBottom: 20,
+        background: lowPower ? 'linear-gradient(180deg, rgba(168,95,51,0.10), var(--bg-2))' : undefined,
+        border: '1px solid ' + (lowPower ? 'rgba(232,181,145,0.30)' : 'var(--line-1)'),
+      }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+          <input
+            type="checkbox" checked={lowPower}
+            onChange={e => setStoredTheme({ lowPower: e.target.checked })}
+            style={{ marginTop: 3 }} />
+          <span style={{ flex: 1 }}>
+            <b style={{ color: 'var(--text-1)', fontSize: 14 }}>Modo bajo rendimiento</b>
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.5 }}>
+              Desactiva los videos de fondo y cae a degradado en su lugar. Recomendado para
+              portátiles con gráficos integrados (<i>Intel HD Graphics 520, i3 6ª gen y similares</i>)
+              donde el video de fondo a 1080p tira del 100% de CPU/GPU. Aplica al proyector,
+              al overlay y al preview de inmediato.
+            </span>
+          </span>
+        </label>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <div className="field">
@@ -975,7 +1000,7 @@ function SectionAcerca() {
         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
           <span style={{ color: 'var(--text-3)' }}>Versión</span>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-1)' }}>
-            {info?.version || upd?.currentVersion || '0.2.12'}
+            {info?.version || upd?.currentVersion || '0.2.13'}
             {isPortable && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)' }}>(portable)</span>}
           </span>
           <span style={{ color: 'var(--text-3)' }}>Datos del usuario</span>

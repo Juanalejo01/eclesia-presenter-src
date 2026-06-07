@@ -69,6 +69,14 @@ function defaultTheme() {
     transitionType: 'fade',
     transitionDuration: 500,
     transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    // Efectos de texto v0.2.13 (sincronizado con DEFAULT_THEME del renderer).
+    fontStyle: 'normal',
+    letterSpacing: 0,
+    textTransform: 'none',
+    strokeWidth: 0,
+    strokeColor: '#000000',
+    textMargin: 40,
+    lowPower: false,
   }
 }
 
@@ -208,6 +216,24 @@ function openProjection(opts = {}) {
     // para que el teclado siga funcionando ahí.
     returnFocusToMain()
   })
+
+  // CRÍTICO (bug en producción reportado en Acer i3 con HD Graphics 520):
+  // si por cualquier vía (taskbar, Alt-Tab, click en la ventana de pantalla
+  // completa, hover de Windows...) el foco vuelve a una ventana no-interactiva
+  // de proyección, el teclado deja de funcionar en la ventana principal.
+  // El usuario tenía que minimizar/restaurar la app para recuperar el input.
+  //
+  // Antes solo devolvíamos el foco al ABRIR. Ahora lo devolvemos cada vez
+  // que la ventana de proyección recibe foco — para background y overlay
+  // (no interactivas). El stage display SÍ acepta foco porque es el monitor
+  // del músico/predicador y podría usar teclas.
+  if (!isStage) {
+    win.on('focus', () => {
+      // setImmediate evita que peleemos en el mismo tick con el SO; sin él
+      // el foco se queda a mitad y se pierde el teclado igualmente.
+      setImmediate(returnFocusToMain)
+    })
+  }
 
   projections.set(mode, { window: win, options: opts })
 

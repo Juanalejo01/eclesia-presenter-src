@@ -55,13 +55,21 @@ function SlideRendererInner({ slide, theme, isBlackout: forceBlackout = false, t
   // Detectar blackout: por prop explícita (preview) o por el tipo del slide.
   const isBlackout = forceBlackout || slide?.type === 'blackout'
 
-  const showVideo = eff.bgType === 'video' && eff.bgVideo
+  // Modo bajo rendimiento: en máquinas de gama baja (Intel HD Graphics,
+  // i3 de generaciones viejas) el <video> de fondo a 1080p tira del 100%
+  // de CPU/GPU. Con lowPower activo forzamos el fallback a degradado,
+  // saltando el <video> completamente.
+  const lowPower = !!eff.lowPower
+  const showVideo = !lowPower && eff.bgType === 'video' && eff.bgVideo
   const showImage = eff.bgType === 'image' && eff.bgImage
+
   // Para image/video usaremos un <img>/<video> con object-fit (más control que background-size).
   // El "fondo" del contenedor es solo el color de relleno detrás cuando object-fit:contain deja barras.
+  // En lowPower + bgType=video, caemos al degradado para no encolar un <video>.
   const bg =
       isBlackout ? '#000000'
     : eff.bgType === 'transparent' && transparentBg ? 'transparent'
+    : (lowPower && eff.bgType === 'video') ? `linear-gradient(135deg, ${(eff.bgGradient && eff.bgGradient[0]) || '#0a1620'}, ${(eff.bgGradient && eff.bgGradient[1]) || '#1e3a5f'})`
     : eff.bgType === 'gradient' ? `linear-gradient(135deg, ${eff.bgGradient[0]}, ${eff.bgGradient[1]})`
     : eff.bgType === 'transparent' ? 'repeating-conic-gradient(#1a1410 0 25%, #2a1f17 0 50%) 50% / 14px 14px'
     : showImage || eff.bgType === 'video' ? '#000'
@@ -80,7 +88,21 @@ function SlideRendererInner({ slide, theme, isBlackout: forceBlackout = false, t
   const REF_RATIOS = { sm: 1 / 5, md: 1 / 4, lg: 1 / 3, xl: 1 / 2 }
   const refRatio   = REF_RATIOS[eff.referenceSize] ?? REF_RATIOS.md
   const refSize    = `${((eff.fontSize * refRatio) / 1920) * 100}cqw`
-  const paddingPct = `${(40 / 1920) * 100}cqw`
+  // Margen lateral configurable (en px a 1920 base, escalado por cqw).
+  // Por defecto 40 px → 2.08% del ancho del contenedor.
+  const marginPx   = typeof eff.textMargin === 'number' ? Math.max(0, Math.min(400, eff.textMargin)) : 40
+  const paddingPct = `${(marginPx / 1920) * 100}cqw`
+  // Letter-spacing: rango -10 a +50 unidades de 0.01em.
+  // 0 = neutro (CSS letterSpacing: normal). Cualquier otro valor en em.
+  const letterSpacingEm = typeof eff.letterSpacing === 'number' ? eff.letterSpacing : 0
+  const letterSpacingCss = letterSpacingEm === 0 ? 'normal' : `${letterSpacingEm * 0.01}em`
+  // text-transform: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+  const textTransform = ['uppercase', 'lowercase', 'capitalize'].includes(eff.textTransform) ? eff.textTransform : 'none'
+  // Borde del texto (outline). Si strokeWidth > 0 lo aplicamos vía
+  // -webkit-text-stroke (soportado por Chromium = Electron).
+  const strokeWidth = typeof eff.strokeWidth === 'number' ? Math.max(0, Math.min(12, eff.strokeWidth)) : 0
+  const strokeColor = (typeof eff.strokeColor === 'string' && eff.strokeColor) || '#000000'
+  const textStrokeCss = strokeWidth > 0 ? `${strokeWidth}px ${strokeColor}` : 'initial'
 
   const renderContent = (s) => (
     <div style={{
@@ -101,8 +123,12 @@ function SlideRendererInner({ slide, theme, isBlackout: forceBlackout = false, t
               fontSize,
               fontFamily: eff.fontFamily || 'var(--font-display)',
               fontWeight: eff.fontWeight ?? 500,
+              fontStyle: eff.fontStyle === 'italic' ? 'italic' : 'normal',
               textShadow: eff.textShadow ? '0 4px 20px rgba(0,0,0,0.6)' : 'none',
-              lineHeight: 1.25, margin: 0, letterSpacing: '0.005em',
+              lineHeight: 1.25, margin: 0,
+              letterSpacing: letterSpacingCss,
+              textTransform,
+              WebkitTextStroke: textStrokeCss,
               whiteSpace: 'pre-line',
             }}
           />
@@ -113,7 +139,10 @@ function SlideRendererInner({ slide, theme, isBlackout: forceBlackout = false, t
             fontFamily: eff.fontFamily || 'var(--font-display)',
             fontWeight: eff.fontWeight ?? 500,
             textShadow: eff.textShadow ? '0 4px 20px rgba(0,0,0,0.6)' : 'none',
-            lineHeight: 1.25, margin: 0, letterSpacing: '0.005em',
+            lineHeight: 1.25, margin: 0,
+            letterSpacing: letterSpacingCss,
+            textTransform,
+            WebkitTextStroke: textStrokeCss,
             whiteSpace: 'pre-line',
           }}>{s.text}</p>
         )}
@@ -196,7 +225,10 @@ function mergeThemeWithSlide(theme, slide) {
   const keys = ['bgType', 'bgColor', 'bgGradient', 'bgImage', 'bgVideo',
                 'imageFit', 'videoFit', 'bgImageBlur',
                 'fontColor', 'fontFamily', 'fontSize', 'fontWeight',
-                'textAlign', 'textShadow', 'referenceVisible', 'referenceSize']
+                'textAlign', 'textShadow', 'referenceVisible', 'referenceSize',
+                // Nuevos efectos de texto (v0.2.13)
+                'letterSpacing', 'textTransform', 'strokeWidth', 'strokeColor',
+                'textMargin', 'lowPower', 'fontStyle']
   for (const k of keys) {
     if (slide[k] !== undefined) out[k] = slide[k]
   }

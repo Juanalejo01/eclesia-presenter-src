@@ -84,8 +84,16 @@ export default function LowerThirdRenderer({ slide, theme }) {
         fontFamily: o.fontFamily,
         fontSize: px(o.fontSize),
         fontWeight: o.fontWeight,
+        fontStyle: o.fontStyle === 'italic' ? 'italic' : 'normal',
         lineHeight: 1.2,
-        letterSpacing: '0.005em',
+        letterSpacing: typeof o.letterSpacing === 'number' && o.letterSpacing !== 0
+          ? `${o.letterSpacing * 0.01}em`
+          : '0.005em',
+        textTransform: ['uppercase', 'lowercase', 'capitalize'].includes(o.textTransform)
+          ? o.textTransform : 'none',
+        WebkitTextStroke: (typeof o.strokeWidth === 'number' && o.strokeWidth > 0)
+          ? `${o.strokeWidth}px ${o.strokeColor || '#000000'}`
+          : 'initial',
         textShadow: o.textShadow
           ? `0 ${px(4)} ${px(20)} rgba(0, 0, 0, 0.85), 0 ${px(2)} ${px(6)} rgba(0, 0, 0, 0.95)`
           : 'none',

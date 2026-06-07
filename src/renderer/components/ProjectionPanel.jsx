@@ -129,7 +129,7 @@ export default function ProjectionPanel({ slide }) {
     <div className="workspace">
       <div className="ws-header">
         <div className="ws-title">
-          <h1 className="ws-h1">Proyección</h1>
+          <h1 className="ws-h1">Edición</h1>
           <span className="ws-sub">
             Ventanas nativas · capturables por OBS
             {!hasElectron && <span style={{ color: 'var(--preview)', marginLeft: 8 }}>· Solo preview en navegador</span>}
@@ -275,11 +275,16 @@ function CustomizationGrid({ theme, updateTheme }) {
         </div>
 
         <div className="field">
-          <span className="label">Tamaño · {theme.fontSize}px</span>
-          <input type="range" min="32" max="120" value={theme.fontSize}
+          <span className="label">
+            Tamaño · {theme.fontSize}px
+            <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              · 32-240
+            </span>
+          </span>
+          <input type="range" min="32" max="240" value={theme.fontSize}
             onChange={e => updateTheme({ fontSize: +e.target.value })}
             className="slider"
-            style={{ '--val': ((theme.fontSize - 32) / 88 * 100) + '%' }} />
+            style={{ '--val': ((theme.fontSize - 32) / 208 * 100) + '%' }} />
         </div>
 
         <div className="field" style={{ gridColumn: 'span 2' }}>
@@ -392,7 +397,17 @@ function CustomizationGrid({ theme, updateTheme }) {
             style={{ '--val': ((theme.transitionDuration ?? 500) / 2000 * 100) + '%', marginTop: 8 }} />
         </div>
 
-        <div className="field" style={{ gridColumn: 'span 2', flexDirection: 'row', gap: 18 }}>
+        <div className="field" style={{ gridColumn: 'span 2', flexDirection: 'row', gap: 18, flexWrap: 'wrap' }}>
+          <CheckboxLabel
+            checked={(theme.fontWeight ?? 500) >= 700}
+            onChange={v => updateTheme({ fontWeight: v ? 800 : 500 })}>
+            <b>Negrita</b>
+          </CheckboxLabel>
+          <CheckboxLabel
+            checked={theme.fontStyle === 'italic'}
+            onChange={v => updateTheme({ fontStyle: v ? 'italic' : 'normal' })}>
+            <em>Cursiva</em>
+          </CheckboxLabel>
           <CheckboxLabel checked={!!theme.textShadow} onChange={v => updateTheme({ textShadow: v })}>
             Sombra de texto
           </CheckboxLabel>
@@ -400,6 +415,73 @@ function CustomizationGrid({ theme, updateTheme }) {
             Mostrar referencia bíblica
           </CheckboxLabel>
         </div>
+
+        {/* ════════════ EFECTOS DE TEXTO (v0.2.13) ════════════ */}
+        <div className="field" style={{ gridColumn: 'span 2' }}>
+          <span className="label" style={{
+            display: 'flex', alignItems: 'baseline', gap: 10,
+            fontSize: 10, letterSpacing: '0.14em', color: 'var(--copper-200)',
+          }}>
+            ── Efectos del texto ──
+          </span>
+        </div>
+
+        <div className="field">
+          <span className="label">
+            Mayús/minús
+          </span>
+          <SegmentedControl
+            options={[
+              { value: 'none',       label: 'Auto' },
+              { value: 'uppercase',  label: 'MAYÚS' },
+              { value: 'lowercase',  label: 'minús' },
+              { value: 'capitalize', label: 'Capital.' },
+            ]}
+            value={theme.textTransform || 'none'}
+            onChange={v => updateTheme({ textTransform: v })} />
+        </div>
+
+        <div className="field">
+          <span className="label">
+            Espaciado entre letras · {(theme.letterSpacing ?? 0)}
+          </span>
+          <input type="range" min="-10" max="50" step="1" value={theme.letterSpacing ?? 0}
+            onChange={e => updateTheme({ letterSpacing: +e.target.value })}
+            className="slider"
+            style={{ '--val': (((theme.letterSpacing ?? 0) + 10) / 60 * 100) + '%' }} />
+        </div>
+
+        <div className="field">
+          <span className="label">
+            Grosor del borde · {theme.strokeWidth ?? 0}px
+            <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              · 0 = sin borde
+            </span>
+          </span>
+          <input type="range" min="0" max="12" step="1" value={theme.strokeWidth ?? 0}
+            onChange={e => updateTheme({ strokeWidth: +e.target.value })}
+            className="slider"
+            style={{ '--val': ((theme.strokeWidth ?? 0) / 12 * 100) + '%' }} />
+        </div>
+
+        {(theme.strokeWidth ?? 0) > 0 && (
+          <ColorRow label="Color del borde" value={theme.strokeColor || '#000000'}
+            onChange={v => updateTheme({ strokeColor: v })} />
+        )}
+
+        <div className="field" style={{ gridColumn: 'span 2' }}>
+          <span className="label">
+            Margen lateral · {theme.textMargin ?? 40}px
+            <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              · a 1920px base
+            </span>
+          </span>
+          <input type="range" min="0" max="400" step="10" value={theme.textMargin ?? 40}
+            onChange={e => updateTheme({ textMargin: +e.target.value })}
+            className="slider"
+            style={{ '--val': ((theme.textMargin ?? 40) / 400 * 100) + '%' }} />
+        </div>
+
 
         {/* Selector de tamaño de la referencia — solo visible si la referencia
             está activada. 4 niveles, garantizados ≤ tamaño del texto principal. */}
@@ -525,8 +607,8 @@ function OverlayEditor({ theme, preview, activePreset, setActivePreset, updateOv
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-          {/* Toggle fondo */}
-          <div className="field" style={{ gridColumn: 'span 2', flexDirection: 'row', gap: 18 }}>
+          {/* Toggle fondo + estilo del texto (bold/italic) */}
+          <div className="field" style={{ gridColumn: 'span 2', flexDirection: 'row', gap: 18, flexWrap: 'wrap' }}>
             <CheckboxLabel checked={o.bgEnabled} onChange={v => updateOverlay({ bgEnabled: v })}>
               Fondo de banda
             </CheckboxLabel>
@@ -538,6 +620,16 @@ function OverlayEditor({ theme, preview, activePreset, setActivePreset, updateOv
             </CheckboxLabel>
             <CheckboxLabel checked={o.textShadow} onChange={v => updateOverlay({ textShadow: v })}>
               Sombra texto
+            </CheckboxLabel>
+            <CheckboxLabel
+              checked={(o.fontWeight ?? 500) >= 700}
+              onChange={v => updateOverlay({ fontWeight: v ? 800 : 500 })}>
+              <b>Negrita</b>
+            </CheckboxLabel>
+            <CheckboxLabel
+              checked={o.fontStyle === 'italic'}
+              onChange={v => updateOverlay({ fontStyle: v ? 'italic' : 'normal' })}>
+              <em>Cursiva</em>
             </CheckboxLabel>
           </div>
 
@@ -637,15 +729,69 @@ function OverlayEditor({ theme, preview, activePreset, setActivePreset, updateOv
           </div>
 
           <div className="field">
-            <span className="label">Tamaño texto · {o.fontSize}px</span>
-            <input type="range" min="24" max="96" value={o.fontSize}
+            <span className="label">
+              Tamaño texto · {o.fontSize}px
+              <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                · 24-200
+              </span>
+            </span>
+            <input type="range" min="24" max="200" value={o.fontSize}
               onChange={e => updateOverlay({ fontSize: +e.target.value })}
               className="slider"
-              style={{ '--val': ((o.fontSize - 24) / 72 * 100) + '%' }} />
+              style={{ '--val': ((o.fontSize - 24) / 176 * 100) + '%' }} />
           </div>
 
           <ColorRow label="Color del texto" value={o.fontColor}
             onChange={v => updateOverlay({ fontColor: v })} />
+
+          {/* ════════ Efectos del texto (overlay) ════════ */}
+          <div className="field" style={{ gridColumn: 'span 2' }}>
+            <span className="label" style={{
+              display: 'flex', alignItems: 'baseline', gap: 10,
+              fontSize: 10, letterSpacing: '0.14em', color: 'var(--copper-200)',
+            }}>
+              ── Efectos del texto ──
+            </span>
+          </div>
+
+          <div className="field">
+            <span className="label">Mayús/minús</span>
+            <SegmentedControl
+              options={[
+                { value: 'none',       label: 'Auto' },
+                { value: 'uppercase',  label: 'MAYÚS' },
+                { value: 'lowercase',  label: 'minús' },
+                { value: 'capitalize', label: 'Capital.' },
+              ]}
+              value={o.textTransform || 'none'}
+              onChange={v => updateOverlay({ textTransform: v })} />
+          </div>
+
+          <div className="field">
+            <span className="label">Espaciado entre letras · {o.letterSpacing ?? 0}</span>
+            <input type="range" min="-10" max="50" step="1" value={o.letterSpacing ?? 0}
+              onChange={e => updateOverlay({ letterSpacing: +e.target.value })}
+              className="slider"
+              style={{ '--val': (((o.letterSpacing ?? 0) + 10) / 60 * 100) + '%' }} />
+          </div>
+
+          <div className="field">
+            <span className="label">
+              Grosor del borde · {o.strokeWidth ?? 0}px
+              <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                · 0 = sin borde
+              </span>
+            </span>
+            <input type="range" min="0" max="12" step="1" value={o.strokeWidth ?? 0}
+              onChange={e => updateOverlay({ strokeWidth: +e.target.value })}
+              className="slider"
+              style={{ '--val': ((o.strokeWidth ?? 0) / 12 * 100) + '%' }} />
+          </div>
+
+          {(o.strokeWidth ?? 0) > 0 && (
+            <ColorRow label="Color del borde" value={o.strokeColor || '#000000'}
+              onChange={v => updateOverlay({ strokeColor: v })} />
+          )}
 
           <div className="field" style={{ gridColumn: 'span 2' }}>
             <span className="label">
@@ -657,7 +803,7 @@ function OverlayEditor({ theme, preview, activePreset, setActivePreset, updateOv
               <option value='"Cormorant Garamond", serif'>Cormorant Garamond (default)</option>
               {fonts.length > 0 && <optgroup label="── Sistema ──">
                 {fonts.filter(f => !f.generic).map(f => (
-                  <option key={f.family} value={f.family} style={{ fontFamily: f.family }}>
+                  <option key={f.family} value={f.family}>
                     {f.family}
                   </option>
                 ))}

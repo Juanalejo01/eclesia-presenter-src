@@ -32,6 +32,12 @@ export const DEFAULT_OVERLAY = {
   fontSize: 54,
   fontColor: '#ffffff',
   fontWeight: 500,
+  // Estilo/efectos añadidos en v0.2.13 (overlay también)
+  fontStyle: 'normal',          // 'normal' | 'italic'
+  letterSpacing: 0,             // unidades 0.01em (-10 a +50)
+  textTransform: 'none',        // 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+  strokeWidth: 0,               // 0-12 px (borde -webkit-text-stroke)
+  strokeColor: '#000000',
   textShadow: true,
 
   // Referencia
@@ -70,6 +76,21 @@ const DEFAULT_THEME = {
   transitionType: 'fade',
   transitionDuration: 500,
   transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+  // ── Efectos de texto añadidos en v0.2.13 ──
+  // fontStyle: 'normal' | 'italic'. fontWeight controla negrita (500/800).
+  fontStyle: 'normal',
+  // letterSpacing en unidades de 0.01em: -10 a +50 (0 = normal CSS).
+  letterSpacing: 0,
+  // textTransform: 'none' | 'uppercase' | 'lowercase' | 'capitalize'.
+  textTransform: 'none',
+  // Borde del texto (outline) en pixels via -webkit-text-stroke.
+  strokeWidth: 0,
+  strokeColor: '#000000',
+  // Margen lateral del texto, en px a 1920 base (escalado por cqw en render).
+  textMargin: 40,
+  // Modo bajo rendimiento: salta <video> de fondo, simplifica transiciones.
+  // Útil en máquinas con HD Graphics integradas (i3 6th gen, etc.).
+  lowPower: false,
   // Configuración del overlay (lower-third) — anidada para mantener un único theme
   overlay: { ...DEFAULT_OVERLAY },
 }

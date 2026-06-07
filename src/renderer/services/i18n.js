@@ -14,7 +14,7 @@ const DICT = {
     'nav.image':       'Imagen',
     'nav.video':       'Video',
     'nav.text':        'Texto',
-    'nav.projection':  'Proyección',
+    'nav.projection':  'Edición',
     'nav.transmision': 'Transmisión',
 
     // ----- Topbar -----
@@ -277,7 +277,7 @@ const DICT = {
     'text.addToList':     'Añadir a lista',
 
     // ----- Projection -----
-    'projection.title':         'Proyección',
+    'projection.title':         'Edición',
     'projection.subtitle':      'Ventanas nativas · capturables por OBS',
     'projection.browserOnly':   'Solo preview en navegador',
     'projection.tryTransition': 'Probar transición',

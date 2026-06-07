@@ -11,6 +11,55 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.13] — 2026-06-07
+
+Tanda centrada en rendimiento para máquinas modestas (Intel HD Graphics,
+i3 de generaciones viejas) y en efectos de tipografía. Solución a un bug
+crítico de foco que dejaba el teclado inservible en producción.
+
+### Added
+- 🎨 **Efectos de texto** completos en proyección y en overlay:
+  - **Negrita** y **cursiva** como toggles
+  - **Mayús/minús** (Auto / MAYÚS / minús / Capital.)
+  - **Espaciado entre letras** (slider de -0.1em a +0.5em)
+  - **Grosor del borde** del texto (0-12 px, vía `-webkit-text-stroke`)
+  - **Color del borde** (color picker, solo si grosor > 0)
+  - **Margen lateral** del texto (slider 0-400 px a 1920 base)
+- 🔠 **Tamaño de tipografía ampliado**: pantalla 32-240 px, overlay
+  24-200 px (antes 32-120 / 24-96 — se quedaba corto para textos cortos
+  con espacio sobrado en pantalla)
+- 🐌 **Modo bajo rendimiento** (Ajustes → Video y rendimiento). Cuando
+  está activo, se salta el `<video>` de fondo y cae a degradado en su
+  lugar. Recomendado para portátiles con gráficos integrados (Intel HD
+  Graphics 520, i3 6ª gen y similares) donde el video de fondo a 1080p
+  tira del 100% de CPU/GPU. Aplica al proyector, al overlay y al preview.
+
+### Changed
+- 📝 **"Proyección" renombrado a "Edición"** (más profesional — refleja
+  que el panel es para editar el estilo, no para abrir las ventanas, que
+  viven en Transmisión). Icono del sidebar cambiado a un lápiz.
+- 🎛 El toggle de "Modo bajo rendimiento" se ha movido del panel de
+  Edición a **Ajustes → Video y rendimiento**, donde encaja mejor
+  conceptualmente con la calidad/fps de video.
+
+### Fixed
+- 🔴 **CRÍTICO: el teclado dejaba de funcionar y había que minimizar
+  la app para recuperar el input**. Causa: `returnFocusToMain()` solo
+  se llamaba al abrir/cerrar la proyección, pero si por cualquier vía
+  (click en la taskbar del proyector, Alt-Tab, hover de Windows) el foco
+  volvía a la ventana de proyección, nunca se devolvía. Reportado en
+  Acer i3 con HD Graphics 520. Fix: instalo un listener `'focus'`
+  permanente en las ventanas de proyección no-interactivas
+  (background + overlay; stage SÍ acepta foco porque es la pantalla
+  del músico) que rebota el foco al main en cada activación.
+- 🧊 **Otro caso del bug de "congelación al cambiar la fuente"** que
+  se nos había escapado en el selector de fuente del **overlay**
+  (lower-third). Cada `<option>` tenía `style={{fontFamily}}` forzando
+  a Chromium a instanciar cada tipografía del sistema al desplegar.
+  Quitado.
+
+---
+
 ## [0.2.12] — 2026-06-06
 
 Tanda centrada en bugs reportados al usar la app y polish de UX.
