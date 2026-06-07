@@ -150,6 +150,29 @@ function startServer(opts = {}) {
   // Mobile remote control
   app.get('/remote', (_req, res) => res.send(REMOTE_PAGE))
 
+  // Discriminador público para el móvil: responde "¿soy EclesiaPresenter?".
+  // Lo llama pairing.checkServer() ANTES de POST /api/pair para distinguir
+  //   - puerto incorrecto (responde, pero no es esta app)
+  //   - servidor caído (no responde)
+  //   - red/firewall (timeout)
+  //   - Brave Shields / mixed-content (TypeError con patrón policy)
+  // sin gastar intentos del rate-limiter de /api/pair (5/min/IP).
+  //
+  // GET simple sin headers custom → no dispara CORS preflight.
+  // CORS '*' aquí es seguro: la respuesta no expone nada sensible
+  // (nombre app + versión semver pública).
+  app.get('/api/info', (_req, res) => {
+    res.set('Access-Control-Allow-Origin', '*')
+    res.set('Cache-Control', 'no-store')
+    res.json({
+      ok: true,
+      app: 'EclesiaPresenter',
+      version: require('../../package.json').version,
+      protocol: 1,
+      capabilities: ['ws-remote', 'pair-v1'],
+    })
+  })
+
   // Endpoint para que el móvil valide el PIN y reciba un token de autorización.
   // Rate-limited por IP para prevenir brute-force del PIN de 6 dígitos.
   // Body: { pin, deviceId?, deviceName? }
