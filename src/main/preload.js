@@ -109,18 +109,7 @@ contextBridge.exposeInMainWorld('electron', {
     onError:           (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('updater:error',           h); return () => ipcRenderer.removeListener('updater:error', h) },
   },
 
-  // Biblioteca de fondos preset (CC0 worship videos descargables)
-  bglib: {
-    state:     ()    => ipcRenderer.invoke('bglib:state'),
-    refresh:   ()    => ipcRenderer.invoke('bglib:refresh'),
-    download:  (id)  => ipcRenderer.invoke('bglib:download', id),
-    cancel:    (id)  => ipcRenderer.invoke('bglib:cancel', id),
-    delete:    (id)  => ipcRenderer.invoke('bglib:delete', id),
-    localPath: (id)  => ipcRenderer.invoke('bglib:localPath', id),
-    setStorageDir: (dir) => ipcRenderer.invoke('bglib:setStorageDir', dir),
-    onStart:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-start',    h); return () => ipcRenderer.removeListener('bglib:download-start', h) },
-    onProgress: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-progress', h); return () => ipcRenderer.removeListener('bglib:download-progress', h) },
-    onOk:       (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-ok',       h); return () => ipcRenderer.removeListener('bglib:download-ok', h) },
-    onError:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('bglib:download-error',    h); return () => ipcRenderer.removeListener('bglib:download-error', h) },
-  },
+  // (v0.2.14) bglib eliminado — la biblioteca de fondos preset vive ahora
+  // en el apartado /recursos de la web. El usuario descarga lo que quiere
+  // como archivos normales y los usa vía MediaPicker.
 })
