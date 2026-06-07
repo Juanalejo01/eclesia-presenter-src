@@ -1,6 +1,6 @@
 {
   "name": "eclesia-presenter",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "Software de presentación para iglesias — Biblia, canciones, lista, proyección OBS",
   "main": "src/main/main.js",
   "homepage": "https://github.com/Juanalejo01/eclesia-presenter",

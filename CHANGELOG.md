@@ -11,6 +11,25 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.15] — 2026-06-07
+
+Patch encima de v0.2.14 para corregir un cleanup incompleto del bglib.
+
+### Fixed
+- 🐛 **Sección "Fondos preset" seguía apareciendo en Ajustes** con un
+  estado infinito "Cargando catálogo…". El cleanup de `bglib` en v0.2.14
+  eliminó la lógica del backend (`backgroundLibrary.js` + IPC handlers +
+  bridge del preload) pero un `git checkout HEAD --` accidental en
+  Settings.jsx durante el sweep de diálogos revirtió la eliminación
+  de la entrada del menú lateral + función `SectionFondos`. Removidas
+  ahora: entrada `'fondos'` en `SECTIONS`, dispatcher condicional, y
+  bloque entero de `SectionFondos` (~300 líneas). Settings.jsx pasa de
+  1664 a 1365 líneas.
+- Los vídeos siguen disponibles en
+  `eclesia-presenter.vercel.app/recursos` como ya estaba planeado.
+
+---
+
 ## [0.2.14] — 2026-06-07
 
 Tanda grande de UX + refactor. Editor reinventado al estilo Canva, botón
