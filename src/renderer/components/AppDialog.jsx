@@ -10,6 +10,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDialog, resolveDialog } from '../services/dialogService.js'
 
+// Mini ref-counter para que múltiples modales anidados no se pisen el overflow
+// del body. Sobrevive pre-emption (open→open con id distinto): cleanup decrementa,
+// re-effect incrementa, neto = 1. Si en el futuro otro modal usa el mismo helper,
+// también respeta el orden correcto de restauración.
+let _bodyLockCount = 0
+let _prevOverflow = ''
+function lockBodyScroll() {
+  if (_bodyLockCount === 0) {
+    _prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  }
+  _bodyLockCount++
+}
+function unlockBodyScroll() {
+  _bodyLockCount = Math.max(0, _bodyLockCount - 1)
+  if (_bodyLockCount === 0) {
+    document.body.style.overflow = _prevOverflow
+  }
+}
+
 // Iconos SVG inline para no añadir dependencia. Se pintan con currentColor.
 function IconQuestion() {
   return (
@@ -63,8 +83,7 @@ export default function AppDialog() {
   // Bloquear scroll del body + handlers de teclado mientras el modal está abierto.
   useEffect(() => {
     if (!dlg) return
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    lockBodyScroll()
 
     // Auto-focus tras el primer paint para que la animación no robe el foco.
     const raf = requestAnimationFrame(() => {
@@ -80,9 +99,11 @@ export default function AppDialog() {
       }
     })
 
+    // Fix 1: Leer del DOM evita el bug TDZ del ref espejo (Enter inmediato con
+    // defaultValue devolvía null porque el effect mirror corría después).
     const handleConfirm = () => {
       if (dlg.type === 'prompt') {
-        const v = (inputValRef.current || '').trim()
+        const v = (inputRef.current?.value || '').trim()
         resolveDialog(v ? v : null)
       } else {
         resolveDialog(true)
@@ -92,32 +113,52 @@ export default function AppDialog() {
       resolveDialog(dlg.type === 'prompt' ? null : false)
     }
 
+    // Fix 4: focus trap entre primer y último elemento focusable del card.
+    const trapFocus = (e) => {
+      const root = cardRef.current
+      if (!root) return
+      const focusables = root.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        e.stopPropagation()
+        // Fix 2: stopImmediatePropagation evita que SongEditor/CommandPalette u
+        // otros listeners hermanos en capture-phase también reaccionen al Esc.
+        e.stopImmediatePropagation()
         e.preventDefault()
         handleCancel()
       } else if (e.key === 'Enter') {
-        // En textareas no interceptaríamos; aquí solo hay input single-line.
-        // El comportamiento es: Enter confirma siempre.
+        // En textareas no interceptar (no aplica hoy pero seguro a futuro).
+        if (e.target && e.target.tagName === 'TEXTAREA') return
+        e.stopImmediatePropagation()
         e.preventDefault()
         handleConfirm()
+      } else if (e.key === 'Tab') {
+        trapFocus(e)
       }
     }
     window.addEventListener('keydown', onKey, true)
 
     return () => {
       cancelAnimationFrame(raf)
-      document.body.style.overflow = prevOverflow
+      unlockBodyScroll()
       window.removeEventListener('keydown', onKey, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dlg?.id])
-
-  // Ref espejada del inputVal: necesaria para que el handler de teclado lea el
-  // valor más reciente sin tener que re-crear el effect en cada keystroke.
-  const inputValRef = useRef('')
-  useEffect(() => { inputValRef.current = inputVal }, [inputVal])
 
   if (!dlg) return null
 
