@@ -26,6 +26,12 @@ const TOKEN_TTL_MS = 24 * 60 * 60 * 1000   // 24h
 const PIN_ATTEMPTS_WINDOW_MS = 60_000       // 60s
 const PIN_LOCKOUT_MS = 15 * 60_000          // 15 min
 const PIN_MAX_ATTEMPTS = 5
+// Anti-DoS: cap del Map de intentos por IP. Si lo superamos, evict LRU
+// (Map preserva orden de inserción → keys().next() devuelve el más viejo).
+const PIN_ATTEMPTS_MAX_ENTRIES = 10_000
+// Threshold para limpieza periódica de entries SIN lockout activo (10 min).
+// Records con lockout activo se respetan hasta que el lockout expire.
+const PIN_ATTEMPTS_CLEANUP_MS = 10 * 60_000
 
 // ---------------- Estado interno ----------------
 
@@ -46,6 +52,7 @@ function checkPinRateLimit(ip) {
   const record = pinAttempts.get(ip)
   if (!record) {
     pinAttempts.set(ip, { count: 1, firstAttempt: now, lockedUntil: 0 })
+    evictOldestIfOverCap()
     return { allowed: true }
   }
   if (record.lockedUntil > now) {
@@ -64,6 +71,50 @@ function checkPinRateLimit(ip) {
     return { allowed: false, retryAfterMs: PIN_LOCKOUT_MS }
   }
   return { allowed: true }
+}
+
+// Anti-DoS: si el Map crece más allá del cap, evict el más viejo.
+// Map mantiene orden de inserción → keys().next().value es el primer
+// entry insertado (= el más viejo). Esto evita que un atacante distribuído
+// llene memoria creando millones de entries por IP.
+function evictOldestIfOverCap() {
+  if (pinAttempts.size > PIN_ATTEMPTS_MAX_ENTRIES) {
+    const oldestKey = pinAttempts.keys().next().value
+    if (oldestKey !== undefined) pinAttempts.delete(oldestKey)
+  }
+}
+
+/**
+ * Verifica el PIN en tiempo constante (timing-safe). Centraliza la
+ * comparación segura aquí para no exponer PAIRING_PIN al endpoint y evitar
+ * oracle timing attacks (un `!==` ingenuo permitiría inferir el PIN
+ * byte-a-byte midiendo latencias).
+ *
+ * crypto.timingSafeEqual EXIGE que ambos buffers tengan la misma longitud,
+ * de lo contrario lanza. Para no filtrar la longitud real del PIN ni
+ * permitir variaciones de timing por la rama de "longitud distinta":
+ *   1. PAIRING_PIN es siempre 6 dígitos (generado con randomInt(100000,1000000))
+ *   2. Pad-end con NUL hasta 6 bytes para emparejar longitudes
+ *   3. Slice(0, 6) para descartar overflow (input >6 bytes)
+ *   4. Comparamos también la longitud original al final (sin afectar el
+ *      timing de la comparación de bytes) para rechazar inputs que sólo
+ *      coinciden por padding/truncado.
+ *
+ * @param {string} submitted PIN recibido del cliente
+ * @returns {boolean}
+ */
+function verifyPin(submitted) {
+  const s = String(submitted == null ? '' : submitted).trim()
+  // Padding/truncado a EXACTAMENTE 6 bytes para que timingSafeEqual no lance.
+  const a = Buffer.from(s.padEnd(6, '\0'), 'utf8').slice(0, 6)
+  const b = Buffer.from(PAIRING_PIN, 'utf8').slice(0, 6)
+  // Ambos buffers ahora miden 6 bytes garantizado → safe comparar.
+  const bytesEqual = crypto.timingSafeEqual(a, b)
+  // Comparamos longitudes después: si el PIN enviado no medía exactamente 6
+  // bytes, rechazamos (incluso si los primeros 6 bytes coincidían tras
+  // padding/truncado). Esta rama corre IGUAL para todos los inputs porque
+  // bytesEqual ya se evaluó arriba — el atacante no obtiene oracle.
+  return bytesEqual && s.length === b.length
 }
 
 // ---------------- Tokens ----------------
@@ -139,13 +190,17 @@ function listDevices() {
 
 // Cada hora, borra tokens expirados + IPs viejas sin lockout activo.
 // unref() para no impedir que el proceso termine.
+// PIN_ATTEMPTS_CLEANUP_MS (10 min) es agresivo a propósito: records sin
+// lockout activo no aportan nada después de ese tiempo (la ventana de
+// rate-limit es de 60s). Records lockeados se mantienen hasta que el
+// lockout expire para no resetear el castigo.
 const cleanupInterval = setInterval(() => {
   const now = Date.now()
   for (const [token, rec] of authorizedTokens) {
     if (now - rec.issuedAt > TOKEN_TTL_MS) authorizedTokens.delete(token)
   }
   for (const [ip, rec] of pinAttempts) {
-    if (rec.lockedUntil < now && now - rec.firstAttempt > 24 * 60 * 60_000) {
+    if (rec.lockedUntil < now && now - rec.firstAttempt > PIN_ATTEMPTS_CLEANUP_MS) {
       pinAttempts.delete(ip)
     }
   }
@@ -175,6 +230,7 @@ function __resetForTests() {
 
 module.exports = {
   get PAIRING_PIN() { return PAIRING_PIN },  // getter para reflejar __setPinForTests
+  verifyPin,
   checkPinRateLimit,
   issueToken,
   validateToken,
@@ -186,6 +242,7 @@ module.exports = {
   PIN_MAX_ATTEMPTS,
   PIN_LOCKOUT_MS,
   PIN_ATTEMPTS_WINDOW_MS,
+  PIN_ATTEMPTS_MAX_ENTRIES,
   // test-only
   __setPinForTests,
   __resetForTests,

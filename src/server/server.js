@@ -61,7 +61,11 @@ const broadcastChannel = {
     return () => _broadcastSubscribers.delete(fn)
   },
   publish(type, payload) {
-    for (const fn of _broadcastSubscribers) {
+    // Snapshot del Set antes de iterar: si un subscriber llama a
+    // subscribe/unsubscribe durante el callback, mutar el Set en plena
+    // iteración tiene semántica indefinida en ES; el snapshot lo evita.
+    const snapshot = Array.from(_broadcastSubscribers)
+    for (const fn of snapshot) {
       try { fn(type, payload) } catch (e) {
         console.warn('[server] broadcast subscriber error:', e?.message || e)
       }
@@ -82,7 +86,9 @@ function pushTheme(theme) {
   broadcastChannel.publish('pgm-update-theme', currentTheme)
 }
 
-/** Push del schedule (lista del día) a los móviles. */
+/** Push del schedule (lista del día) a los móviles.
+ *  API expuesta pero aún SIN caller — se cableará desde main.js (T7) cuando
+ *  se modifique la Lista del día (drag&drop reorder, etc.). */
 function pushSchedule(items) {
   currentSchedule = Array.isArray(items) ? items : []
   broadcastChannel.publish('schedule-update', currentSchedule)
@@ -160,8 +166,10 @@ function startServer(opts = {}) {
         retryAfterMs: rate.retryAfterMs,
       })
     }
-    const submitted = String(req.body?.pin || '').trim()
-    if (submitted !== pairing.PAIRING_PIN) {
+    // Comparación timing-safe centralizada en pairing.verifyPin para no
+    // exponer PAIRING_PIN al endpoint y evitar oracle timing attacks (un
+    // `!==` permitiría inferir el PIN byte-a-byte midiendo latencias).
+    if (!pairing.verifyPin(req.body?.pin)) {
       return res.status(401).json({ ok: false, error: 'pin_incorrecto' })
     }
     const deviceId = String(req.body?.deviceId || '').slice(0, 64) || 'unknown'
@@ -185,7 +193,10 @@ function startServer(opts = {}) {
   // el token sea válido. Reutiliza el mismo Map de pairing.
   const requireBearer = (req, res, next) => {
     const auth = String(req.headers['authorization'] || '')
-    const m = auth.match(/^Bearer\s+(.+)$/i)
+    // Regex tightened: token sin espacios internos (\S+) y trailing whitespace
+    // opcional. Antes (.+) podía aceptar tokens con espacios — válido en HTTP
+    // pero no en nuestros tokens hex.
+    const m = auth.match(/^Bearer\s+(\S+)\s*$/i)
     if (!m) return res.status(401).json({ ok: false, error: 'token_requerido' })
     const v = pairing.validateToken(m[1])
     if (!v.valid) return res.status(401).json({ ok: false, error: 'token_invalido' })
@@ -206,10 +217,19 @@ function startServer(opts = {}) {
     res.json({ ok: true, devices })
   })
 
-  // Revoca un token específico. El propio dispositivo puede auto-revocarse
-  // (útil para "cerrar sesión") y el admin puede revocar a otros.
+  // Revoca un token. SOLO permitimos self-revocation (un device cierra su
+  // propia sesión). Todos los devices pareados son peers iguales — no hay
+  // rol "admin del servicio". Sin esta restricción, cualquier token válido
+  // podría revocar a cualquier otro device → privilege escalation entre peers.
+  //
+  // SI en el futuro queremos un rol "admin del servicio" (operador del PC),
+  // añadir un flag isAdmin al token (emitido desde el desktop UI) y permitir
+  // a esos tokens revocar otros.
   app.delete('/api/pair/:token', requireBearer, (req, res) => {
     const target = String(req.params.token || '')
+    if (target !== req.deviceInfo.token) {
+      return res.status(403).json({ ok: false, error: 'no_autorizado' })
+    }
     const existed = pairing.revokeToken(target)
     res.json({ ok: true, revoked: existed })
   })

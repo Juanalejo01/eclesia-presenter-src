@@ -57,6 +57,27 @@ function postJson(port, path, body) {
   })
 }
 
+/** HTTP request genérico con method + headers custom (para DELETE con Bearer). */
+function httpRequest(port, method, path, { headers = {} } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      host: '127.0.0.1', port, path, method,
+      headers,
+    }, (res) => {
+      const chunks = []
+      res.on('data', (c) => chunks.push(c))
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8')
+        let json
+        try { json = JSON.parse(text) } catch { json = null }
+        resolve({ status: res.statusCode, body: json, text })
+      })
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+
 /** Promesa que se resuelve con el primer mensaje recibido del WS de un tipo dado. */
 function waitFor(ws, predicate, timeout = 2000) {
   return new Promise((resolve, reject) => {
@@ -165,18 +186,41 @@ describe('POST /api/pair', () => {
 })
 
 describe('WS raw /ws/remote — auth', () => {
-  test('rechaza conexión sin Sec-WebSocket-Protocol header', async () => {
-    // El truco: `new WebSocket(url)` SIN protocolos → no envía el header.
-    // El server debe responder 401 → el cliente emite 'unexpected-response'.
+  test('rechaza conexión sin Sec-WebSocket-Protocol header con 401', async () => {
+    // `new WebSocket(url)` SIN protocolos → no envía Sec-WebSocket-Protocol.
+    // El server responde 401 durante el handshake HTTP → el cliente ws
+    // emite 'unexpected-response' con res.statusCode === 401.
     const ws = new WebSocket(`ws://127.0.0.1:${handle.port}/ws/remote`)
-    const result = await waitForClose(ws)
-    expect([401, 0, 1006]).toContain(result.code)  // 401 unexpected o close abrupt
+    const statusCode = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timeout esperando 401')), 2000)
+      ws.once('unexpected-response', (_req, res) => {
+        clearTimeout(timer)
+        resolve(res.statusCode)
+      })
+      // Errores también son aceptables si el server cierra abruptamente
+      // sin status — pero exigimos que llegue 'unexpected-response' primero.
+      ws.once('error', (err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+    })
+    expect(statusCode).toBe(401)
   })
 
-  test('rechaza conexión con token inválido', async () => {
+  test('rechaza conexión con token inválido con 401', async () => {
     const ws = openClient(handle, 'token-que-no-existe-en-absoluto-1234')
-    const result = await waitForClose(ws)
-    expect([401, 0, 1006]).toContain(result.code)
+    const statusCode = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timeout esperando 401')), 2000)
+      ws.once('unexpected-response', (_req, res) => {
+        clearTimeout(timer)
+        resolve(res.statusCode)
+      })
+      ws.once('error', (err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+    })
+    expect(statusCode).toBe(401)
   })
 
   test('acepta conexión con token válido y emite estado inicial', async () => {
@@ -364,5 +408,70 @@ describe('Socket.IO legacy sigue funcionando', () => {
     expect(data.status).toBe(200)
     // El payload empieza con una char que indica el tipo de paquete (0 = open)
     expect(data.body).toMatch(/^0\{/)
+  })
+})
+
+describe('DELETE /api/pair/:token — self-revocation only', () => {
+  test('un device puede auto-revocar su propio token', async () => {
+    const token = await obtainToken(handle, 'phone-self', 'Phone Self')
+    const res = await httpRequest(handle.port, 'DELETE', `/api/pair/${token}`, {
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+    expect(res.body.revoked).toBe(true)
+    // El token ya no debe ser válido
+    expect(pairing.validateToken(token).valid).toBe(false)
+  })
+
+  test('un device NO puede revocar el token de otro device (403)', async () => {
+    const tokenA = await obtainToken(handle, 'phone-a', 'Phone A')
+    const tokenB = await obtainToken(handle, 'phone-b', 'Phone B')
+    // A intenta revocar B con su propio bearer → debe fallar 403
+    const res = await httpRequest(handle.port, 'DELETE', `/api/pair/${tokenB}`, {
+      headers: { authorization: `Bearer ${tokenA}` },
+    })
+    expect(res.status).toBe(403)
+    expect(res.body.ok).toBe(false)
+    expect(res.body.error).toBe('no_autorizado')
+    // Ambos tokens siguen válidos
+    expect(pairing.validateToken(tokenA).valid).toBe(true)
+    expect(pairing.validateToken(tokenB).valid).toBe(true)
+  })
+
+  test('DELETE sin bearer válido devuelve 401', async () => {
+    const token = await obtainToken(handle)
+    const res = await httpRequest(handle.port, 'DELETE', `/api/pair/${token}`, {
+      headers: {},  // sin Authorization
+    })
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('pairing.verifyPin — timing-safe', () => {
+  test('acepta el PIN correcto', () => {
+    pairing.__setPinForTests('123456')
+    expect(pairing.verifyPin('123456')).toBe(true)
+  })
+
+  test('rechaza PIN incorrecto', () => {
+    pairing.__setPinForTests('123456')
+    expect(pairing.verifyPin('000000')).toBe(false)
+    expect(pairing.verifyPin('123455')).toBe(false)
+  })
+
+  test('rechaza PIN demasiado corto o demasiado largo sin lanzar', () => {
+    pairing.__setPinForTests('123456')
+    expect(pairing.verifyPin('')).toBe(false)
+    expect(pairing.verifyPin('12345')).toBe(false)
+    expect(pairing.verifyPin('1234567')).toBe(false)
+  })
+
+  test('rechaza valores no-string sin lanzar', () => {
+    pairing.__setPinForTests('123456')
+    expect(pairing.verifyPin(null)).toBe(false)
+    expect(pairing.verifyPin(undefined)).toBe(false)
+    expect(pairing.verifyPin(123456)).toBe(true)  // String() lo coerce a '123456'
+    expect(pairing.verifyPin({})).toBe(false)
   })
 })

@@ -37,6 +37,26 @@ const FORWARDABLE_COMMANDS = new Set([
 ])
 
 /**
+ * Envía un 401 Unauthorized HTTP/1.1 bien formado y destruye el socket.
+ * Centralizado para que las 3 ramas de rechazo del handshake (sin proto,
+ * sin bearer, token inválido) emitan EXACTAMENTE la misma respuesta:
+ *   - Content-Length: 0 → cumple HTTP/1.1 (algunos clientes/proxies se
+ *     quejan si falta y la respuesta tiene body de longitud 0)
+ *   - Connection: close → libera el socket sin keep-alive
+ *   - WWW-Authenticate: Bearer realm → hint al cliente del esquema esperado
+ */
+function send401(socket) {
+  socket.write(
+    'HTTP/1.1 401 Unauthorized\r\n' +
+    'Connection: close\r\n' +
+    'Content-Length: 0\r\n' +
+    'WWW-Authenticate: Bearer realm="ws/remote"\r\n' +
+    '\r\n'
+  )
+  socket.destroy()
+}
+
+/**
  * Monta el endpoint WS raw `/ws/remote` sobre el httpServer pasado.
  * @param {import('http').Server} httpServer
  * @param {{
@@ -89,8 +109,7 @@ function attachWsRemote(httpServer, deps) {
     // A partir de aquí, el path es nuestro: validamos y respondemos.
     const protocolHeader = req.headers['sec-websocket-protocol']
     if (!protocolHeader || typeof protocolHeader !== 'string') {
-      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
-      socket.destroy()
+      send401(socket)
       return
     }
 
@@ -99,16 +118,14 @@ function attachWsRemote(httpServer, deps) {
     const protocols = protocolHeader.split(',').map(s => s.trim())
     const bearerProto = protocols.find(p => p.startsWith('bearer.'))
     if (!bearerProto) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
-      socket.destroy()
+      send401(socket)
       return
     }
 
     const token = bearerProto.slice('bearer.'.length)
     const result = pairing.validateToken(token)
     if (!result.valid) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
-      socket.destroy()
+      send401(socket)
       return
     }
 
@@ -130,6 +147,8 @@ function attachWsRemote(httpServer, deps) {
   wss.on('connection', (ws, req, deviceInfo) => {
     // Estado inicial al conectar — un solo round-trip de eventos.
     sendEvent(ws, 'pgm-update', safeGetter(getCurrentSlide, { text: '', reference: '', type: 'blank' }))
+    // pgm-update-theme: solo se envía en handshake inicial SI hay theme
+    // cargado. El cliente NO debe esperarlo en cada connect — es opcional.
     const theme = safeGetter(getCurrentTheme, null)
     if (theme) sendEvent(ws, 'pgm-update-theme', theme)
     sendEvent(ws, 'schedule-update', safeGetter(getCurrentSchedule, []))
@@ -212,9 +231,11 @@ function attachWsRemote(httpServer, deps) {
     ws.on('close', () => {
       try { offBroadcast() } catch {}
       clearInterval(heartbeat)
-      // Log corto sin filtrar token completo.
+      // Log corto sin filtrar PII: omitimos deviceName (puede ser "iPhone
+      // de Juan") y solo dejamos tokenTail + 8 chars de deviceId opaco.
       const tokenTail = deviceInfo.token ? deviceInfo.token.slice(-6) : '------'
-      console.log(`[ws-remote] device ${deviceInfo.deviceName} (#${tokenTail}) disconnected`)
+      const idTail = deviceInfo.deviceId ? deviceInfo.deviceId.slice(0, 8) : '--------'
+      console.log(`[ws-remote] device #${tokenTail} disconnected (${idTail})`)
     })
 
     ws.on('error', (err) => {
