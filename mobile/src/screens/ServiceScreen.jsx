@@ -30,6 +30,7 @@ import BigButton from '../components/BigButton.jsx'
 import CommandButton from '../components/CommandButton.jsx'
 import StatusPill from '../components/StatusPill.jsx'
 import PgmPreview from '../components/PgmPreview.jsx'
+import ScheduleList from '../components/ScheduleList.jsx'
 import { transport, ClientCommand, ServerEvent } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
 import { usePgmState } from '../hooks/usePgmState.js'
@@ -175,6 +176,11 @@ export default function ServiceScreen() {
           aria-label="Quitar proyección en vivo"
         />
       </div>
+
+      {/* Lista del día — sortable con drag&drop táctil. Tap proyecta el
+          item; el handle (⋮⋮) inicia el drag para reordenar. El componente
+          se suscribe a schedule-update internamente vía useSchedule. */}
+      <ScheduleList />
 
       {/* Desemparejar — discreto, al fondo. Link gris para no competir con
           los CTAs principales pero accesible cuando el usuario lo busque. */}

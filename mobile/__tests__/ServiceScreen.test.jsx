@@ -306,9 +306,12 @@ test('9. NOT OPEN → click en Prev no envía ni vibra', () => {
 // ──────────────────────────────────────────────────────────────────────
 test('10. unmount → cleanup invoca cada unsubscribe registrada', () => {
   const { unmount } = render(<ServiceScreen />)
-  // El componente subscribe a 3 eventos: PGM_UPDATE, pgm-update-theme,
-  // AUTH_ERROR. Cada uno devuelve su propia jest.fn() unsubscribe.
-  expect(mockUnsubscribes).toHaveLength(3)
+  // El árbol subscribe a 4 eventos:
+  //   - ServiceScreen: PGM_UPDATE, pgm-update-theme, AUTH_ERROR (usePgmState
+  //     + el effect propio de la screen).
+  //   - ScheduleList → useSchedule: SCHEDULE_UPDATE.
+  // Cada uno devuelve su propia jest.fn() unsubscribe.
+  expect(mockUnsubscribes).toHaveLength(4)
   for (const off of mockUnsubscribes) {
     expect(off).not.toHaveBeenCalled()
   }

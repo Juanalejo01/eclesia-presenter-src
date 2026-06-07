@@ -20,17 +20,18 @@
 
 // Comandos: cliente (mobile) → server (desktop)
 export const ClientCommand = Object.freeze({
-  NEXT:              'next',
-  PREV:              'prev',
-  BLANK:             'blank',
-  BLACK:             'black',
-  CLEAR:             'clear',
-  BIBLE_REF:         'bible-ref',         // payload: { book, chapter, verse, version }
-  SONG:              'song',              // payload: { id, sectionIndex? }
-  ANNOUNCE:          'announce',          // payload: { title, body, durationSec? }
-  PROJECTION_CLOSE:  'projection-close',
-  LIST_REORDER:      'list-reorder',      // payload: { ids: string[] }
-  PING:              'ping',              // payload: { ts: number }
+  NEXT:                  'next',
+  PREV:                  'prev',
+  BLANK:                 'blank',
+  BLACK:                 'black',
+  CLEAR:                 'clear',
+  BIBLE_REF:             'bible-ref',             // payload: { book, chapter, verse, version }
+  SONG:                  'song',                  // payload: { id, sectionIndex? }
+  ANNOUNCE:              'announce',              // payload: { title, body, durationSec? }
+  PROJECTION_CLOSE:      'projection-close',
+  LIST_REORDER:          'list-reorder',          // payload: { ids: string[] }
+  PROJECT_SCHEDULE_ITEM: 'project-schedule-item', // payload: { id } — server resuelve por id
+  PING:                  'ping',                  // payload: { ts: number }
 })
 
 // Eventos: server (desktop) → cliente (mobile)
