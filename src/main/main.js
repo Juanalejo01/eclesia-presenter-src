@@ -170,9 +170,14 @@ function createMainWindow() {
   // en que React monta el useEffect que registra onRequestQuitConfirm, el
   // listener no existe. Si el user pulsa X en esa ventana, el send() se
   // descarta silenciosamente y e.preventDefault() deja al user atrapado.
-  // Mismo problema si el renderer está freezed (loop infinito). Por eso si
-  // en 2s no llega respuesta del renderer, caemos al dialog nativo (NO
-  // _quitNow directo — seguimos pidiendo confirmación).
+  // Mismo problema si el renderer está freezed (loop infinito).
+  //
+  // CRÍTICO: el timer mide "¿el renderer está vivo?" — NO "¿el usuario ya
+  // respondió?". El renderer envía un ACK inmediato al recibir el request
+  // (antes de mostrar el dialog) → el main cancela el timer al recibir el
+  // ack. Si no hay ack en 2s, el listener está realmente muerto y caemos
+  // al dialog nativo. SIN el ack, el timer disparaba el dialog nativo en
+  // paralelo al custom si el usuario tardaba en decidir (bug de v0.2.14).
   mainWindow.on('close', (e) => {
     if (_isQuitting) return  // ya confirmado, dejar cerrar
     e.preventDefault()
@@ -188,9 +193,10 @@ function createMainWindow() {
 
     mainWindow.webContents.send('app:request-quit-confirm')
 
-    // Guard: si el renderer no responde en 2s, asumimos que el listener
-    // no está montado (race con el splash/mount) o el renderer está freezed.
-    // Fallback al dialog nativo para no atrapar al usuario.
+    // Si no recibimos ack del renderer en 2s, asumimos que el listener no
+    // está montado o el renderer está freezed → fallback nativo. El ack
+    // llega NORMALMENTE en milisegundos (es síncrono en el renderer, no
+    // espera al usuario), así que 2s es muy generoso para el caso real.
     _pendingQuitTimer = setTimeout(() => {
       _pendingQuitTimer = null
       _confirmQuitNativeAndMaybeClose()
@@ -229,13 +235,29 @@ function _confirmQuitNativeAndMaybeClose() {
   if (choice === 1) _quitNow()
 }
 
-// El renderer responde al request-quit-confirm con true/false. Registrado
-// UNA sola vez (fuera de createMainWindow) para no acumular handlers.
-ipcMain.handle('app:respond-quit-confirm', (_e, ok) => {
+// El renderer envía este ack INMEDIATAMENTE al recibir el request — antes
+// de mostrar el modal. Eso confirma que el listener está vivo y cancelamos
+// el timer del fallback nativo. Sin esto, si el usuario tarda >2s en
+// decidir, salía el nativo en paralelo (mala UX).
+function _cancelPendingQuitTimer() {
   if (_pendingQuitTimer) {
     clearTimeout(_pendingQuitTimer)
     _pendingQuitTimer = null
   }
+}
+
+// ACK del renderer: se dispara INMEDIATAMENTE al recibir el request, antes
+// de mostrar el modal. Cancela el timer del fallback nativo. Si el ack no
+// llega → el listener no existe → fallback nativo a los 2s. Si SÍ llega →
+// el usuario puede tardar lo que quiera respondiendo.
+ipcMain.on('app:ack-quit-confirm', () => {
+  _cancelPendingQuitTimer()
+})
+
+// El renderer responde al request-quit-confirm con true/false. Registrado
+// UNA sola vez (fuera de createMainWindow) para no acumular handlers.
+ipcMain.handle('app:respond-quit-confirm', (_e, ok) => {
+  _cancelPendingQuitTimer()  // por si el ack no llegó (defensa en profundidad)
   if (ok === true) _quitNow()
   // si ok=false, no hacemos nada — la ventana se queda abierta
 })

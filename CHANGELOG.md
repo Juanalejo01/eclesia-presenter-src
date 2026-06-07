@@ -11,6 +11,26 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.17] — 2026-06-07
+
+Fix UX del confirm de cierre — eliminado el doble dialog (custom + nativo
+Win11) que aparecía si el usuario tardaba >2 s en decidir.
+
+### Fixed
+- 🐛 **Doble diálogo al cerrar la app**: el AppDialog custom aparecía
+  primero (correcto), pero a los 2 s también el dialog nativo amarillo
+  Win11 (por el timer de seguridad). Causa: el timer media "¿el usuario
+  ya respondió?" en vez de "¿el renderer está vivo?".
+- Fix: **patrón ACK** — el renderer manda `app:ack-quit-confirm` al main
+  inmediatamente al recibir el request, antes de mostrar el modal. El
+  main cancela el timer al recibir el ack. Si el ack NO llega en 2 s (el
+  renderer está freezed o el listener no se montó), entonces sí cae al
+  nativo como fallback de seguridad. Si llega (caso normal), el usuario
+  puede tardar todo lo que quiera respondiendo sin que aparezca el
+  nativo en paralelo.
+
+---
+
 ## [0.2.16] — 2026-06-07
 
 Fix de UX del auto-updater + hardening del CI.

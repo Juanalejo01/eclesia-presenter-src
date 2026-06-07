@@ -149,11 +149,13 @@ export default function App() {
     // Confirmación de cierre de la app: el main process pide al renderer
     // que muestre el AppDialog custom (en lugar del dialog nativo Win11)
     // y luego responde con true/false para que main decida cerrar.
-    // try/catch defensivo: si dialogConfirm rechaza por algún motivo
-    // inesperado (boundary explota, store corrupto, etc.) igual mandamos
-    // respondQuitConfirm(false) para que el main no quede atrapado
-    // esperando con el timer en vuelo y el user no quede preso.
+    // ACK INMEDIATO: cancela el timer del fallback nativo en el main —
+    // sin esto, si el usuario tarda >2s en decidir, salía el nativo en
+    // paralelo (bug v0.2.14-v0.2.16). El ack confirma que el listener
+    // está vivo; el respond viene después con la decisión del usuario.
     const offQuit = window.electron?.app?.onRequestQuitConfirm?.(async () => {
+      // Ack síncrono — corre ANTES de mostrar el modal.
+      try { window.electron?.app?.ackQuitConfirm?.() } catch {}
       try {
         const ok = await dialogConfirm({
           title: 'Cerrar EclesiaPresenter',

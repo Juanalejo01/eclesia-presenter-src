@@ -50,6 +50,10 @@ contextBridge.exposeInMainWorld('electron', {
     // Confirmación de cierre: el main pide al renderer que muestre el
     // AppDialog custom (en lugar del nativo Win11), y el renderer responde
     // con true/false para que el main decida cerrar o cancelar.
+    // El ack inmediato cancela el timer del fallback nativo en el main;
+    // sin él, si el usuario tarda >2s en decidir, salía el nativo en
+    // paralelo (bug de v0.2.14-v0.2.16).
+    ackQuitConfirm: () => ipcRenderer.send('app:ack-quit-confirm'),
     respondQuitConfirm: (ok) => ipcRenderer.invoke('app:respond-quit-confirm', ok),
     onRequestQuitConfirm: (cb) => {
       const h = () => cb()
