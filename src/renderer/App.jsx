@@ -21,6 +21,9 @@ import { useGlobalShortcuts, subscribe, emit } from './hooks/useShortcuts.js'
 import { selectSlide, setLive, useSlideStore } from './services/slideStore.js'
 import { syncFromMain } from './services/themeStore.js'
 import { refreshImportedVersions } from './services/bibleService.js'
+// Alias para evitar shadowing con el window.confirm global (que no usamos
+// pero la lint y la legibilidad agradecen la distinción explícita).
+import { confirm as dialogConfirm } from './services/dialogService.js'
 
 const PANELS = {
   bible:       BiblePanel,
@@ -143,7 +146,27 @@ export default function App() {
       }
     })
 
-    return () => { offSettings(); offFullscreen(); offScheduleFocus(); offRemote?.() }
+    // Confirmación de cierre de la app: el main process pide al renderer
+    // que muestre el AppDialog custom (en lugar del dialog nativo Win11)
+    // y luego responde con true/false para que main decida cerrar.
+    const offQuit = window.electron?.app?.onRequestQuitConfirm?.(async () => {
+      const ok = await dialogConfirm({
+        title: 'Cerrar EclesiaPresenter',
+        message: '¿Seguro que quieres cerrar la aplicación?',
+        detail: 'Se cerrarán también las ventanas de proyección y overlay que estén abiertas.',
+        confirmLabel: 'Cerrar EclesiaPresenter',
+        cancelLabel: 'Cancelar',
+        variant: 'danger',
+      })
+      try {
+        await window.electron.app.respondQuitConfirm(!!ok)
+      } catch {
+        // Si la respuesta falla, no podemos hacer mucho — el usuario
+        // todavía puede pulsar el botón nativo de cerrar de la ventana.
+      }
+    })
+
+    return () => { offSettings(); offFullscreen(); offScheduleFocus(); offRemote?.(); offQuit?.() }
   }, [])
 
   useGlobalShortcuts({

@@ -157,30 +157,41 @@ function createMainWindow() {
   }
 
   // Confirmación al cerrar + cierre de ventanas de proyección huérfanas.
-  // Sin esto, al cerrar la app las ventanas de Pantalla completa / overlay /
-  // stage quedaban abiertas (procesos huérfanos visibles en el proyector).
+  // Reemplazamos el dialog.showMessageBoxSync nativo Win11 (look genérico
+  // amarillo) por el AppDialog del renderer (acorde al brand cobre). El
+  // patrón: preventDefault, enviar IPC al renderer, esperar respuesta vía
+  // otro IPC, decidir cerrar o cancelar. Si el renderer aún no está vivo
+  // (caso edge — el close se dispara antes del did-finish-load) caemos al
+  // dialog nativo como fallback para no dejar al usuario atrapado.
   mainWindow.on('close', (e) => {
     if (_isQuitting) return  // ya confirmado, dejar cerrar
     e.preventDefault()
-    const choice = dialog.showMessageBoxSync(mainWindow, {
-      type: 'question',
-      buttons: ['Cancelar', 'Cerrar EclesiaPresenter'],
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true,
-      title: 'Cerrar EclesiaPresenter',
-      message: '¿Seguro que quieres cerrar la aplicación?',
-      detail: 'Se cerrarán también las ventanas de proyección y overlay que estén abiertas.',
-    })
-    if (choice === 1) {
-      _isQuitting = true
-      try { projection.closeAll() } catch {}
-      mainWindow.close()
+    if (mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send('app:request-quit-confirm')
+    } else {
+      _quitNow()
     }
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
 }
+
+// Helper centralizado para cerrar la app de verdad. Setea _isQuitting (el
+// listener de close lo respeta y deja pasar), cierra todas las ventanas de
+// proyección y cierra la mainWindow (lo que vuelve a entrar al listener,
+// pero _isQuitting=true → pasa directo).
+function _quitNow() {
+  _isQuitting = true
+  try { projection.closeAll() } catch {}
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close()
+}
+
+// El renderer responde al request-quit-confirm con true/false. Registrado
+// UNA sola vez (fuera de createMainWindow) para no acumular handlers.
+ipcMain.handle('app:respond-quit-confirm', (_e, ok) => {
+  if (ok === true) _quitNow()
+  // si ok=false, no hacemos nada — la ventana se queda abierta
+})
 
 // Flag para distinguir el cierre confirmado del primer intento (que muestra
 // el diálogo). También lo activan before-quit / window-all-closed.

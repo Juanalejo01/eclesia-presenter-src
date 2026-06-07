@@ -43,10 +43,19 @@ contextBridge.exposeInMainWorld('electron', {
     importHolyrics: ()     => ipcRenderer.invoke('songs:importHolyrics'),
   },
 
-  // Utilidades de la app (settings)
+  // Utilidades de la app (settings + ciclo de vida)
   app: {
     pickDirectory: (title) => ipcRenderer.invoke('app:pickDirectory', title),
     info:          ()      => ipcRenderer.invoke('app:info'),
+    // Confirmación de cierre: el main pide al renderer que muestre el
+    // AppDialog custom (en lugar del nativo Win11), y el renderer responde
+    // con true/false para que el main decida cerrar o cancelar.
+    respondQuitConfirm: (ok) => ipcRenderer.invoke('app:respond-quit-confirm', ok),
+    onRequestQuitConfirm: (cb) => {
+      const h = () => cb()
+      ipcRenderer.on('app:request-quit-confirm', h)
+      return () => ipcRenderer.removeListener('app:request-quit-confirm', h)
+    },
   },
 
   // Servidor local embebido (mobile remote + OBS overlay)
