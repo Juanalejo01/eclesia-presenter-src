@@ -104,13 +104,47 @@ function init() {
     emit('updater:error', { error: _state.error })
   })
 
-  // Check inicial 30s después del startup, solo si estamos en build empaquetada
-  // y NO es portable. Para portable solo hacemos check on-demand.
+  // Política de chequeo:
+  //   1. Primer check a los 5 s tras startup (antes era 30 s — demasiado tarde:
+  //      el usuario ya estaba operando y no veía el botón Actualizar).
+  //   2. Si el primer check falla por red, reintentamos a 60 s y luego cada
+  //      5 min hasta éxito (cubre culto con WiFi inestable).
+  //   3. Tras éxito, re-check cada 4 h por si la app está abierta mucho tiempo
+  //      (servicios largos, equipos siempre encendidos en sala de control).
+  // En portable / dev no chequeamos automáticamente.
   if (app.isPackaged && !_state.isPortable) {
-    setTimeout(() => {
-      checkForUpdates().catch(e => console.warn('[updater] initial check failed:', e.message))
-    }, 30_000)
+    _scheduleInitialCheck()
   }
+}
+
+function _scheduleInitialCheck() {
+  setTimeout(() => _runCheckWithRetry(), 5_000)
+}
+
+async function _runCheckWithRetry(attempt = 0) {
+  try {
+    const r = await checkForUpdates()
+    if (r.ok) {
+      // Éxito → arrancamos el ciclo de re-chequeo cada 4 h
+      _schedulePeriodicCheck()
+      return
+    }
+    if (r.error === 'dev_mode') return  // no reintentar en dev
+    throw new Error(r.error)
+  } catch (e) {
+    // Backoff: 60 s, 5 min, 5 min, 5 min...
+    const delay = attempt === 0 ? 60_000 : 5 * 60_000
+    console.warn(`[updater] check failed (attempt ${attempt + 1}), retry in ${delay/1000}s:`, e?.message)
+    setTimeout(() => _runCheckWithRetry(attempt + 1), delay)
+  }
+}
+
+let _periodicTimer = null
+function _schedulePeriodicCheck() {
+  if (_periodicTimer) return  // ya está arrancado
+  _periodicTimer = setInterval(() => {
+    checkForUpdates().catch(e => console.warn('[updater] periodic check failed:', e?.message))
+  }, 4 * 60 * 60 * 1000)  // 4 horas
 }
 
 async function checkForUpdates() {

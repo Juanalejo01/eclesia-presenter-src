@@ -11,6 +11,31 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.16] — 2026-06-07
+
+Fix de UX del auto-updater + hardening del CI.
+
+### Changed
+- 🔔 **Notificación de actualización más agresiva** — el botón cobre
+  "Actualizar EclesiaPresenter vX.X.X" ahora aparece a los **5 segundos**
+  del arranque (antes 30 s, que era demasiado tarde — el usuario ya
+  estaba operando y no veía el aviso).
+- 🔁 **Retry on network error**: si el primer check falla por red, se
+  reintenta a los 60 s y luego cada 5 min hasta éxito (cubre cultos con
+  WiFi inestable).
+- 🔄 **Check periódico cada 4 h** mientras la app está abierta — para
+  servicios largos o equipos de sala de control que quedan encendidos
+  todo el día. Si el operador no cierra la app, igual se entera de
+  nuevas versiones.
+
+### Infrastructure
+- 🔧 **CI: Node.js 20 → 22** en el workflow de tests (mata el warning
+  "Node.js 20 actions are deprecated").
+- 🔧 **CI: retry de `npm install`** con backoff exponencial (10 s, 20 s,
+  30 s) para sobrevivir blips `ECONNRESET` del runner de GitHub Actions.
+
+---
+
 ## [0.2.15] — 2026-06-07
 
 Patch encima de v0.2.14 para corregir un cleanup incompleto del bglib.

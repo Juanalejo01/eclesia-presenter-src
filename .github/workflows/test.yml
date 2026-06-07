@@ -27,13 +27,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies (root)
         shell: bash
         run: |
           set +o pipefail
-          npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts
+          # Retry con backoff para sobrevivir ECONNRESET / blips de red del runner
+          for i in 1 2 3; do
+            npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts && break
+            echo "npm install falló (intento $i/3), reintentando en $((i*10))s..."
+            sleep $((i*10))
+          done
         env:
           CI: 'true'
 
@@ -64,13 +69,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install root dependencies
         shell: bash
         run: |
           set +o pipefail
-          npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts
+          for i in 1 2 3; do
+            npm install --no-audit --no-fund --legacy-peer-deps --ignore-scripts && break
+            echo "npm install (root) falló (intento $i/3), reintentando en $((i*10))s..."
+            sleep $((i*10))
+          done
         env:
           CI: 'true'
 
@@ -78,7 +87,11 @@ jobs:
         shell: bash
         run: |
           cd web
-          npm install --no-audit --no-fund --legacy-peer-deps
+          for i in 1 2 3; do
+            npm install --no-audit --no-fund --legacy-peer-deps && break
+            echo "npm install (web) falló (intento $i/3), reintentando en $((i*10))s..."
+            sleep $((i*10))
+          done
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
