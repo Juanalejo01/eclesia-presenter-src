@@ -69,10 +69,11 @@ describe('deriveBgStyle', () => {
   })
 
   test('7. bgType gradient → linear-gradient 135deg con los 2 colores', () => {
+    // Usamos hex válidos (3 dígitos cumplen el regex de _isValidColor).
     expect(
-      deriveBgStyle({ bgType: 'gradient', bgGradient: ['#1', '#2'] }),
+      deriveBgStyle({ bgType: 'gradient', bgGradient: ['#abc', '#def'] }),
     ).toEqual({
-      background: 'linear-gradient(135deg, #1 0%, #2 100%)',
+      background: 'linear-gradient(135deg, #abc 0%, #def 100%)',
     })
   })
 
@@ -177,6 +178,188 @@ describe('classifySlide', () => {
 
   test('14c. objeto vacío → empty', () => {
     expect(classifySlide({})).toBe('empty')
+  })
+})
+
+describe('mergeTheme — security & coercion', () => {
+  test('16. CSS injection en bgColor → rechazado, queda default', () => {
+    const m = mergeTheme({ bgColor: 'red; background-image: url(https://evil/) //' })
+    expect(m.bgColor).toBe(DEFAULT_THEME.bgColor)
+  })
+
+  test('16b. url() solo → rechazado', () => {
+    const m = mergeTheme({ bgColor: 'url(https://evil/x.png)' })
+    expect(m.bgColor).toBe(DEFAULT_THEME.bgColor)
+  })
+
+  test('16c. expression() rechazado', () => {
+    const m = mergeTheme({ fontColor: 'expression(alert(1))' })
+    expect(m.fontColor).toBe(DEFAULT_THEME.fontColor)
+  })
+
+  test('16d. var() rechazado (no aceptamos indirección)', () => {
+    const m = mergeTheme({ bgColor: 'var(--evil)' })
+    expect(m.bgColor).toBe(DEFAULT_THEME.bgColor)
+  })
+
+  test('16e. newline en color rechazado', () => {
+    const m = mergeTheme({ bgColor: '#fff\nbackground: red' })
+    expect(m.bgColor).toBe(DEFAULT_THEME.bgColor)
+  })
+
+  test('17. CSS injection en bgGradient → todo el array rechazado', () => {
+    const m = mergeTheme({
+      bgGradient: ['red; background-image: url(https://evil/)', '#000'],
+    })
+    // bgGradient queda igual a defaults (rechazo de TODO el array,
+    // no aceptación parcial — la regla es estricta).
+    expect(m.bgGradient).toEqual([
+      DEFAULT_THEME.bgGradient[0],
+      DEFAULT_THEME.bgGradient[1],
+    ])
+  })
+
+  test('17b. bgGradient array con 1 solo color → rechazado', () => {
+    const m = mergeTheme({ bgGradient: ['#fff'] })
+    expect(m.bgGradient).toEqual([
+      DEFAULT_THEME.bgGradient[0],
+      DEFAULT_THEME.bgGradient[1],
+    ])
+  })
+
+  test('17c. bgGradient válido → copia (no referencia compartida)', () => {
+    const input = ['#abcdef', '#123456']
+    const m = mergeTheme({ bgGradient: input })
+    expect(m.bgGradient).toEqual(input)
+    expect(m.bgGradient).not.toBe(input) // copia, no ref
+  })
+
+  test('18. CSS injection en fontFamily → rechazado', () => {
+    const m = mergeTheme({ fontFamily: 'Arial; expression(alert(1))' })
+    expect(m.fontFamily).toBe(DEFAULT_THEME.fontFamily)
+  })
+
+  test('18b. fontFamily con url() rechazado', () => {
+    const m = mergeTheme({ fontFamily: 'Arial, url(https://evil/x.woff)' })
+    expect(m.fontFamily).toBe(DEFAULT_THEME.fontFamily)
+  })
+
+  test('18c. fontFamily válido aceptado', () => {
+    const m = mergeTheme({ fontFamily: '"Open Sans", sans-serif' })
+    expect(m.fontFamily).toBe('"Open Sans", sans-serif')
+  })
+
+  test('19. fontSize string no numérico → default (NaN rechazado)', () => {
+    const m = mergeTheme({ fontSize: 'evil' })
+    expect(m.fontSize).toBe(DEFAULT_THEME.fontSize)
+  })
+
+  test('19b. fontSize NaN → default', () => {
+    const m = mergeTheme({ fontSize: NaN })
+    expect(m.fontSize).toBe(DEFAULT_THEME.fontSize)
+  })
+
+  test('19c. fontSize Infinity → default', () => {
+    const m = mergeTheme({ fontSize: Infinity })
+    expect(m.fontSize).toBe(DEFAULT_THEME.fontSize)
+  })
+
+  test('19d. fontSize negativo → clamp al min 8', () => {
+    const m = mergeTheme({ fontSize: -10 })
+    expect(m.fontSize).toBe(8)
+  })
+
+  test('19e. fontSize muy grande → clamp al max 400', () => {
+    const m = mergeTheme({ fontSize: 9999 })
+    expect(m.fontSize).toBe(400)
+  })
+
+  test('19f. fontSize string numérico → coerce + acepta', () => {
+    const m = mergeTheme({ fontSize: '72' })
+    expect(m.fontSize).toBe(72)
+  })
+
+  test('20. textMargin negativo → clamp a 0', () => {
+    const m = mergeTheme({ textMargin: -1000 })
+    expect(m.textMargin).toBe(0)
+  })
+
+  test('20b. strokeWidth negativo → clamp a 0', () => {
+    const m = mergeTheme({ strokeWidth: -5 })
+    expect(m.strokeWidth).toBe(0)
+  })
+
+  test('20c. letterSpacing fuera de rango → clamp', () => {
+    expect(mergeTheme({ letterSpacing: -10 }).letterSpacing).toBe(-0.5)
+    expect(mergeTheme({ letterSpacing: 50 }).letterSpacing).toBe(2)
+  })
+
+  test('20d. fontWeight fuera de rango → clamp', () => {
+    expect(mergeTheme({ fontWeight: 50 }).fontWeight).toBe(100)
+    expect(mergeTheme({ fontWeight: 1500 }).fontWeight).toBe(900)
+  })
+
+  test('21. bgType inválido → default', () => {
+    const m = mergeTheme({ bgType: 'evil-injection' })
+    expect(m.bgType).toBe(DEFAULT_THEME.bgType)
+  })
+
+  test('21b. textAlign inválido → default', () => {
+    const m = mergeTheme({ textAlign: 'justify; url(x)' })
+    expect(m.textAlign).toBe(DEFAULT_THEME.textAlign)
+  })
+
+  test('21c. referenceSize inválido → default', () => {
+    const m = mergeTheme({ referenceSize: 'xxl' })
+    expect(m.referenceSize).toBe(DEFAULT_THEME.referenceSize)
+  })
+
+  test('22. textShadow no-boolean → default', () => {
+    const m = mergeTheme({ textShadow: 'true' })
+    expect(m.textShadow).toBe(DEFAULT_THEME.textShadow)
+  })
+
+  test('22b. referenceVisible no-boolean → default', () => {
+    const m = mergeTheme({ referenceVisible: 1 })
+    expect(m.referenceVisible).toBe(DEFAULT_THEME.referenceVisible)
+  })
+
+  test('23. bgImage URL válida https → aceptada', () => {
+    const m = mergeTheme({ bgImage: 'https://cdn.example/x.png' })
+    expect(m.bgImage).toBe('https://cdn.example/x.png')
+  })
+
+  test('23b. bgImage url() injection rechazada', () => {
+    const m = mergeTheme({ bgImage: 'https://x.com/) ; url(evil' })
+    expect(m.bgImage).toBe(DEFAULT_THEME.bgImage)
+  })
+
+  test('23c. bgImage javascript: rechazada', () => {
+    const m = mergeTheme({ bgImage: 'javascript:alert(1)' })
+    expect(m.bgImage).toBe(DEFAULT_THEME.bgImage)
+  })
+
+  test('24. rgb() válido aceptado', () => {
+    const m = mergeTheme({ bgColor: 'rgb(255, 0, 0)' })
+    expect(m.bgColor).toBe('rgb(255, 0, 0)')
+  })
+
+  test('24b. rgba() válido aceptado', () => {
+    const m = mergeTheme({ bgColor: 'rgba(0,0,0,0.5)' })
+    expect(m.bgColor).toBe('rgba(0,0,0,0.5)')
+  })
+
+  test('24c. rgb con paréntesis sin cerrar → rechazado', () => {
+    const m = mergeTheme({ bgColor: 'rgb(255, 0, 0' })
+    expect(m.bgColor).toBe(DEFAULT_THEME.bgColor)
+  })
+
+  test('25. DEFAULT_THEME.bgGradient es array frozen — mutar lanza', () => {
+    expect(() => DEFAULT_THEME.bgGradient.push('#fff')).toThrow(TypeError)
+  })
+
+  test('25b. DEFAULT_THEME es frozen — mutar lanza', () => {
+    expect(() => { DEFAULT_THEME.fontSize = 99 }).toThrow(TypeError)
   })
 })
 

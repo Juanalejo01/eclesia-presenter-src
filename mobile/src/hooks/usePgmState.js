@@ -7,6 +7,16 @@
  *                         `version` del server, emitido en el handshake
  *                         inicial y en cada cambio.
  *
+ * CONTRATO con el server:
+ *   El server SIEMPRE emite un theme completo (full payload), no
+ *   parches incrementales. Eso simplifica el cliente: cada
+ *   `pgm-update-theme` reemplaza el estado entero, no muta campos
+ *   individuales. Si en T6+ aparece un patrón patch-incremental,
+ *   habría que pasar a `{ ...prev, ...mergeTheme(payload) }` y
+ *   versionar; documentar aquí cuando suceda. En DEV avisamos por
+ *   console si llega un payload sospechosamente incompleto — útil
+ *   durante desarrollo del desktop, silencioso en producción.
+ *
  * Devuelve `{ slide, theme, serverVersion }` listo para componer en la
  * UI. Se debe usar UNA SOLA VEZ por árbol (lo monta ServiceScreen) para
  * no duplicar logs ni handlers. Si en T11 hace falta usarlo desde otro
@@ -23,22 +33,13 @@
 import { useEffect, useState } from 'react'
 import { transport, ServerEvent } from '../services/transport.js'
 import { DEFAULT_THEME, mergeTheme } from '../services/slideTheme.js'
+import { IS_DEV, debug } from '../services/devLog.js'
 
-// DEV-only logger — mismo patrón que ServiceScreen: import.meta literal
-// es parse-error en Jest CJS, así que lo accedemos via `new Function`.
-const _isDev = (() => {
-  try {
-    // eslint-disable-next-line no-new-func
-    const env = new Function('try { return import.meta.env } catch { return undefined }')()
-    return !!(env && env.DEV)
-  } catch {
-    return false
-  }
-})()
-
-function _debug(...args) {
-  if (_isDev) console.log(...args)
-}
+// Campos cuya ausencia en el payload del server consideramos
+// sospechosa (vienen siempre en un theme bien formado del desktop).
+// Si faltan, IS_DEV warn — pero seguimos aplicando el merge porque
+// `mergeTheme` ya rellena con defaults seguros.
+const _EXPECTED_THEME_FIELDS = ['bgType', 'fontFamily', 'fontColor', 'textAlign']
 
 export function usePgmState() {
   const [slide, setSlide] = useState(null)
@@ -50,7 +51,7 @@ export function usePgmState() {
 
     const offSlide = transport.subscribe(ServerEvent.PGM_UPDATE, (payload) => {
       if (!mounted) return
-      _debug('[pgm] slide update', payload?.text?.slice(0, 40))
+      debug('[pgm] slide update', payload?.text?.slice(0, 40))
       setSlide(payload || null)
     })
 
@@ -58,7 +59,27 @@ export function usePgmState() {
     // no del slide). Suscribimos por literal — el server lo emite.
     const offTheme = transport.subscribe('pgm-update-theme', (payload) => {
       if (!mounted) return
-      _debug('[pgm] theme update')
+      debug('[pgm] theme update')
+      // Aviso DEV-only si el server manda un payload parcial: indica
+      // un bug de contrato del desktop, no del cliente. Producción
+      // ignora silenciosamente (mergeTheme rellena con defaults).
+      if (IS_DEV && payload && typeof payload === 'object') {
+        const missing = _EXPECTED_THEME_FIELDS.filter(
+          (k) => payload[k] === undefined,
+        )
+        if (missing.length === _EXPECTED_THEME_FIELDS.length) {
+          // Payload no tiene NINGUNO de los campos esperados — muy
+          // probable que sea sólo `{version}` o un wrapper distinto.
+          // No es un warn duro, sólo log informativo.
+          debug('[pgm] theme payload sin campos de tema, sólo metadata')
+        } else if (missing.length > 0) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[pgm] theme payload parcial — campos faltantes:',
+            missing.join(','),
+          )
+        }
+      }
       if (payload && typeof payload.version === 'string') {
         setServerVersion(payload.version)
       }
