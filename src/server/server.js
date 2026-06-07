@@ -144,6 +144,24 @@ function startServer(opts = {}) {
   _io = io
   app.use(express.json({ limit: '8kb' }))
 
+  // CORS global para TODAS las rutas /api/*. Sin esto, los browsers bloquean
+  // el POST /api/pair desde el mobile dev server (puerto 5173) hacia el server
+  // (puerto 3434) — son origins distintos para el navegador aunque coincida IP.
+  // Permitimos '*' porque:
+  //   - Solo expuesto en LAN (puerto 3434 sin reverse proxy a internet)
+  //   - Endpoints sensibles (/api/pair/devices, /api/pair/:token) usan Bearer
+  //   - El rate-limit por IP del /api/pair sigue activo
+  // OPTIONS preflight se responde con 204 + headers para los POST con
+  // content-type: application/json (que disparan preflight).
+  app.use('/api', (req, res, next) => {
+    res.set('Access-Control-Allow-Origin', '*')
+    res.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    res.set('Access-Control-Max-Age', '86400')
+    if (req.method === 'OPTIONS') return res.sendStatus(204)
+    next()
+  })
+
   // Página raíz: bienvenida + link al remote
   app.get('/', (_req, res) => {
     const ip = getLocalIP()
