@@ -11,6 +11,7 @@ export default function sitemap() {
     { path: '/pricing',          priority: 0.9, changeFrequency: 'monthly' },
     { path: '/download',         priority: 0.9, changeFrequency: 'weekly'  },
     { path: '/casos-de-uso',     priority: 0.7, changeFrequency: 'monthly' },
+    { path: '/recursos',         priority: 0.8, changeFrequency: 'weekly'  },
     { path: '/docs',             priority: 0.7, changeFrequency: 'weekly'  },
     { path: '/contacto',         priority: 0.5, changeFrequency: 'yearly'  },
     { path: '/legal/privacidad', priority: 0.3, changeFrequency: 'yearly'  },

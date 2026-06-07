@@ -43,6 +43,9 @@ export default async function Navbar() {
           <Link href="/casos-de-uso" className="text-ink-2 hover:text-ink-1 transition-colors">
             Casos de uso
           </Link>
+          <Link href="/recursos" className="text-ink-2 hover:text-ink-1 transition-colors">
+            Recursos
+          </Link>
           <Link href="/docs" className="text-ink-2 hover:text-ink-1 transition-colors">
             Documentación
           </Link>

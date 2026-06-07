@@ -29,6 +29,7 @@ export default function MobileMenu({ user }) {
     { href: '/#features',     label: 'Funciones' },
     { href: '/pricing',       label: 'Precios' },
     { href: '/casos-de-uso',  label: 'Casos de uso' },
+    { href: '/recursos',      label: 'Recursos' },
     { href: '/docs',          label: 'Documentación' },
     { href: '/download',      label: 'Descargar' },
     { href: '/contacto',      label: 'Contacto' },
