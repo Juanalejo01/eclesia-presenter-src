@@ -7,6 +7,7 @@ import { useAppSettings, setSettings, pickDirectory } from '../services/appSetti
 import { setTheme as setStoredTheme, useTheme } from '../services/themeStore.js'
 import { refreshImportedVersions } from '../services/bibleService.js'
 import { AVAILABLE_LOCALES } from '../services/i18n.js'
+import { confirm, alert } from '../services/dialogService.js'
 import {
   IconX, IconImage, IconVideo, IconMonitor, IconBible, IconMusic,
   IconBroadcast, IconSettings, IconUpload, IconTrash, IconCheck, IconKey,
@@ -505,7 +506,15 @@ function SectionBiblias({ onUpdate }) {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar esta Biblia importada?')) return
+    const ok = await confirm({
+      title: 'Eliminar Biblia',
+      message: '¿Eliminar esta Biblia importada?',
+      detail: 'Si la necesitas más tarde, puedes volver a importarla desde el archivo original.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     await window.electron.bibles.deleteImported(id)
     await refreshImportedVersions()
     refresh(); onUpdate?.()
@@ -1161,7 +1170,15 @@ function SectionLicencia({ onUpdate }) {
   }
 
   const onDeactivate = async () => {
-    if (!confirm('¿Seguro? Este PC volverá a plan Free y liberará un slot para que actives otro equipo.')) return
+    const ok = await confirm({
+      title: 'Desactivar licencia en este PC',
+      message: '¿Seguro que quieres desactivar la licencia aquí?',
+      detail: 'Este PC volverá al plan Free y liberará un slot para que actives otro equipo.',
+      confirmLabel: 'Desactivar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     setError(''); setSuccess(''); setLoading(true)
     try {
       const res = await window.electron.license.deactivate()
@@ -1456,7 +1473,14 @@ function SectionFondos({ onUpdate }) {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('¿Borrar este fondo? Lo puedes volver a descargar después.')) return
+    const ok = await confirm({
+      title: 'Borrar fondo',
+      message: '¿Borrar este fondo? Lo puedes volver a descargar después.',
+      confirmLabel: 'Borrar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     await window.electron.bglib.delete(id)
     refresh()
   }
@@ -1464,7 +1488,13 @@ function SectionFondos({ onUpdate }) {
   const handleUseAsBg = async (id) => {
     const bgUrl = `preset://${id}.mp4`
     setStoredTheme({ bgType: 'video', bgVideo: bgUrl, videoFit: 'cover' })
-    alert('✓ Aplicado como fondo de proyección. Ve al panel Proyección para ajustar.')
+    await alert({
+      title: 'Fondo aplicado',
+      message: 'Aplicado como fondo de proyección.',
+      detail: 'Ve al panel Proyección para ajustar.',
+      okLabel: 'Entendido',
+      variant: 'info',
+    })
   }
 
   if (!state) return <div style={{ color: 'var(--text-3)' }}>Cargando catálogo…</div>

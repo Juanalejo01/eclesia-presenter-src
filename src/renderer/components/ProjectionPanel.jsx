@@ -6,6 +6,7 @@ import {
   useTheme, setTheme as setStoredTheme, setOverlay, applyOverlayPreset, OVERLAY_PRESETS, resetTheme,
 } from '../services/themeStore.js'
 import { listSystemFonts } from '../services/systemFontsService.js'
+import { confirm, alert } from '../services/dialogService.js'
 import {
   IconExternal, IconMonitor, IconLayers, IconRefresh,
 } from './Icons.jsx'
@@ -91,7 +92,13 @@ export default function ProjectionPanel({ slide }) {
 
   const open = async (mode, displayId) => {
     if (!hasElectron) {
-      alert('Las ventanas de proyección requieren Electron real (npm run dev). En navegador solo puedes previsualizar.')
+      await alert({
+        title: 'Modo solo preview',
+        message: 'Las ventanas de proyección requieren la app nativa.',
+        detail: 'En navegador solo puedes previsualizar el resultado. Usa `npm run dev` o instala la app de escritorio.',
+        okLabel: 'Entendido',
+        variant: 'info',
+      })
       return
     }
     await window.electron.projection.open({ mode, displayId })
@@ -256,8 +263,16 @@ function CustomizationGrid({ theme, updateTheme }) {
         <h3>Personalización avanzada</h3>
         <button
           className="btn btn-ghost"
-          onClick={() => {
-            if (confirm('¿Restablecer el tema de proyección a los valores por defecto?\n\nVuelve al degradado azul, fuente Cormorant, texto blanco y tamaño 64, y limpia fondos de imagen/vídeo. Útil si la proyección se ve negra.')) {
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Restablecer tema de proyección',
+              message: '¿Restablecer el tema a los valores por defecto?',
+              detail: 'Vuelve al degradado azul, fuente Cormorant, texto blanco y tamaño 64, y limpia fondos de imagen/vídeo. Útil si la proyección se ve negra.',
+              confirmLabel: 'Restablecer',
+              cancelLabel: 'Cancelar',
+              variant: 'default',
+            })
+            if (ok) {
               resetTheme()
             }
           }}

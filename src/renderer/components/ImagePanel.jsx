@@ -3,6 +3,7 @@ import {
   listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
 import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
+import { confirm } from '../services/dialogService.js'
 import { subscribe } from '../hooks/useShortcuts.js'
 import {
   IconUpload, IconImage, IconTrash, IconArrowRight, IconPlus,
@@ -260,7 +261,14 @@ export default function ImagePanel({ onSendSlide }) {
                         style={{ height: 28, padding: '0 8px' }}
                         onClick={async (e) => {
                           e.stopPropagation()
-                          if (confirm(t('image.deleteConfirm', { name: item.name }))) {
+                          const ok = await confirm({
+                            title: 'Eliminar imagen',
+                            message: t('image.deleteConfirm', { name: item.name }),
+                            confirmLabel: 'Eliminar',
+                            cancelLabel: 'Cancelar',
+                            variant: 'danger',
+                          })
+                          if (ok) {
                             await deleteMedia(item.id); refresh()
                             if (selected?.id === item.id) setSelected(null)
                           }

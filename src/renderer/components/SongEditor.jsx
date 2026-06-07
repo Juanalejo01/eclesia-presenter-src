@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { songToSlides } from '../services/songSplit.js'
+import { confirm } from '../services/dialogService.js'
 import {
   IconX, IconPlus, IconArrowUp, IconArrowDown, IconCheck, IconChevDown,
 } from './Icons.jsx'
@@ -115,9 +116,16 @@ export default function SongEditor({ song, onSave, onCancel }) {
   }
 
   // Cierre seguro: si hay cambios sin guardar, pedir confirmación.
-  const requestClose = () => {
+  const requestClose = async () => {
     if (hasUnsavedChanges()) {
-      const ok = confirm('Tienes cambios sin guardar. ¿Seguro que quieres cerrar y descartar lo escrito?')
+      const ok = await confirm({
+        title: 'Cambios sin guardar',
+        message: '¿Cerrar y descartar lo que has escrito?',
+        detail: 'Los cambios en esta canción se perderán y no podrás recuperarlos.',
+        confirmLabel: 'Descartar y cerrar',
+        cancelLabel: 'Seguir editando',
+        variant: 'danger',
+      })
       if (!ok) return
     }
     onCancel()

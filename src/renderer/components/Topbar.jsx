@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LogoMonogram, IconSettings } from './Icons.jsx'
 import { useT } from '../services/i18n.js'
+import { alert } from '../services/dialogService.js'
 import UpdateButton from './UpdateButton.jsx'
 
 export default function Topbar({ onSettingsChange, onOpenSettings }) {
@@ -29,7 +30,13 @@ export default function Topbar({ onSettingsChange, onOpenSettings }) {
   const openPresenter = async () => {
     const proj = window.electron?.projection
     if (!proj) {
-      alert('La proyección requiere la app nativa (npm run dev). En navegador no funciona.')
+      await alert({
+        title: 'Función no disponible',
+        message: 'La proyección requiere la app nativa.',
+        detail: 'En modo navegador puedes previsualizar pero no abrir ventanas de proyección. Usa `npm run dev` o instala la app.',
+        okLabel: 'Entendido',
+        variant: 'info',
+      })
       return
     }
     try {

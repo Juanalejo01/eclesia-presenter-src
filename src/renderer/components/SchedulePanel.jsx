@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   subscribe, getItems, addItem, removeItem, toggleDone, moveItem, clear,
 } from '../services/scheduleService.js'
+import { confirm } from '../services/dialogService.js'
 import { subscribe as onShortcut } from '../hooks/useShortcuts.js'
 import {
   IconPlus, IconCheck, IconX, IconBible, IconMusic, IconList,
@@ -86,7 +87,16 @@ export default function SchedulePanel({ onSendSlide }) {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {items.length > 0 && (
-            <button className="btn btn-ghost btn-danger" onClick={() => confirm(t('schedule.clearConfirm')) && clear()}>
+            <button className="btn btn-ghost btn-danger" onClick={async () => {
+              const ok = await confirm({
+                title: 'Vaciar lista del día',
+                message: t('schedule.clearConfirm'),
+                confirmLabel: 'Vaciar',
+                cancelLabel: 'Cancelar',
+                variant: 'danger',
+              })
+              if (ok) clear()
+            }}>
               {t('schedule.clearAll')}
             </button>
           )}

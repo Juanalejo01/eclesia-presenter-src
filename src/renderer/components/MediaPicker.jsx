@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { pickMedia, listMedia, deleteMedia, getMediaURL, isUsingNativeStorage } from '../services/mediaService.js'
+import { confirm } from '../services/dialogService.js'
 
 /**
  * Picker visual de medios. Lista miniaturas, permite añadir nuevos archivos
@@ -45,7 +46,15 @@ export default function MediaPicker({ kind = 'all', value, onChange, label = 'Me
 
   const handleDelete = async (e, id) => {
     e.stopPropagation()
-    if (!confirm('¿Quitar este archivo de la biblioteca?')) return
+    const ok = await confirm({
+      title: 'Quitar archivo',
+      message: '¿Quitar este archivo de la biblioteca?',
+      detail: 'El archivo se elimina de la biblioteca pero NO se borra del disco — siempre puedes volver a importarlo.',
+      confirmLabel: 'Quitar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteMedia(id)
     refresh()
     // Si era el seleccionado, deseleccionar

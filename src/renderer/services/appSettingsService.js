@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { setLocale } from './i18n.js'
+import { alert } from './dialogService.js'
 
 const KEY = 'eclesia.appSettings'
 
@@ -75,7 +76,13 @@ if (typeof document !== 'undefined') {
 
 export async function pickDirectory(title) {
   if (!window.electron?.app?.pickDirectory) {
-    alert('Esta función requiere Electron real (npm run dev).')
+    await alert({
+      title: 'Solo en la app instalada',
+      message: 'Esta función requiere Electron.',
+      detail: 'Usa `npm run dev` para desarrollo o instala la app de escritorio.',
+      okLabel: 'Entendido',
+      variant: 'info',
+    })
     return null
   }
   return window.electron.app.pickDirectory(title)

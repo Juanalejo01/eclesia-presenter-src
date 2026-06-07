@@ -7,6 +7,7 @@ import { normalizeText } from '../services/textUtils.js'
 import SongEditor from './SongEditor.jsx'
 import ResizableDivider from './ResizableDivider.jsx'
 import { subscribe, emit } from '../hooks/useShortcuts.js'
+import { confirm } from '../services/dialogService.js'
 import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
 import { getSongsCache, updateSongsCache } from '../services/panelStateCache.js'
 import { songToSlides } from '../services/songSplit.js'
@@ -168,7 +169,14 @@ export default function SongsPanel({ onSendSlide }) {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm(t('songs.deleteConfirm'))) return
+    const ok = await confirm({
+      title: 'Eliminar canción',
+      message: t('songs.deleteConfirm'),
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteSong(id)
     if (selected?.id === id) setSelected(null)
     // Quitar del orden del servicio si estaba
@@ -373,7 +381,14 @@ export default function SongsPanel({ onSendSlide }) {
   }, [])
 
   const clearService = async () => {
-    if (!confirm(t('songs.clearListConfirm'))) return
+    const ok = await confirm({
+      title: 'Vaciar lista del día',
+      message: t('songs.clearListConfirm'),
+      confirmLabel: 'Vaciar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     for (const id of serviceOrderIds) {
       const s = songs.find(x => x.id === id)
       if (s?.is_favorite) await toggleFavorite(id)

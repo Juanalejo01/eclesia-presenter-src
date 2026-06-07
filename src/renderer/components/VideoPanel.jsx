@@ -3,6 +3,7 @@ import {
   listMedia, pickMedia, addFiles, deleteMedia, getMediaURL,
 } from '../services/mediaService.js'
 import { addItem as addToSchedule, setScheduleDragPayload } from '../services/scheduleService.js'
+import { confirm } from '../services/dialogService.js'
 import { emit, subscribe } from '../hooks/useShortcuts.js'
 import {
   IconUpload, IconVideo, IconTrash, IconArrowRight, IconPlus, IconPlay, IconPause,
@@ -235,7 +236,14 @@ export default function VideoPanel({ onSendSlide }) {
                   onProject={() => project(item)}
                   onSchedulePayload={() => buildScheduleItem(item)}
                   onDelete={async () => {
-                    if (confirm(t('video.deleteConfirm', { name: item.name }))) {
+                    const ok = await confirm({
+                      title: 'Eliminar video',
+                      message: t('video.deleteConfirm', { name: item.name }),
+                      confirmLabel: 'Eliminar',
+                      cancelLabel: 'Cancelar',
+                      variant: 'danger',
+                    })
+                    if (ok) {
                       await deleteMedia(item.id); refresh()
                       if (selected?.id === item.id) setSelected(null)
                     }
