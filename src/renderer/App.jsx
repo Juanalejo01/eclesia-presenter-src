@@ -15,6 +15,7 @@ import CommandPalette from './components/CommandPalette.jsx'
 import Settings from './components/Settings.jsx'
 import SplashScreen from './components/SplashScreen.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import AppDialog from './components/AppDialog.jsx'
 import ResizableDivider from './components/ResizableDivider.jsx'
 import { useGlobalShortcuts, subscribe, emit } from './hooks/useShortcuts.js'
 import { selectSlide, setLive, useSlideStore } from './services/slideStore.js'
@@ -201,6 +202,10 @@ export default function App() {
           initialSection={settingsInitialSection}
         />
       )}
+      {/* Modal global de confirm/alert/prompt: montado siempre, renderiza
+          null cuando no hay dialog activo. Reemplaza los window.* nativos
+          (look genérico Win11) por uno acorde al brand cobre. */}
+      <AppDialog />
     </>
   )
 }
