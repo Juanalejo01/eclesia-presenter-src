@@ -16,6 +16,12 @@ const { attachWsRemote } = require('./wsRemote')
 
 const PORT = 3434  // movido del clásico 3000 para evitar choque con otros dev servers
 
+// Cacheamos la versión del package.json al cargar el módulo. require() está
+// memoized por Node (siempre devuelve el mismo objeto), pero parsear la ruta
+// + lookup en el cache por cada request es trabajo gratuito que ya teníamos
+// en /api/info y /api/pair. Mejor leerlo una vez al boot.
+const APP_VERSION = require('../../package.json').version
+
 // Estado del slide actual (lo mantiene el server para enviarlo a clientes nuevos)
 let currentSlide = { text: '', reference: '', type: 'blank' }
 let currentTheme = null
@@ -167,7 +173,7 @@ function startServer(opts = {}) {
     res.json({
       ok: true,
       app: 'EclesiaPresenter',
-      version: require('../../package.json').version,
+      version: APP_VERSION,
       protocol: 1,
       capabilities: ['ws-remote', 'pair-v1'],
     })
@@ -202,7 +208,7 @@ function startServer(opts = {}) {
       ok: true,
       token,
       serverInfo: {
-        version: require('../../package.json').version,
+        version: APP_VERSION,
         // Usamos el puerto real del listener (no la constante PORT) por si
         // en tests/dev se levantó en un puerto distinto.
         wsUrl: `ws://${getLocalIP()}:${httpServer.address()?.port || PORT}/ws/remote`,

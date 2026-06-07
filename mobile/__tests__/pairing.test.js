@@ -13,12 +13,13 @@
  * moduleNameMapper, así que getDeviceId() funciona sin Capacitor.
  */
 
-let pairWithDesktop, checkServer, PairingError
+let pairWithDesktop, probeServer, checkServer, PairingError
 
 beforeEach(() => {
   jest.resetModules()
   const mod = require('../src/services/pairing.js')
   pairWithDesktop = mod.pairWithDesktop
+  probeServer = mod.probeServer
   checkServer = mod.checkServer
   PairingError = mod.PairingError
 })
@@ -310,16 +311,16 @@ test('9b. fetch recibe AbortSignal (verifica wiring del timeout)', async () => {
 })
 
 // ---------------------------------------------------------------------------
-// T3 hardening: checkServer() y probe-before-pair
+// T3 hardening: probeServer() y probe-before-pair
 // ---------------------------------------------------------------------------
 
-describe('checkServer()', () => {
-  test('URL sin scheme → no_alcanzable, sin fetch', async () => {
+describe('probeServer() (contrato throw)', () => {
+  test('URL sin scheme → throws PairingError(no_alcanzable), sin fetch', async () => {
     const spy = jest.fn()
     global.fetch = spy
-    const r = await checkServer('nope')
-    expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('no_alcanzable')
+    await expect(probeServer('nope')).rejects.toMatchObject({
+      code: 'no_alcanzable',
+    })
     expect(spy).not.toHaveBeenCalled()
   })
 
@@ -330,7 +331,7 @@ describe('checkServer()', () => {
         json: { ok: true, app: 'EclesiaPresenter', version: '9.9.9', protocol: 1 },
       }),
     )
-    const r = await checkServer('http://1.2.3.4:3434')
+    const r = await probeServer('http://1.2.3.4:3434')
     expect(r.ok).toBe(true)
     expect(r.app).toBe('EclesiaPresenter')
     expect(r.version).toBe('9.9.9')
@@ -342,7 +343,13 @@ describe('checkServer()', () => {
     )
   })
 
-  test('respuesta HTML (Content-Type text/html) → puerto_incorrecto', async () => {
+  test('Status 404 → { legacy: true } (desktop antiguo sin /api/info)', async () => {
+    mockFetchOnce(makeRes({ status: 404, json: {} }))
+    const r = await probeServer('http://1.2.3.4:3434')
+    expect(r.legacy).toBe(true)
+  })
+
+  test('respuesta HTML (Content-Type text/html) → throws puerto_incorrecto', async () => {
     mockFetchOnce(
       makeRes({
         status: 200,
@@ -350,12 +357,81 @@ describe('checkServer()', () => {
         json: {},
       }),
     )
-    const r = await checkServer('http://1.2.3.4:5173')
-    expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('puerto_incorrecto')
+    await expect(probeServer('http://1.2.3.4:5173')).rejects.toMatchObject({
+      code: 'puerto_incorrecto',
+    })
   })
 
-  test('JSON con app distinto → puerto_incorrecto', async () => {
+  test('JSON con app distinto → throws no_es_eclesia', async () => {
+    mockFetchOnce(
+      makeRes({
+        status: 200,
+        json: { ok: true, app: 'OtraApp', version: '1' },
+      }),
+    )
+    await expect(probeServer('http://1.2.3.4:3434')).rejects.toMatchObject({
+      code: 'no_es_eclesia',
+    })
+  })
+
+  test('TypeError "Failed to fetch" → throws no_alcanzable (CORS/TCP/legacy ambigüedad)', async () => {
+    global.fetch = jest.fn(() => {
+      const e = new TypeError('Failed to fetch')
+      return Promise.reject(e)
+    })
+    await expect(probeServer('http://1.2.3.4:3434')).rejects.toMatchObject({
+      code: 'no_alcanzable',
+      message: expect.stringMatching(/versión antigua|mismo WiFi|encendido/i),
+    })
+  })
+
+  test('ECONNREFUSED → throws servidor_caido', async () => {
+    global.fetch = jest.fn(() => Promise.reject(new Error('connect ECONNREFUSED 1.2.3.4:3434')))
+    await expect(probeServer('http://1.2.3.4:3434')).rejects.toMatchObject({
+      code: 'servidor_caido',
+    })
+  })
+
+  test('AbortError tras timeout → throws firewall_o_red', async () => {
+    global.fetch = jest.fn(() => {
+      const err = new Error('aborted')
+      err.name = 'AbortError'
+      return Promise.reject(err)
+    })
+    await expect(probeServer('http://1.2.3.4:3434', { timeoutMs: 10 })).rejects.toMatchObject({
+      code: 'firewall_o_red',
+    })
+  })
+
+  test('TypeError "blocked by client" → throws mixed_content_o_shields', async () => {
+    global.fetch = jest.fn(() => Promise.reject(new TypeError('NetworkError: blocked by client (Brave Shields)')))
+    await expect(probeServer('http://1.2.3.4:3434')).rejects.toMatchObject({
+      code: 'mixed_content_o_shields',
+    })
+  })
+
+  test('JSON con app correcta pero protocol distinto → throws unknown', async () => {
+    mockFetchOnce(
+      makeRes({
+        status: 200,
+        json: { ok: true, app: 'EclesiaPresenter', version: '2.0', protocol: 2 },
+      }),
+    )
+    await expect(probeServer('http://1.2.3.4:3434')).rejects.toMatchObject({
+      code: 'unknown',
+    })
+  })
+
+  test('Status 200 con JSON inválido (parser tira) → throws puerto_incorrecto', async () => {
+    mockFetchOnce(makeRes({ status: 200, jsonThrows: true }))
+    await expect(probeServer('http://1.2.3.4:3434')).rejects.toMatchObject({
+      code: 'puerto_incorrecto',
+    })
+  })
+})
+
+describe('checkServer() (alias retro-compat con contrato {ok,error})', () => {
+  test('throws del nuevo probe → { ok:false, error }', async () => {
     mockFetchOnce(
       makeRes({
         status: 200,
@@ -364,61 +440,28 @@ describe('checkServer()', () => {
     )
     const r = await checkServer('http://1.2.3.4:3434')
     expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('puerto_incorrecto')
+    expect(r.error).toBeInstanceOf(PairingError)
+    expect(r.error.code).toBe('no_es_eclesia')
   })
 
-  test('TypeError "Failed to fetch" → servidor_caido', async () => {
-    global.fetch = jest.fn(() => {
-      const e = new TypeError('Failed to fetch')
-      return Promise.reject(e)
-    })
+  test('legacy 404 → { ok:false, legacyServer:true, error.code:servidor_legacy }', async () => {
+    mockFetchOnce(makeRes({ status: 404, json: {} }))
     const r = await checkServer('http://1.2.3.4:3434')
     expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('servidor_caido')
+    expect(r.legacyServer).toBe(true)
+    expect(r.error.code).toBe('servidor_legacy')
   })
 
-  test('ECONNREFUSED → servidor_caido', async () => {
-    global.fetch = jest.fn(() => Promise.reject(new Error('connect ECONNREFUSED 1.2.3.4:3434')))
-    const r = await checkServer('http://1.2.3.4:3434')
-    expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('servidor_caido')
-  })
-
-  test('AbortError tras timeout → no_alcanzable', async () => {
-    global.fetch = jest.fn(() => {
-      const err = new Error('aborted')
-      err.name = 'AbortError'
-      return Promise.reject(err)
-    })
-    const r = await checkServer('http://1.2.3.4:3434', { timeoutMs: 10 })
-    expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('no_alcanzable')
-  })
-
-  test('TypeError "blocked by client" → mixed_content_o_shields', async () => {
-    global.fetch = jest.fn(() => Promise.reject(new TypeError('NetworkError: blocked by client (Brave Shields)')))
-    const r = await checkServer('http://1.2.3.4:3434')
-    expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('mixed_content_o_shields')
-  })
-
-  test('JSON con app correcta pero protocol distinto → version_incompatible', async () => {
+  test('success → { ok:true, app, version, protocol }', async () => {
     mockFetchOnce(
       makeRes({
         status: 200,
-        json: { ok: true, app: 'EclesiaPresenter', version: '2.0', protocol: 2 },
+        json: { ok: true, app: 'EclesiaPresenter', version: '1', protocol: 1 },
       }),
     )
     const r = await checkServer('http://1.2.3.4:3434')
-    expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('version_incompatible')
-  })
-
-  test('Status 200 con JSON inválido (parser tira) → puerto_incorrecto', async () => {
-    mockFetchOnce(makeRes({ status: 200, jsonThrows: true }))
-    const r = await checkServer('http://1.2.3.4:3434')
-    expect(r.ok).toBe(false)
-    expect(r.error.code).toBe('puerto_incorrecto')
+    expect(r.ok).toBe(true)
+    expect(r.app).toBe('EclesiaPresenter')
   })
 })
 
@@ -470,7 +513,7 @@ describe('pairWithDesktop() probe-before-pair', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 
-  test('baseUrl === window.location.host → puerto_incorrecto SIN ningún fetch', async () => {
+  test('baseUrl === window.location.host → puerto_dev_server SIN ningún fetch', async () => {
     const spy = jest.fn()
     global.fetch = spy
     // Mock mínimo de window.location.
@@ -479,7 +522,7 @@ describe('pairWithDesktop() probe-before-pair', () => {
     try {
       await expect(
         pairWithDesktop({ url: 'http://192.168.0.24:5173', pin: '123456' }),
-      ).rejects.toMatchObject({ code: 'puerto_incorrecto' })
+      ).rejects.toMatchObject({ code: 'puerto_dev_server' })
       expect(spy).not.toHaveBeenCalled()
     } finally {
       delete globalThis.window
@@ -487,11 +530,53 @@ describe('pairWithDesktop() probe-before-pair', () => {
     }
   })
 
-  test('probe servidor_caido → POST NUNCA se llama', async () => {
+  test('probe TypeError "Failed to fetch" → no_alcanzable, POST NUNCA se llama', async () => {
     global.fetch = jest.fn(() => Promise.reject(new TypeError('Failed to fetch')))
     await expect(
       pairWithDesktop({ url: 'http://1.2.3.4:3434', pin: '123456' }),
-    ).rejects.toMatchObject({ code: 'servidor_caido' })
+    ).rejects.toMatchObject({ code: 'no_alcanzable' })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  test('probe legacy 404 → POST SÍ se llama (back-compat con desktop antiguo)', async () => {
+    let call = 0
+    global.fetch = jest.fn((url) => {
+      call++
+      if (call === 1) {
+        // GET /api/info devuelve 404 (desktop antiguo sin /api/info)
+        expect(url).toBe('http://1.2.3.4:3434/api/info')
+        return Promise.resolve(makeRes({ status: 404, json: {} }))
+      }
+      // POST /api/pair sigue OK como en versiones antiguas
+      expect(url).toBe('http://1.2.3.4:3434/api/pair')
+      return Promise.resolve(
+        makeRes({
+          status: 200,
+          json: {
+            ok: true,
+            token: 'legacy-tok',
+            serverInfo: { version: '0.2.10', wsUrl: 'ws://1.2.3.4:3434/ws/remote' },
+          },
+        }),
+      )
+    })
+    const out = await pairWithDesktop({
+      url: 'http://1.2.3.4:3434',
+      pin: '123456',
+    })
+    expect(out.token).toBe('legacy-tok')
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  test('probe firewall_o_red (timeout) → POST NUNCA se llama', async () => {
+    global.fetch = jest.fn(() => {
+      const err = new Error('aborted')
+      err.name = 'AbortError'
+      return Promise.reject(err)
+    })
+    await expect(
+      pairWithDesktop({ url: 'http://1.2.3.4:3434', pin: '123456' }),
+    ).rejects.toMatchObject({ code: 'firewall_o_red' })
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 })

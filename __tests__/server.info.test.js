@@ -12,6 +12,13 @@
 //   - startServer({ port: 0 }) → puerto random asignado por el OS
 //   - http.get nativo, sin librerías nuevas
 //   - cerrar el server al final
+//
+// Convención del repo: tests del server viven en /__tests__ root (no en
+// src/server/__tests__/) porque el jest root está configurado para
+// descubrir cualquier archivo *.test.js bajo /__tests__/. Mover este
+// archivo bajo src/ obligaría a duplicar la config Jest con un segundo
+// "roots" o un "testPathIgnorePatterns" — más coste que beneficio. La
+// vecindad simbólica con server.wsRemote.test.js refuerza la lectura.
 
 const http = require('http')
 const { startServer } = require('../src/server/server')
