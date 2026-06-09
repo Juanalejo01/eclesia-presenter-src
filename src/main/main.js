@@ -793,6 +793,18 @@ app.whenReady().then(() => {
     callback({ path: fullPath })
   })
 
+  // Inicializa el módulo de pairing con persistencia en disco. Si no lo
+  // hacemos, los tokens viven solo en memoria y los móviles emparejados
+  // pierden la sesión cada vez que se reinicia la app del PC.
+  try {
+    const pairing = require('../server/pairing')
+    pairing.init({
+      storagePath: path.join(app.getPath('userData'), 'pairing_tokens.json'),
+    })
+  } catch (e) {
+    console.warn('[pairing] init failed:', e?.message)
+  }
+
   serverHandle = startServer()
   // Bridge: cuando el móvil dispara un comando, lo reenviamos a la mainWindow
   // como evento IPC. App.jsx lo escucha y dispara la acción correspondiente.

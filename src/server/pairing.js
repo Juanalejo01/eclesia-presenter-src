@@ -19,6 +19,8 @@
 //   - limpieza periódica de registros viejos cada hora
 
 const crypto = require('crypto')
+const fs = require('fs')
+const path = require('path')
 
 // ---------------- Constantes ----------------
 
@@ -135,6 +137,7 @@ function issueToken(info = {}) {
     issuedAt: now,
     lastUsedAt: now,
   })
+  _persistToDisk()
   return token
 }
 
@@ -165,7 +168,9 @@ function touchToken(token) {
  * @param {string} token
  */
 function revokeToken(token) {
-  return authorizedTokens.delete(token)
+  const existed = authorizedTokens.delete(token)
+  if (existed) _persistToDisk()
+  return existed
 }
 
 /**
@@ -207,6 +212,91 @@ const cleanupInterval = setInterval(() => {
 }, 60 * 60_000)
 if (cleanupInterval.unref) cleanupInterval.unref()
 
+// ---------------- Persistencia en disco ----------------
+//
+// Por defecto los tokens viven SOLO en memoria → al reiniciar el server, los
+// móviles emparejados pierden la sesión y tienen que volver a teclear el PIN.
+// Para una iglesia que reinicia su PC entre cultos eso es molesto. Si main.js
+// nos da una storagePath (vía init), guardamos el Map de tokens en JSON en
+// disco con escritura atómica + debounce 2 s para no saturar el FS.
+//
+// El módulo se mantiene PURO si nadie llama init(): los tests siguen sin
+// tocar el filesystem.
+
+let _storagePath = null
+let _persistTimer = null
+
+/**
+ * Inicializa el módulo con un path opcional para persistir tokens.
+ * Si no se llama, los tokens viven solo en memoria (compat con tests).
+ * @param {object} opts
+ * @param {string} [opts.storagePath] — ruta absoluta a un .json
+ */
+function init({ storagePath } = {}) {
+  if (storagePath && typeof storagePath === 'string') {
+    _storagePath = storagePath
+    _loadFromDisk()
+  }
+}
+
+function _loadFromDisk() {
+  if (!_storagePath) return
+  try {
+    if (!fs.existsSync(_storagePath)) return
+    const raw = fs.readFileSync(_storagePath, 'utf8')
+    const data = JSON.parse(raw)
+    if (!data || typeof data !== 'object') return
+    const tokens = data.tokens && typeof data.tokens === 'object' ? data.tokens : {}
+    const now = Date.now()
+    let loaded = 0, expired = 0
+    for (const [token, rec] of Object.entries(tokens)) {
+      // Validación defensiva por si el archivo está corrupto
+      if (typeof token !== 'string' || token.length !== 48) continue
+      if (!rec || typeof rec !== 'object') continue
+      if (typeof rec.issuedAt !== 'number') continue
+      if (now - rec.issuedAt > TOKEN_TTL_MS) { expired++; continue }
+      authorizedTokens.set(token, {
+        deviceId: String(rec.deviceId || 'unknown').slice(0, 64),
+        deviceName: String(rec.deviceName || 'Cliente sin nombre').slice(0, 64),
+        issuedAt: rec.issuedAt,
+        lastUsedAt: typeof rec.lastUsedAt === 'number' ? rec.lastUsedAt : rec.issuedAt,
+      })
+      loaded++
+    }
+    console.log(`[pairing] tokens cargados del disco: ${loaded} validos, ${expired} expirados`)
+  } catch (e) {
+    console.warn('[pairing] load failed:', e?.message)
+  }
+}
+
+function _persistToDisk() {
+  if (!_storagePath) return
+  // Debounce 2 s — múltiples cambios cercanos (pareo de 2 móviles seguidos)
+  // se escriben una sola vez.
+  if (_persistTimer) clearTimeout(_persistTimer)
+  _persistTimer = setTimeout(_writeNow, 2000)
+  if (_persistTimer.unref) _persistTimer.unref()
+}
+
+function _writeNow() {
+  if (!_storagePath) return
+  try {
+    const tokens = {}
+    for (const [token, rec] of authorizedTokens) {
+      tokens[token] = { ...rec }
+    }
+    const dir = path.dirname(_storagePath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    // Escritura atómica: tmp + rename. Si crashea a mitad, el .json original
+    // se mantiene intacto en lugar de quedar a medio escribir.
+    const tmp = _storagePath + '.tmp'
+    fs.writeFileSync(tmp, JSON.stringify({ tokens, savedAt: Date.now() }, null, 2), 'utf8')
+    fs.renameSync(tmp, _storagePath)
+  } catch (e) {
+    console.warn('[pairing] persist failed:', e?.message)
+  }
+}
+
 // ---------------- Test helpers (no production) ----------------
 
 // Permite setear un PIN determinista desde tests. NO disponible en producción.
@@ -230,6 +320,7 @@ function __resetForTests() {
 
 module.exports = {
   get PAIRING_PIN() { return PAIRING_PIN },  // getter para reflejar __setPinForTests
+  init,
   verifyPin,
   checkPinRateLimit,
   issueToken,
