@@ -1,0 +1,346 @@
+name: Mobile Build & Release
+
+# Se dispara cuando se hace push de un tag tipo mobile-v0.1.0, mobile-v1.2.3, etc.
+# Construye el APK Android del cliente Capacitor y lo sube como asset al Release
+# del tag. Disjoint del scheme `v*` de release.yml (Electron desktop).
+#
+# Modos:
+#   - RELEASE firmado: si los 4 secrets ANDROID_KEYSTORE_BASE64,
+#     ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#     están configurados, ejecuta assembleRelease con signing config.
+#   - DEBUG fallback: si falta alguno de los 4 secrets, ejecuta assembleDebug
+#     (firmado con el debug keystore autogenerado de Android) y publica el
+#     APK debug con un warning en el job summary.
+#
+# Ver docs/MOBILE_CI.md para la guía de generación del keystore y carga de secrets.
+
+on:
+  push:
+    tags:
+      - 'mobile-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag a buildear (ej: mobile-v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # necesario para subir assets al Release
+
+env:
+  ORG_GRADLE_PROJECT_org.gradle.jvmargs: '-Xmx2g -XX:MaxMetaspaceSize=512m'
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "Tag recibido: $TAG"
+          if [[ ! "$TAG" =~ ^mobile-v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::Tag '$TAG' no matchea el patrón mobile-vX.Y.Z (solo dígitos)"
+            {
+              echo "## Error de versionado"
+              echo ""
+              echo "El tag \`$TAG\` no matchea el patrón requerido \`mobile-vX.Y.Z\`."
+              echo ""
+              echo "Ejemplo válido: \`mobile-v0.1.0\`, \`mobile-v1.2.3\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}"
+          VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Versionado extraído del tag"
+            echo ""
+            echo "| Campo | Valor |"
+            echo "| --- | --- |"
+            echo "| Tag | \`$TAG\` |"
+            echo "| versionName | \`$VERSION_NAME\` |"
+            echo "| versionCode | \`$VERSION_CODE\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-cache-${{ hashFiles('mobile/android/**/*.gradle*', 'mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-cache-
+
+      - name: Cache mobile node_modules
+        uses: actions/cache@v4
+        with:
+          path: mobile/node_modules
+          key: mobile-node-${{ hashFiles('mobile/package-lock.json', 'mobile/package.json') }}
+          restore-keys: |
+            mobile-node-
+
+      - name: Install mobile dependencies (with retry)
+        shell: bash
+        run: |
+          set +o pipefail
+          for i in 1 2 3; do
+            npm install --no-audit --no-fund --legacy-peer-deps && break
+            echo "npm install (mobile) falló (intento $i/3), reintentando en $((i*10))s..."
+            sleep $((i*10))
+          done
+        env:
+          CI: 'true'
+
+      - name: Build web bundle (vite)
+        run: npm run build
+
+      - name: Ensure android platform exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          # mobile/android/ está en mobile/.gitignore, así que en CI hay que
+          # regenerarla con cap add android. Si ya existe (build local), no-op.
+          if [[ ! -d android ]]; then
+            echo "android/ no existe — ejecutando cap add android"
+            npx cap add android
+          else
+            echo "android/ ya existe — saltando cap add"
+          fi
+
+      - name: Capacitor sync android
+        run: npx cap sync android
+
+      - name: Patch build.gradle versionCode/versionName
+        shell: bash
+        run: |
+          set -euo pipefail
+          GRADLE_FILE="android/app/build.gradle"
+          if [[ ! -f "$GRADLE_FILE" ]]; then
+            echo "::error::$GRADLE_FILE no existe tras cap sync — algo falló al generar la plataforma"
+            ls -la android/ || true
+            exit 1
+          fi
+          echo "Antes del patch:"
+          grep -E 'versionCode|versionName' "$GRADLE_FILE" || true
+          sed -i "s/versionCode 1/versionCode ${VERSION_CODE}/" "$GRADLE_FILE"
+          sed -i "s/versionName \"1.0\"/versionName \"${VERSION_NAME}\"/" "$GRADLE_FILE"
+          echo "Después del patch:"
+          grep -E 'versionCode|versionName' "$GRADLE_FILE"
+          if ! grep -qE "versionCode ${VERSION_CODE}" "$GRADLE_FILE"; then
+            echo "::error::Patch de versionCode falló"
+            exit 1
+          fi
+          if ! grep -qE "versionName \"${VERSION_NAME}\"" "$GRADLE_FILE"; then
+            echo "::error::Patch de versionName falló"
+            exit 1
+          fi
+
+      - name: Check signing secrets
+        id: signing
+        shell: bash
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" && -n "$KEYSTORE_PASSWORD" && -n "$KEY_ALIAS" && -n "$KEY_PASSWORD" ]]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets detectados — build mode: RELEASE firmado."
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets ausentes — build mode: DEBUG fallback."
+          fi
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Decode keystore and write keystore.properties
+        if: steps.signing.outputs.has_signing == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          if [[ ! -s android/app/release.keystore ]]; then
+            echo "::error::release.keystore vacío después de decode — base64 inválido"
+            exit 1
+          fi
+          cat > android/keystore.properties <<EOF
+          storeFile=app/release.keystore
+          storePassword=${KEYSTORE_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          keyPassword=${KEY_PASSWORD}
+          EOF
+          echo "keystore.properties escrito (sin mostrar contenido)."
+          ls -la android/app/release.keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Apply release signing override
+        if: steps.signing.outputs.has_signing == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > android/app/signing.gradle <<'EOF'
+          def keystorePropertiesFile = rootProject.file("keystore.properties")
+          def keystoreProperties = new Properties()
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+          }
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile rootProject.file(keystoreProperties['storeFile'])
+                      storePassword keystoreProperties['storePassword']
+                      keyAlias keystoreProperties['keyAlias']
+                      keyPassword keystoreProperties['keyPassword']
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
+          echo "" >> android/app/build.gradle
+          echo "apply from: 'signing.gradle'" >> android/app/build.gradle
+          echo "Tail del build.gradle:"
+          tail -5 android/app/build.gradle
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build APK Release (signed)
+        if: steps.signing.outputs.has_signing == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          SRC="app/build/outputs/apk/release/app-release.apk"
+          DEST="app/build/outputs/apk/release/EclesiaPresenter-mobile-v${VERSION_NAME}-release.apk"
+          if [[ ! -f "$SRC" ]]; then
+            echo "::error::APK release no encontrado en $SRC"
+            ls -la app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          mv "$SRC" "$DEST"
+          ls -la "$DEST"
+          {
+            echo ""
+            echo "### Build mode: RELEASE (firmado)"
+            echo ""
+            echo "APK generado: \`EclesiaPresenter-mobile-v${VERSION_NAME}-release.apk\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build APK Debug (unsigned fallback)
+        if: steps.signing.outputs.has_signing == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          SRC="app/build/outputs/apk/debug/app-debug.apk"
+          DEST="app/build/outputs/apk/debug/EclesiaPresenter-mobile-v${VERSION_NAME}-debug.apk"
+          if [[ ! -f "$SRC" ]]; then
+            echo "::error::APK debug no encontrado en $SRC"
+            ls -la app/build/outputs/apk/debug/ || true
+            exit 1
+          fi
+          mv "$SRC" "$DEST"
+          ls -la "$DEST"
+          {
+            echo ""
+            echo "### Build mode: DEBUG"
+            echo ""
+            echo "Secrets \`ANDROID_KEYSTORE_BASE64\` / \`ANDROID_KEYSTORE_PASSWORD\` / \`ANDROID_KEY_ALIAS\` / \`ANDROID_KEY_PASSWORD\` no configurados."
+            echo ""
+            echo "Solo se publica un APK debug (firma del debug keystore autogenerado). NO es instalable como upgrade del release firmado. Ver \`docs/MOBILE_CI.md\` para activar el build firmado."
+            echo ""
+            echo "APK generado: \`EclesiaPresenter-mobile-v${VERSION_NAME}-debug.apk\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-apk-${{ env.VERSION_NAME }}
+          path: mobile/android/app/build/outputs/apk/**/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          files: |
+            mobile/android/app/build/outputs/apk/**/EclesiaPresenter-mobile-*.apk
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Gradle log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Tail logs (gradle) ==="
+          if [[ -d android/app/build/outputs/logs ]]; then
+            for f in android/app/build/outputs/logs/*; do
+              echo "::group::$f"
+              tail -200 "$f" || true
+              echo "::endgroup::"
+            done
+          fi
+          if [[ -d "$HOME/.gradle/daemon" ]]; then
+            LATEST_LOG=$(find "$HOME/.gradle/daemon" -name "*.out.log" -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | awk '{print $2}')
+            if [[ -n "$LATEST_LOG" && -f "$LATEST_LOG" ]]; then
+              echo "::group::Latest gradle daemon log: $LATEST_LOG"
+              tail -200 "$LATEST_LOG" || true
+              echo "::endgroup::"
+            fi
+          fi
+          echo "=== APK outputs (si existen) ==="
+          find android/app/build/outputs -type f 2>/dev/null || true
