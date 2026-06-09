@@ -217,10 +217,44 @@ function attachWsRemote(httpServer, deps) {
           break
         case 'bible-ref':
         case 'song':
-        case 'announce':
         case 'list-reorder':
           safeCall(onRemoteEvent, msg.type, msg.payload || {})
           break
+        case 'announce': {
+          // T11: anuncio rapido desde el mobile. El payload es texto libre
+          // tipeado por el operador, asi que validamos shape ANTES del forward
+          // para evitar que un cliente comprometido inyecte un slide gigante
+          // o un titulo absurdamente largo que rompa el render. Limites
+          // alineados con AnnouncementForm (mobile): title 1..80, body 1..500,
+          // durationMs opcional 1000..60000.
+          const p = msg.payload || {}
+          const title = typeof p.title === 'string' ? p.title : ''
+          const body = typeof p.body === 'string' ? p.body : ''
+          const trimmedTitle = title.trim()
+          const trimmedBody = body.trim()
+          const okTitle = trimmedTitle.length >= 1 && title.length <= 80
+          const okBody = trimmedBody.length >= 1 && body.length <= 500
+          // durationMs es opcional: undefined/null pasa; si viene tiene que ser
+          // numero finito en rango [1000, 60000]. Cualquier otra cosa rechaza.
+          let durationMs = null
+          if (p.durationMs !== undefined && p.durationMs !== null) {
+            if (!Number.isFinite(p.durationMs) || p.durationMs < 1000 || p.durationMs > 60000) {
+              sendEvent(ws, 'error', { code: 'invalid_payload', message: 'announce shape' })
+              break
+            }
+            durationMs = p.durationMs
+          }
+          if (!okTitle || !okBody) {
+            sendEvent(ws, 'error', { code: 'invalid_payload', message: 'announce shape' })
+            break
+          }
+          safeCall(onRemoteEvent, msg.type, {
+            title: trimmedTitle,
+            body: trimmedBody,
+            durationMs,
+          })
+          break
+        }
         case 'bible-project-direct': {
           // T9: el móvil ya resolvió el versículo via /api/bible/search y
           // ahora pide proyectarlo SIN re-buscar. Validamos la shape mínima

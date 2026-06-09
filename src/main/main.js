@@ -312,6 +312,11 @@ ipcMain.handle('cloud-sync:syncNow',   ()        => cloudSync.syncOnce())
 // IPC: proyección externa (overlay/background sin red, capturable por OBS)
 ipcMain.handle('projection:open',  (_e, opts)   => projection.openProjection(opts))
 ipcMain.handle('projection:close', (_e, mode)   => projection.closeProjection(mode))
+// T11: cerrar TODAS las ventanas de proyeccion de golpe (panico desde mobile).
+// El handler NO acepta argumentos del renderer: si en el futuro alguien lo
+// expone via IPC con args, projection.closeAll los ignora — solo itera las
+// BrowserWindows internas que ya tiene registradas.
+ipcMain.handle('projection:closeAll', () => projection.closeAll())
 ipcMain.handle('projection:theme', (_e, patch)  => { projection.setTheme(patch); return projection.getState().theme })
 ipcMain.handle('projection:resetTheme', ()      => projection.resetTheme())
 ipcMain.handle('projection:state', ()           => projection.getState())

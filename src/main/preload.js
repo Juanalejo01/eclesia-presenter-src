@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('electron', {
   projection: {
     open:  (opts)  => ipcRenderer.invoke('projection:open', opts),
     close: (mode)  => ipcRenderer.invoke('projection:close', mode),
+    // T11: cerrar TODAS las ventanas de proyeccion (panico desde mobile).
+    closeAll: ()   => ipcRenderer.invoke('projection:closeAll'),
     theme: (patch) => ipcRenderer.invoke('projection:theme', patch),
     resetTheme: () => ipcRenderer.invoke('projection:resetTheme'),
     state: ()      => ipcRenderer.invoke('projection:state'),

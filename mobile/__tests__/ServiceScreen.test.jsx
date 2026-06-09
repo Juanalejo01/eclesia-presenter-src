@@ -236,30 +236,27 @@ test('5. auth-error del server → disconnect + navigate("/pair")', () => {
 })
 
 // ──────────────────────────────────────────────────────────────────────
-// 6. Desemparejar (confirm = true) → disconnect + navigate
+// 6. (T11) ServiceScreen YA NO contiene boton Desemparejar — la accion
+//    se movio a MoreScreen como ubicacion canonica. Verificamos que el
+//    boton NO existe en esta pantalla para detectar regresiones futuras.
 // ──────────────────────────────────────────────────────────────────────
-test('6. Click Desemparejar con confirm OK → disconnect + nav a /pair', () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true)
+test('6. (T11) ServiceScreen no tiene boton Desemparejar', () => {
   render(<ServiceScreen />)
-  const unpair = screen.getByRole('button', { name: /desemparejar este mando/i })
-  fireEvent.click(unpair)
-  expect(confirmSpy).toHaveBeenCalled()
-  expect(mockDisconnect).toHaveBeenCalledTimes(1)
-  expect(mockNavigate).toHaveBeenCalledWith('/pair', { replace: true })
-  confirmSpy.mockRestore()
+  const unpair = screen.queryByRole('button', { name: /desemparejar este mando/i })
+  expect(unpair).toBeNull()
 })
 
 // ──────────────────────────────────────────────────────────────────────
-// 7. Desemparejar (confirm = false) → no hace nada
+// 7. (T11) Click en otra zona de la pantalla no dispara disconnect
+//    (regresion: que no haya boton-fantasma de desemparejar).
 // ──────────────────────────────────────────────────────────────────────
-test('7. Click Desemparejar con confirm cancel → no acción', () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false)
+test('7. (T11) No hay accion de desemparejar accidental en la screen', () => {
   render(<ServiceScreen />)
-  const unpair = screen.getByRole('button', { name: /desemparejar este mando/i })
-  fireEvent.click(unpair)
+  // Buscamos cualquier link/boton con texto que incluya "Desemparejar"
+  // (incluso si cambia el role) — si aparece, falla.
+  const candidates = screen.queryAllByText(/desemparejar/i)
+  expect(candidates).toHaveLength(0)
   expect(mockDisconnect).not.toHaveBeenCalled()
-  expect(mockNavigate).not.toHaveBeenCalled()
-  confirmSpy.mockRestore()
 })
 
 // ──────────────────────────────────────────────────────────────────────

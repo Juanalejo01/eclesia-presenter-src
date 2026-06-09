@@ -82,17 +82,10 @@ export default function ServiceScreen() {
     transport.send({ type })
   }
 
-  function handleUnpair() {
-    // (T9+) Migrar a un AppDialog mobile cuando exista — el window.confirm
-    // nativo del WebView ignora el tema cobre y se ve fuera del brand.
-    const ok = window.confirm(
-      '¿Desemparejar este mando? Tendrás que volver a escanear el PIN del PC.',
-    )
-    if (!ok) return
-    console.warn('[service] desemparejado por el usuario')
-    transport.disconnect()
-    nav('/pair', { replace: true })
-  }
+  // T11: el boton "Desemparejar" se movio a MoreScreen como ubicacion
+  // canonica — evita duplicar acciones destructivas en dos pantallas
+  // (riesgo de tap accidental, divergencia futura si se anade telemetria
+  // a una pero no a la otra).
 
   const headerSubtitle = isConnected
     ? `Mando conectado${serverVersion ? ` · EclesiaPresenter v${serverVersion}` : ''}`
@@ -182,17 +175,7 @@ export default function ServiceScreen() {
           se suscribe a schedule-update internamente vía useSchedule. */}
       <ScheduleList />
 
-      {/* Desemparejar — discreto, al fondo. Link gris para no competir con
-          los CTAs principales pero accesible cuando el usuario lo busque. */}
-      <div className="flex justify-center mt-2">
-        <button
-          type="button"
-          onClick={handleUnpair}
-          className="text-xs text-ink-3 hover:text-ink-2 underline underline-offset-2 transition"
-        >
-          Desemparejar este mando
-        </button>
-      </div>
+      {/* T11: el boton "Desemparejar" se movio a More > Cuenta. */}
     </div>
   )
 }

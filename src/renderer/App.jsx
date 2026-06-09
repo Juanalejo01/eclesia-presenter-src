@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar.jsx'
 import BiblePanel from './components/BiblePanel.jsx'
 import SongsPanel from './components/SongsPanel.jsx'
@@ -66,6 +66,11 @@ export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [monitorWidth, setMonitorWidth] = useState(loadMonitorWidth)
   const { live } = useSlideStore()
+  // T11: timer del auto-clear de anuncio. Guardado en ref para que un
+  // nuevo announce/clear cancele el timer anterior — evita que un timer
+  // viejo borre un slide nuevo proyectado por otro flujo (ej. el operador
+  // proyecta una cancion 30s despues de un anuncio con durationMs=60s).
+  const announceTimerRef = useRef(null)
 
   const persistMonitorWidth = (w) => {
     try { localStorage.setItem(MAIN_MONITOR_STORAGE_KEY, String(w)) } catch {}
@@ -190,6 +195,56 @@ export default function App() {
           })
           break
         }
+
+        case 'announce': {
+          // T11: anuncio rapido desde el mobile. El server YA validó shape
+          // (title 1..80, body 1..500, durationMs 1000..60000 si presente),
+          // pero validamos defensivamente otra vez por si el evento llega
+          // desde otra fuente futura (ej. plugin) sin pasar por wsRemote.
+          const title = typeof payload?.title === 'string' ? payload.title : ''
+          const body = typeof payload?.body === 'string' ? payload.body : ''
+          if (!title.trim() || !body.trim()) break
+          // Cancelar timer previo antes de programar uno nuevo — sin esto,
+          // un announce A con durationMs=60s podria borrar un slide B
+          // proyectado 30s despues por otro flujo.
+          if (announceTimerRef.current) {
+            clearTimeout(announceTimerRef.current)
+            announceTimerRef.current = null
+          }
+          setLive({
+            type: 'announcement',
+            text: body.slice(0, 500),
+            reference: title.slice(0, 80),
+          })
+          // Auto-clear opcional si el mobile pidió duracion.
+          const durationMs = Number.isFinite(payload?.durationMs) ? payload.durationMs : null
+          if (durationMs && durationMs >= 1000 && durationMs <= 60000) {
+            announceTimerRef.current = setTimeout(() => {
+              announceTimerRef.current = null
+              setLive(null)
+            }, durationMs)
+          }
+          break
+        }
+
+        case 'projection-close': {
+          // T11: PANICO — cerrar TODAS las ventanas de proyeccion del PC y
+          // limpiar el live. Destructivo y final: las BrowserWindows se
+          // destruyen, liberando el segundo monitor. El operador del PC
+          // debe re-abrirlas manualmente desde Settings > Proyeccion. Esta
+          // asimetria (facil cerrar, manual abrir) es DELIBERADA — el panico
+          // debe ser real, no un toggle reversible desde el movil.
+          // Cancelamos cualquier timer de announce pendiente.
+          if (announceTimerRef.current) {
+            clearTimeout(announceTimerRef.current)
+            announceTimerRef.current = null
+          }
+          ;(async () => {
+            try { await window.electron?.projection?.closeAll?.() } catch {}
+            setLive(null)
+          })()
+          break
+        }
       }
     })
 
@@ -219,7 +274,14 @@ export default function App() {
       }
     })
 
-    return () => { offSettings(); offFullscreen(); offScheduleFocus(); offRemote?.(); offQuit?.() }
+    return () => {
+      offSettings(); offFullscreen(); offScheduleFocus(); offRemote?.(); offQuit?.()
+      // T11: cleanup del timer de auto-clear de anuncio.
+      if (announceTimerRef.current) {
+        clearTimeout(announceTimerRef.current)
+        announceTimerRef.current = null
+      }
+    }
   }, [])
 
   useGlobalShortcuts({
