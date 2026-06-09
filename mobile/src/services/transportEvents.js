@@ -26,6 +26,7 @@ export const ClientCommand = Object.freeze({
   BLACK:                 'black',
   CLEAR:                 'clear',
   BIBLE_REF:             'bible-ref',             // payload: { book, chapter, verse, version }
+  BIBLE_PROJECT_DIRECT:  'bible-project-direct',  // payload: { reference, text, version?, bookIndex?, chapterNum?, verseNum?, verseEnd? }
   SONG:                  'song',                  // payload: { id, sectionIndex? }
   ANNOUNCE:              'announce',              // payload: { title, body, durationSec? }
   PROJECTION_CLOSE:      'projection-close',

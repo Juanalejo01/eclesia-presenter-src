@@ -32,7 +32,7 @@ const { WebSocketServer } = require('ws')
 // Cualquier otro tipo se ignora con warning.
 const FORWARDABLE_COMMANDS = new Set([
   'next', 'prev', 'blank', 'black', 'clear',
-  'bible-ref', 'song', 'announce',
+  'bible-ref', 'bible-project-direct', 'song', 'announce',
   'projection-close', 'list-reorder',
 ])
 
@@ -219,6 +219,21 @@ function attachWsRemote(httpServer, deps) {
         case 'list-reorder':
           safeCall(onRemoteEvent, msg.type, msg.payload || {})
           break
+        case 'bible-project-direct': {
+          // T9: el móvil ya resolvió el versículo via /api/bible/search y
+          // ahora pide proyectarlo SIN re-buscar. Validamos la shape mínima
+          // antes de forward para evitar que un cliente comprometido
+          // inyecte un slide gigante que bloquee el renderer.
+          const p = msg.payload || {}
+          const ref = typeof p.reference === 'string' ? p.reference : ''
+          const text = typeof p.text === 'string' ? p.text : ''
+          if (!ref || ref.length > 100 || !text || text.length > 5000) {
+            sendEvent(ws, 'error', { code: 'invalid_payload', message: 'bible-project-direct shape' })
+            break
+          }
+          safeCall(onRemoteEvent, msg.type, p)
+          break
+        }
         default:
           if (FORWARDABLE_COMMANDS.has(msg.type)) {
             safeCall(onRemoteEvent, msg.type, msg.payload || {})

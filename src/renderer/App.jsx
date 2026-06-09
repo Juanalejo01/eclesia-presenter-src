@@ -137,6 +137,32 @@ export default function App() {
           setTimeout(() => emit('bible:remote-search', payload), 80)
           break
 
+        case 'bible-project-direct': {
+          // T9: el mobile ya buscó vía /api/bible/search y nos pasa el
+          // versículo resuelto. Proyectamos directo SIN re-abrir el panel
+          // ni re-buscar. Validamos shape defensivamente (el server ya lo
+          // hace, pero un setLive con datos corruptos rompe el monitor).
+          const ref = typeof payload?.reference === 'string' ? payload.reference : ''
+          const text = typeof payload?.text === 'string' ? payload.text : ''
+          if (!ref || !text) break
+          setLive({
+            type: 'bible',
+            text,
+            reference: ref,
+            // Mantener meta opcional para que el SongHistory/historial de
+            // Biblia (si lo consume el slide) pueda guardar el origen.
+            meta: payload?.bookIndex != null && payload?.chapterNum != null
+              ? {
+                  bookIndex: payload.bookIndex,
+                  chapterNum: payload.chapterNum,
+                  verseNum: payload.verseNum,
+                  verseEnd: payload.verseEnd || null,
+                }
+              : undefined,
+          })
+          break
+        }
+
         case 'song':
           // El móvil pidió proyectar una canción por id.
           // Cambiamos al panel canciones y emitimos al SongsPanel.

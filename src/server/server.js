@@ -12,6 +12,7 @@ const http = require('http')
 const { Server } = require('socket.io')
 const os = require('os')
 const pairing = require('./pairing')
+const bibleSearch = require('./bibleSearch')
 const { attachWsRemote } = require('./wsRemote')
 
 const PORT = 3434  // movido del clásico 3000 para evitar choque con otros dev servers
@@ -279,6 +280,65 @@ function startServer(opts = {}) {
     }
     const existed = pairing.revokeToken(target)
     res.json({ ok: true, revoked: existed })
+  })
+
+  // ---- Endpoint de búsqueda bíblica (T9 mobile) ----
+  //
+  // Bearer auth obligatoria + rate-limit por device (30 req/min). El resultado
+  // viene del módulo bibleSearch que carga los JSON de public/ en memoria
+  // lazy por versionId. Si el modo es 'auto', primero intenta parsear como
+  // referencia ("Juan 3:16") y si no encaja cae a fulltext.
+  //
+  // Mismo modelo de errores que /api/pair: status code HTTP + body { ok:false, error }.
+  // Nunca devolvemos paths del filesystem ni el query del usuario en producción
+  // (solo en dev). Cache-Control: no-store para que ningún proxy cache la respuesta
+  // con Bearer auth.
+  app.post('/api/bible/search', requireBearer, (req, res) => {
+    res.set('Cache-Control', 'no-store')
+
+    // Rate-limit per-device antes de tocar el filesystem.
+    const rate = bibleSearch.checkRateLimit(req.deviceInfo.deviceId)
+    if (!rate.allowed) {
+      res.setHeader('Retry-After', Math.ceil(rate.retryAfterMs / 1000))
+      return res.status(429).json({
+        ok: false,
+        error: 'demasiadas_busquedas',
+        retryAfterMs: rate.retryAfterMs,
+      })
+    }
+
+    // Sanitización del query. express.json({limit:'8kb'}) ya impide payloads
+    // monstruosos; aquí cortamos a 200 chars y colapsamos whitespace para
+    // que parseReference no tropiece.
+    const q = String(req.body?.q || '').slice(0, 200).replace(/\s+/g, ' ').trim()
+    if (!q) return res.status(400).json({ ok: false, error: 'q_required' })
+
+    const version = typeof req.body?.version === 'string' ? req.body.version : bibleSearch.DEFAULT_VERSION
+    if (!bibleSearch.VERSION_IDS.includes(version)) {
+      // Fallback silencioso a default — no rompemos UX por un typo del cliente.
+      // El response devuelve la version efectivamente usada para que el cliente
+      // pueda detectar el downgrade.
+    }
+    const limit = Number.isFinite(Number(req.body?.limit)) ? Number(req.body.limit) : 20
+    const mode = ['auto', 'ref', 'text'].includes(req.body?.mode) ? req.body.mode : 'auto'
+
+    const result = bibleSearch.search({ q, version, limit, mode })
+
+    if (!result.ok) {
+      // Mapeo error → HTTP code
+      const code = result.error === 'q_required'           ? 400
+                 : result.error === 'q_too_short'          ? 400
+                 : result.error === 'book_not_found'       ? 404
+                 : result.error === 'reference_not_found'  ? 404
+                 : result.error === 'bible_unavailable'    ? 503
+                 : 400
+      const body = { ok: false, error: result.error }
+      if (result.error === 'q_too_short') body.minLength = 3
+      if (result.parsed) body.parsed = result.parsed
+      return res.status(code).json(body)
+    }
+
+    return res.json(result)
   })
 
   io.on('connection', (socket) => {
