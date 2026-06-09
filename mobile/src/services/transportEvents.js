@@ -28,6 +28,7 @@ export const ClientCommand = Object.freeze({
   BIBLE_REF:             'bible-ref',             // payload: { book, chapter, verse, version }
   BIBLE_PROJECT_DIRECT:  'bible-project-direct',  // payload: { reference, text, version?, bookIndex?, chapterNum?, verseNum?, verseEnd? }
   SONG:                  'song',                  // payload: { id, sectionIndex? }
+  SONG_PROJECT_DIRECT:   'song-project-direct',   // payload: { songId, sectionId, text, reference }
   ANNOUNCE:              'announce',              // payload: { title, body, durationSec? }
   PROJECTION_CLOSE:      'projection-close',
   LIST_REORDER:          'list-reorder',          // payload: { ids: string[] }
@@ -43,6 +44,8 @@ export const ServerEvent = Object.freeze({
   PONG:              'pong',
   ERROR:             'error',             // { code, message }
   AUTH_ERROR:        'auth-error',        // 401 → renderer limpia token
+  SONGS_LIST:        'songs-list',        // warmup inicial: lista slim
+  SONGS_CHANGED:     'songs-changed',     // delta: { changeType, songIds, serverVersion }
 })
 
 const VALID_COMMAND_TYPES = Object.freeze(Object.values(ClientCommand))

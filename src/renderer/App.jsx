@@ -169,6 +169,27 @@ export default function App() {
           setActivePanel('songs')
           setTimeout(() => emit('songs:remote-project', payload), 80)
           break
+
+        case 'song-project-direct': {
+          // T10: el mobile ya resolvio la cancion via /api/songs/:id y
+          // nos pasa la seccion entera. Proyectamos directo sin abrir el
+          // panel ni re-resolver. Validacion defensiva: el server ya filtra
+          // shape, pero un setLive con datos corruptos rompe el monitor.
+          const ref = typeof payload?.reference === 'string' ? payload.reference : ''
+          const text = typeof payload?.text === 'string' ? payload.text : ''
+          const songId = typeof payload?.songId === 'number' ? payload.songId : null
+          const sectionId = typeof payload?.sectionId === 'string' ? payload.sectionId : ''
+          if (!text) break
+          setLive({
+            type: 'song',
+            text,
+            reference: ref,
+            meta: songId != null
+              ? { songId, sectionId: sectionId || null }
+              : undefined,
+          })
+          break
+        }
       }
     })
 

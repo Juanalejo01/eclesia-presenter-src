@@ -13,6 +13,7 @@ const { Server } = require('socket.io')
 const os = require('os')
 const pairing = require('./pairing')
 const bibleSearch = require('./bibleSearch')
+const songsCatalog = require('./songsCatalog')
 const { attachWsRemote } = require('./wsRemote')
 
 const PORT = 3434  // movido del clásico 3000 para evitar choque con otros dev servers
@@ -101,13 +102,39 @@ function pushSchedule(items) {
   broadcastChannel.publish('schedule-update', currentSchedule)
 }
 
-/** Push de la lista de canciones a los móviles conectados. */
+/** Push de la lista de canciones a los móviles conectados.
+ *
+ *  - Socket.IO legacy /remote HTML: solo metadata (id/title/author/tags).
+ *  - WS raw mobile (T10): broadcast 'songs-list' identico para warmup
+ *    inicial + sincroniza catalogo completo en songsCatalog para los
+ *    endpoints HTTP /api/songs/list y /api/songs/:id.
+ */
 function pushSongs(songs) {
-  _songsCache = Array.isArray(songs) ? songs.map(s => ({
+  const arr = Array.isArray(songs) ? songs : []
+  // Cache slim para /remote HTML legacy (no expone sections).
+  _songsCache = arr.map(s => ({
     id: s.id, title: s.title, author: s.author, tags: s.tags,
-  })) : []
+  }))
+  // Catalogo full (con sections) para los endpoints HTTP del mobile T10.
+  try { songsCatalog.setSnapshot(arr) } catch (e) {
+    console.warn('[server] songsCatalog.setSnapshot failed:', e?.message || e)
+  }
   if (_io) _io.emit('songs:list', _songsCache)
   broadcastChannel.publish('songs-list', _songsCache)
+}
+
+/** Broadcast 'songs-changed' a los WS mobile (T10) cuando hay CRUD.
+ *  El payload es delta-trigger (no contiene letras): {changeType, songIds, serverVersion}.
+ *  El cliente decide invalidar cache + refetch granular.
+ *  changeType: 'created'|'updated'|'deleted'|'bulk'.
+ */
+function pushSongsChanged({ changeType = 'bulk', songIds = [] } = {}) {
+  const payload = {
+    changeType,
+    songIds: Array.isArray(songIds) ? songIds.filter(n => Number.isInteger(n) && n > 0) : [],
+    serverVersion: songsCatalog.getServerVersion(),
+  }
+  broadcastChannel.publish('songs-changed', payload)
 }
 
 function getCurrentSlide() { return currentSlide }
@@ -341,6 +368,79 @@ function startServer(opts = {}) {
     return res.json(result)
   })
 
+  // ---- Endpoints de canciones (T10 mobile) ----
+  //
+  // /api/songs/list:  GET, Bearer auth + rate-limit 30/min/device.
+  //   Devuelve catalogo paginado con filtro q (title/author/tags/lyric).
+  //   Sin sections (lista ligera ~80 bytes/cancion).
+  // /api/songs/:id:   GET, Bearer auth + rate-limit (mismo bucket).
+  //   Devuelve detalle completo con sections expandidas.
+  //
+  // El catalogo se hidrata via songsCatalog.setSnapshot() que llamamos
+  // desde pushSongs() — main.js hace pushSongs(db.listSongs({})) al boot
+  // y tras cada mutacion. NO tocamos SQLite directo aqui.
+
+  app.get('/api/songs/list', requireBearer, (req, res) => {
+    res.set('Cache-Control', 'no-store')
+    const rate = songsCatalog.checkRateLimit(req.deviceInfo.deviceId)
+    if (!rate.allowed) {
+      res.setHeader('Retry-After', Math.ceil(rate.retryAfterMs / 1000))
+      return res.status(429).json({
+        ok: false,
+        error: 'demasiadas_busquedas',
+        retryAfterMs: rate.retryAfterMs,
+      })
+    }
+
+    // Sanitize. NaN limit/offset → 400 explicito para que el cliente sepa.
+    const q = songsCatalog.sanitizeQuery(req.query.q)
+    const rawLimit = req.query.limit
+    const rawOffset = req.query.offset
+    if (rawLimit !== undefined && !Number.isFinite(Number(rawLimit))) {
+      return res.status(400).json({ ok: false, error: 'invalid_limit' })
+    }
+    if (rawOffset !== undefined && !Number.isFinite(Number(rawOffset))) {
+      return res.status(400).json({ ok: false, error: 'invalid_offset' })
+    }
+    const limit = rawLimit !== undefined ? Number(rawLimit) : 50
+    const offset = rawOffset !== undefined ? Number(rawOffset) : 0
+
+    const result = songsCatalog.listSongs({ q, limit, offset })
+    return res.json({
+      ok: true,
+      count: result.count,
+      items: result.items,
+      hasMore: result.hasMore,
+      serverVersion: result.serverVersion,
+    })
+  })
+
+  app.get('/api/songs/:id', requireBearer, (req, res) => {
+    res.set('Cache-Control', 'no-store')
+    const rate = songsCatalog.checkRateLimit(req.deviceInfo.deviceId)
+    if (!rate.allowed) {
+      res.setHeader('Retry-After', Math.ceil(rate.retryAfterMs / 1000))
+      return res.status(429).json({
+        ok: false,
+        error: 'demasiadas_busquedas',
+        retryAfterMs: rate.retryAfterMs,
+      })
+    }
+    const rawId = req.params.id
+    const id = Number(rawId)
+    if (!Number.isFinite(id) || !Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ ok: false, error: 'invalid_id' })
+    }
+    const result = songsCatalog.getSong(id)
+    if (!result.ok) {
+      const code = result.error === 'song_not_found' ? 404
+                 : result.error === 'invalid_id'     ? 400
+                 : 500
+      return res.status(code).json({ ok: false, error: result.error })
+    }
+    return res.json({ ok: true, song: result.song })
+  })
+
   io.on('connection', (socket) => {
     // Estado inicial al conectar — read-only es libre
     socket.emit('slide:update', currentSlide)
@@ -407,7 +507,7 @@ function startServer(opts = {}) {
   return {
     io, httpServer, getLocalIP,
     get port() { return httpServer.address()?.port || listenPort },
-    pushSlide, pushTheme, pushSongs, pushSchedule, onRemoteEvent,
+    pushSlide, pushTheme, pushSongs, pushSongsChanged, pushSchedule, onRemoteEvent,
     getCurrentSlide, getCurrentSchedule, getCurrentTheme,
     getPairingPin: () => pairing.PAIRING_PIN,
     // Cierre ordenado (útil para tests)

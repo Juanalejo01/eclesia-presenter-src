@@ -441,10 +441,26 @@ ipcMain.handle('media:addFiles', async (_e, sourcePaths = []) => {
 //      (no-op silencioso si no hay licencia Pro o auto-sync está apagado)
 ipcMain.handle('songs:list',     (_e, opts)    => db.listSongs(opts))
 ipcMain.handle('songs:get',      (_e, id)      => db.getSong(id))
-ipcMain.handle('songs:create',   (_e, data)    => { const r = db.createSong(data); syncSongsToServer(); cloudSync.triggerSync(); return r })
-ipcMain.handle('songs:update',   (_e, id, data)=> { const r = db.updateSong(id, data); syncSongsToServer(); cloudSync.triggerSync(); return r })
-ipcMain.handle('songs:delete',   (_e, id)      => { const r = db.deleteSong(id); syncSongsToServer(); cloudSync.triggerSync(); return r })
-ipcMain.handle('songs:favorite', (_e, id)      => { const r = db.toggleFavorite(id); cloudSync.triggerSync(); return r })
+ipcMain.handle('songs:create',   (_e, data)    => {
+  const r = db.createSong(data)
+  syncSongsToServer({ changeType: 'created', songIds: r?.id ? [r.id] : [] })
+  cloudSync.triggerSync(); return r
+})
+ipcMain.handle('songs:update',   (_e, id, data)=> {
+  const r = db.updateSong(id, data)
+  syncSongsToServer({ changeType: 'updated', songIds: Number(id) ? [Number(id)] : [] })
+  cloudSync.triggerSync(); return r
+})
+ipcMain.handle('songs:delete',   (_e, id)      => {
+  const r = db.deleteSong(id)
+  syncSongsToServer({ changeType: 'deleted', songIds: Number(id) ? [Number(id)] : [] })
+  cloudSync.triggerSync(); return r
+})
+ipcMain.handle('songs:favorite', (_e, id)      => {
+  const r = db.toggleFavorite(id)
+  syncSongsToServer({ changeType: 'updated', songIds: Number(id) ? [Number(id)] : [] })
+  cloudSync.triggerSync(); return r
+})
 
 // --------- App utilities (settings) ---------
 
@@ -837,9 +853,14 @@ ipcMain.handle('updater:install',  ()  => autoUpdater.quitAndInstall())
 
 // Refrescar la lista de canciones del server cada vez que se cree/edite/borre.
 // Es barato: la query es ~ms y los push solo afectan a clientes móviles conectados.
-function syncSongsToServer() {
+//
+// T10: ademas del pushSongs (warmup inicial /remote HTML + WS), emitimos
+// 'songs-changed' con delta para que los mobiles invaliden cache granular
+// y refetcheen solo lo necesario.
+function syncSongsToServer({ changeType = 'bulk', songIds = [] } = {}) {
   if (!serverHandle) return
   try { serverHandle.pushSongs(db.listSongs({})) } catch {}
+  try { serverHandle.pushSongsChanged?.({ changeType, songIds }) } catch {}
 }
 
 // Wrap los IPC handlers existentes para que llamen syncSongsToServer despues.

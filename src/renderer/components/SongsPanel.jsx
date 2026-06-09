@@ -357,19 +357,29 @@ export default function SongsPanel({ onSendSlide }) {
     return subscribe('songs:remote-project', (payload) => {
       const id = payload?.id
       if (!id) return
+      const targetSection = Number.isInteger(payload?.sectionIndex) && payload.sectionIndex >= 0
+        ? payload.sectionIndex
+        : null
       const found = songsRef.current.find(s => s.id === id)
       const doProject = (song) => {
         if (!song) return
         setSelected(song)
         const slides = songToSlides(song, { maxLines: song.maxLines ?? 4 })
-        if (slides.length > 0) {
-          setSlideIndex(0)
-          setSectionIndex(slides[0].sectionIndex)
-          onSendSlide(slideWithOverride({
-            text: slides[0].text,
-            reference: slides[0].reference,
-          }, song))
+        if (slides.length === 0) return
+        // T10 backward-compat: si el mobile manda sectionIndex (legacy 'song'
+        // event extendido), saltamos al primer slide de esa seccion. Sin
+        // sectionIndex, comportamiento clasico (slide 0).
+        let slideIdx = 0
+        if (targetSection != null) {
+          const candidate = slides.findIndex(s => s.sectionIndex === targetSection)
+          if (candidate >= 0) slideIdx = candidate
         }
+        setSlideIndex(slideIdx)
+        setSectionIndex(slides[slideIdx].sectionIndex)
+        onSendSlide(slideWithOverride({
+          text: slides[slideIdx].text,
+          reference: slides[slideIdx].reference,
+        }, song))
       }
       if (found) doProject(found)
       else listSongs({}).then(all => {

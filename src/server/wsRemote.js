@@ -32,7 +32,9 @@ const { WebSocketServer } = require('ws')
 // Cualquier otro tipo se ignora con warning.
 const FORWARDABLE_COMMANDS = new Set([
   'next', 'prev', 'blank', 'black', 'clear',
-  'bible-ref', 'bible-project-direct', 'song', 'announce',
+  'bible-ref', 'bible-project-direct',
+  'song', 'song-project-direct',
+  'announce',
   'projection-close', 'list-reorder',
 ])
 
@@ -229,6 +231,27 @@ function attachWsRemote(httpServer, deps) {
           const text = typeof p.text === 'string' ? p.text : ''
           if (!ref || ref.length > 100 || !text || text.length > 5000) {
             sendEvent(ws, 'error', { code: 'invalid_payload', message: 'bible-project-direct shape' })
+            break
+          }
+          safeCall(onRemoteEvent, msg.type, p)
+          break
+        }
+        case 'song-project-direct': {
+          // T10: el móvil ya resolvió la cancion via /api/songs/:id y nos
+          // pasa la seccion completa. Validamos shape antes de forward.
+          // Limites alineados con songsCatalog: songId int>0, sectionId
+          // string<=64, text 1-10000, reference <=200.
+          const p = msg.payload || {}
+          const songId = p.songId
+          const sectionId = typeof p.sectionId === 'string' ? p.sectionId : ''
+          const text = typeof p.text === 'string' ? p.text : ''
+          const reference = typeof p.reference === 'string' ? p.reference : ''
+          const okSongId = Number.isInteger(songId) && songId > 0
+          const okSection = sectionId.length > 0 && sectionId.length <= 64
+          const okText = text.length > 0 && text.length <= 10000
+          const okRef = reference.length <= 200
+          if (!okSongId || !okSection || !okText || !okRef) {
+            sendEvent(ws, 'error', { code: 'invalid_payload', message: 'song-project-direct shape' })
             break
           }
           safeCall(onRemoteEvent, msg.type, p)
