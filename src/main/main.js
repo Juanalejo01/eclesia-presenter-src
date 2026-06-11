@@ -290,6 +290,8 @@ ipcMain.handle('server:info', () => {
   return {
     ip: serverHandle.getLocalIP(),
     port: serverHandle.port,
+    // T12: el mando PWA servido por el propio server (vía principal del QR).
+    appUrl: `http://${serverHandle.getLocalIP()}:${serverHandle.port}/app/`,
     remoteUrl: `http://${serverHandle.getLocalIP()}:${serverHandle.port}/remote`,
     overlayUrl: `http://${serverHandle.getLocalIP()}:${serverHandle.port}/overlay`,
     pairingPin: serverHandle.getPairingPin?.() || null,

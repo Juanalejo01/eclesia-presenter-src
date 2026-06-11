@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:app": "vite build --base=/app/ --outDir dist-app",
     "preview": "vite preview",
     "test": "jest",
     "cap:sync": "npm run build && cap sync",
@@ -37,7 +38,8 @@
           ]
         },
         "moduleNameMapper": {
-          "^@capacitor/preferences$": "<rootDir>/__tests__/__mocks__/capacitor-preferences.js"
+          "^@capacitor/preferences$": "<rootDir>/__tests__/__mocks__/capacitor-preferences.js",
+          "^@capacitor/core$": "<rootDir>/__tests__/__mocks__/capacitor-core.js"
         }
       },
       {
@@ -63,7 +65,8 @@
           ]
         },
         "moduleNameMapper": {
-          "^@capacitor/preferences$": "<rootDir>/__tests__/__mocks__/capacitor-preferences.js"
+          "^@capacitor/preferences$": "<rootDir>/__tests__/__mocks__/capacitor-preferences.js",
+          "^@capacitor/core$": "<rootDir>/__tests__/__mocks__/capacitor-core.js"
         }
       }
     ]
@@ -94,6 +97,7 @@
     "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.41",
     "tailwindcss": "^3.4.10",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "vite-plugin-pwa": "^0.20.5"
   }
 }

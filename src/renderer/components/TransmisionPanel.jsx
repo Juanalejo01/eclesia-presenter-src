@@ -248,15 +248,21 @@ function RemoteSection() {
 
   useEffect(() => { loadInfo() }, [])
 
+  // T12: el QR principal codifica appUrl (mando PWA servido por el propio
+  // server en /app — zero-friction: escanear → PairScreen same-origin → solo
+  // PIN). remoteUrl queda como enlace secundario "mando clásico". El
+  // fallback a remoteUrl cubre servers viejos sin appUrl en server:info.
+  const primaryUrl = info?.appUrl || info?.remoteUrl
+
   // Generar QR LOCALMENTE (sin depender de API externa). Negro sobre blanco
   // para máximo contraste — algunas cámaras móviles fallan con colores
   // personalizados aunque tengan contraste suficiente.
-  // Dependencias: info.remoteUrl Y qrRev. El segundo es el que hace que un
+  // Dependencias: primaryUrl Y qrRev. El segundo es el que hace que un
   // refresh con la misma URL TAMBIÉN dispare la regeneración.
   useEffect(() => {
-    if (!info?.remoteUrl) return
+    if (!primaryUrl) return
     let cancelled = false
-    QRCode.toDataURL(info.remoteUrl, {
+    QRCode.toDataURL(primaryUrl, {
       width: 320,             // 2x para retinas (display: 160)
       margin: 2,
       errorCorrectionLevel: 'M',
@@ -269,13 +275,13 @@ function RemoteSection() {
       })
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [info?.remoteUrl, qrRev])
+  }, [primaryUrl, qrRev])
 
   if (!info) return null
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(info.remoteUrl)
+      await navigator.clipboard.writeText(primaryUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch {}
@@ -352,7 +358,7 @@ function RemoteSection() {
               color: 'var(--copper-100)', overflow: 'hidden', textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
-              {info.remoteUrl}
+              {primaryUrl}
             </code>
             <button className="btn btn-ghost" onClick={copy} style={{ height: 28, fontSize: 11 }}>
               {copied ? '✓ Copiado' : 'Copiar'}
@@ -362,6 +368,12 @@ function RemoteSection() {
           <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0, fontFamily: 'var(--font-mono)' }}>
             Puerto: {info.port} · IP local: {info.ip}
           </p>
+
+          {info.appUrl && (
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '6px 0 0', fontFamily: 'var(--font-mono)' }}>
+              Mando legacy: <span style={{ color: 'var(--text-2)' }}>{info.remoteUrl}</span>
+            </p>
+          )}
 
           {info.pairingPin && (
             <div style={{

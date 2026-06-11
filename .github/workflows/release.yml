@@ -81,6 +81,15 @@ jobs:
       - name: Build renderer
         run: npm run build
 
+      # T12: el build PWA del mando va a resources/mobile-app via
+      # extraResources. Sin este paso electron-builder FALLA porque
+      # extraResources.from (mobile/dist-app) no existe.
+      - name: Build mobile PWA (served at /app)
+        shell: bash
+        run: |
+          npm ci --prefix mobile
+          npm run build:mobile-app
+
       # --- WINDOWS: build de 3 fases con embedding del icono ---
       # Reproducimos `npm run dist:all` paso a paso porque hacer todo en una
       # sola llamada a electron-builder NO embebe el icono en el .exe (Windows

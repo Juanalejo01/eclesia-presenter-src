@@ -3,8 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="description" content="Mando remoto para EclesiaPresenter — controla la proyección desde el móvil" />
     <meta name="theme-color" content="#14100d" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- El <link rel="manifest"> lo inyecta vite-plugin-pwa en build (deriva
+         scope/start_url del base de cada build: '/' o '/app/'). -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>EclesiaPresenter — Mando</title>
   </head>
   <body>

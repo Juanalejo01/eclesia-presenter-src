@@ -11,6 +11,8 @@ const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
 const os = require('os')
+const fs = require('fs')
+const path = require('path')
 const pairing = require('./pairing')
 const bibleSearch = require('./bibleSearch')
 const songsCatalog = require('./songsCatalog')
@@ -40,6 +42,43 @@ function getLocalIP() {
     }
   }
   return '127.0.0.1'
+}
+
+/**
+ * Resuelve el directorio del build PWA del mando (T12) probando candidatos
+ * en orden. Cada candidato debe contener index.html para ser válido:
+ *
+ *   1. PROD empaquetado: <resources>/mobile-app (extraResources de
+ *      electron-builder; fuera del asar — express.static funciona sin fs
+ *      parcheado y permite hotfix). En dev Electron, resourcesPath apunta a
+ *      node_modules/electron/dist/resources donde mobile-app no existe, así
+ *      que el check de index.html lo descarta solo — no hace falta
+ *      app.isPackaged (server.js no importa electron).
+ *   2. DEV (repo checkout): mobile/dist-app (generado por
+ *      `npm run build:mobile-app` desde el root).
+ *   3. null → la ruta /app responde 404 accionable, el server NUNCA crashea.
+ *
+ * Path absoluto via process.resourcesPath + existsSync — evita la clase de
+ * bug de bibleSearch.js:52 (__dirname relativo → app.asar/public inexistente
+ * en builds empaquetados).
+ *
+ * @param {{ resourcesPath?: string|null, repoDir?: string }} [opts] —
+ *   inyectables para tests; defaults = entorno real.
+ * @returns {string|null}
+ */
+function resolveMobileAppDir({
+  resourcesPath = typeof process.resourcesPath === 'string' ? process.resourcesPath : null,
+  repoDir = path.join(__dirname, '../../mobile/dist-app'),
+} = {}) {
+  const candidates = []
+  if (resourcesPath) candidates.push(path.join(resourcesPath, 'mobile-app'))
+  if (repoDir) candidates.push(repoDir)
+  for (const dir of candidates) {
+    try {
+      if (fs.existsSync(path.join(dir, 'index.html'))) return dir
+    } catch { /* fs error → siguiente candidato */ }
+  }
+  return null
 }
 
 let onRemoteEventHandlers = []
@@ -189,6 +228,37 @@ function startServer(opts = {}) {
     if (req.method === 'OPTIONS') return res.sendStatus(204)
     next()
   })
+
+  // ---- Mando móvil PWA en /app (T12) ----
+  //
+  // Sirve el build embed del mobile (vite build --base=/app/ → dist-app o
+  // resources/mobile-app en prod). Montado ANTES de las páginas inline; no
+  // colisiona con /, /overlay, /remote, /api/*, /socket.io ni /ws/remote.
+  // options.mobileAppDir permite inyectar un fixture en tests (incluido
+  // null explícito para probar el modo 404).
+  const mobileAppDir = Object.prototype.hasOwnProperty.call(opts, 'mobileAppDir')
+    ? opts.mobileAppDir
+    : resolveMobileAppDir()
+  if (mobileAppDir) {
+    // express.static maneja el redirect /app → /app/ automáticamente.
+    app.use('/app', express.static(mobileAppDir))
+    // SPA fallback para BrowserRouter: /app/service, /app/bible, etc.
+    // devuelven index.html y React Router resuelve client-side (gracias al
+    // basename derivado de import.meta.env.BASE_URL en mobile/src/main.jsx).
+    app.get('/app/*', (_req, res) => {
+      res.sendFile(path.join(mobileAppDir, 'index.html'))
+    })
+  } else {
+    if (!Number.isInteger(opts.port) || opts.port !== 0) {
+      console.warn('[server] /app deshabilitado: build del mobile no encontrado (mobile/dist-app)')
+    }
+    app.get(['/app', '/app/*'], (_req, res) => {
+      res.status(404).type('text/plain').send(
+        'Build del mobile no encontrado. Ejecuta: npm run build:mobile-app '
+        + '(o cd mobile && npm run build:app) y reinicia el servidor.',
+      )
+    })
+  }
 
   // Página raíz: bienvenida + link al remote
   app.get('/', (_req, res) => {
@@ -499,6 +569,9 @@ function startServer(opts = {}) {
       console.log(`[EclesiaPresenter] server activo en http://${ip}:${actualPort}`)
       console.log(`  Página inicio:    http://${ip}:${actualPort}/`)
       console.log(`  Control móvil:    http://${ip}:${actualPort}/remote`)
+      if (mobileAppDir) {
+        console.log(`  Mando (PWA):      http://${ip}:${actualPort}/app/`)
+      }
       console.log(`  OBS overlay:      http://${ip}:${actualPort}/overlay`)
       console.log(`  Mobile WS:        ws://${ip}:${actualPort}/ws/remote`)
     }
@@ -942,11 +1015,15 @@ const WELCOME_PAGE = `<!DOCTYPE html>
     <h1>Eclesia<em>Presenter</em></h1>
     <p>Estás conectado al servidor local de EclesiaPresenter.</p>
     <p>Para controlar la app desde este dispositivo, abre:</p>
-    <code>http://\${IP}:\${PORT}/remote</code>
+    <code>http://\${IP}:\${PORT}/app/</code>
     <br>
-    <a class="link" href="/remote">Abrir control remoto →</a>
+    <a class="link" href="/app/">Abrir mando móvil →</a>
+    <p style="margin-top:18px; font-size:13px;">
+      ¿Problemas con el mando nuevo?
+      <a href="/remote" style="color:#db9f75;">Abrir mando clásico (/remote)</a>
+    </p>
   </div>
 </body>
 </html>`
 
-module.exports = { startServer }
+module.exports = { startServer, resolveMobileAppDir }

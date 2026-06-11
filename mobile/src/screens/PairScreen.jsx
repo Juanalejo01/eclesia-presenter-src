@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import QrScanner from '../components/QrScanner.jsx'
 import BigButton from '../components/BigButton.jsx'
 import FormField from '../components/FormField.jsx'
+import { Capacitor } from '@capacitor/core'
 import { pairWithDesktop, probeServer, PairingError } from '../services/pairing.js'
 import {
   normalizeBaseUrl,
   detectPortIssue,
   suggestCanonicalUrl,
+  isServedFromDesktop,
 } from '../services/urlHelpers.js'
 import { transport } from '../services/transport.js'
 
@@ -131,6 +133,29 @@ export default function PairScreen() {
     origin: typeof window !== 'undefined' ? window.location?.origin || null : null,
     hostname: typeof window !== 'undefined' ? window.location?.hostname || '' : '',
   })
+
+  // --- Modo same-origin (T12) ---
+  // La app se sirve desde el PROPIO desktop server (http://IP:3434/app/):
+  // el server al que parear es window.location.origin — ocultamos el campo
+  // URL y pedimos solo PIN/QR. Calculado en el render body (no en ref) para
+  // que los tests puedan stubear isServedFromDesktop.
+  const servedFromDesktop = isServedFromDesktop(
+    typeof window !== 'undefined' ? window.location : null,
+  )
+
+  // --- Banner cloud https (T12, preparación T15) ---
+  // En la versión web https (Vercel) el navegador bloquea fetch http:// a la
+  // LAN (mixed content) — banner informativo PERSISTENTE, tono neutro. La
+  // defensa reactiva (PairingError mixed_content_o_shields) ya existe en
+  // pairing.js. Gated por !isNativePlatform: el WebView Android de Capacitor
+  // sirve desde https://localhost y NO debe ver este banner.
+  let isNativePlatform = false
+  try { isNativePlatform = Capacitor.isNativePlatform() } catch { /* web */ }
+  const isHttpsCloud =
+    typeof window !== 'undefined' &&
+    window.location?.protocol === 'https:' &&
+    !servedFromDesktop &&
+    !isNativePlatform
 
   // Sugerencia detectada: chip "Usar el detectado" cuando difiere del input.
   const suggested = suggestCanonicalUrl(winRef.current.hostname)
@@ -313,7 +338,8 @@ export default function PairScreen() {
     setServerVersion(null)
   }
 
-  const manualDisabled = loading || !url.trim() || pin.length !== 6
+  const manualDisabled =
+    loading || pin.length !== 6 || (!servedFromDesktop && !url.trim())
 
   // El warning inline para :5173 NO es bloqueante (el probe del submit
   // decide); informa al usuario para que corrija antes de gastar intentos.
@@ -366,6 +392,27 @@ export default function PairScreen() {
           Conecta con el PC donde corre EclesiaPresenter
         </p>
       </header>
+
+      {/* Banner cloud https (persistente, informativo — NO error). La PWA en
+          https no puede hablar con un PC en LAN http (mixed content); la vía
+          correcta hoy es el QR del panel Transmisión. T15 traerá el relay. */}
+      {isHttpsCloud && (
+        <div
+          className="mb-5 p-3 rounded-xl bg-bg-2 border border-line-2 text-xs text-ink-2 leading-relaxed"
+          role="note"
+          aria-label="Aviso de versión web"
+        >
+          <span className="font-semibold text-copper-100 block mb-1">
+            Estás en la versión web
+          </span>
+          Para conectar con el PC de tu red local, abre el mando desde el QR
+          del panel Transmisión del PC (http). Desde https el navegador
+          bloquea conexiones a la red local.
+          <span className="block mt-1 text-ink-3">
+            Conexión cloud próximamente (T15).
+          </span>
+        </div>
+      )}
 
       {/* Banner first-run con instrucciones colapsables. Gated por localStorage
           para que solo aparezca la primera vez por dispositivo/perfil. */}
@@ -445,10 +492,28 @@ export default function PairScreen() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault()
-            if (!manualDisabled) handlePair({ url, pin })
+            // Same-origin: el server es el origen que nos sirvió — el campo
+            // URL ni siquiera se renderiza.
+            const targetUrl = servedFromDesktop ? window.location.origin : url
+            if (!manualDisabled) handlePair({ url: targetUrl, pin })
           }}
         >
-          {showSuggestedChip && (
+          {servedFromDesktop && (
+            <div
+              className="px-3 py-2 rounded-lg bg-bg-2 border border-line-1 text-xs text-ink-2"
+              role="note"
+            >
+              <span className="text-ink-3">Conectado a este PC: </span>
+              <span className="text-copper-100 font-medium">
+                {typeof window !== 'undefined' ? window.location?.origin : ''}
+              </span>
+              <span className="block mt-0.5 text-ink-3">
+                Solo necesitas el PIN del panel Transmisión.
+              </span>
+            </div>
+          )}
+
+          {!servedFromDesktop && showSuggestedChip && (
             <button
               type="button"
               onClick={useSuggested}
@@ -462,21 +527,23 @@ export default function PairScreen() {
             </button>
           )}
 
-          <FormField
-            label="Dirección del PC"
-            placeholder="http://<IP>:3434"
-            value={url}
-            onChange={onUrlChange}
-            onBlur={onUrlBlur}
-            disabled={loading}
-            inputMode="url"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            hint={urlHint}
-            hintTone={urlHintTone}
-            error={urlFieldError}
-          />
+          {!servedFromDesktop && (
+            <FormField
+              label="Dirección del PC"
+              placeholder="http://<IP>:3434"
+              value={url}
+              onChange={onUrlChange}
+              onBlur={onUrlBlur}
+              disabled={loading}
+              inputMode="url"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              hint={urlHint}
+              hintTone={urlHintTone}
+              error={urlFieldError}
+            />
+          )}
           <FormField
             label="PIN de 6 dígitos"
             placeholder="123456"

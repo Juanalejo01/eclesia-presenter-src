@@ -5,3 +5,4 @@ android/
 ios/
 *.local
 .DS_Store
+dist-app

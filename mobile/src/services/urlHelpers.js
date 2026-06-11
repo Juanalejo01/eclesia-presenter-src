@@ -71,7 +71,7 @@ export function normalizeBaseUrl(input) {
  *
  * @param {string} url            URL ya normalizada
  * @param {string|null} windowOrigin  `window.location.origin` o null en SSR/tests
- * @returns {{ kind: 'dev_server' | 'wrong_port' | 'ok', port: string }}
+ * @returns {{ kind: 'dev_server' | 'self_server' | 'wrong_port' | 'ok', port: string }}
  */
 export function detectPortIssue(url, windowOrigin) {
   let target
@@ -83,11 +83,20 @@ export function detectPortIssue(url, windowOrigin) {
   const port = target.port || ''
 
   // Comparación contra el origen del propio navegador (la PWA del mando).
-  // Si coincide host:port → el usuario tipeó la URL del navegador.
+  // Si coincide host:port → dos casos MUY distintos:
+  //   - El origen es el puerto canónico 3434 (T12: la app se sirve desde el
+  //     propio desktop en /app) → 'self_server': el same-origin ES el server
+  //     correcto. El caller lo trata como ok (sin warning ámbar, sin
+  //     suprimir el probe).
+  //   - Cualquier otro puerto (típicamente Vite :5173) → 'dev_server': el
+  //     usuario tipeó la URL del navegador del mando, no la del PC.
   if (windowOrigin) {
     try {
       const win = new URL(windowOrigin)
       if (win.host && win.host === target.host) {
+        if (win.port === CANONICAL_PORT) {
+          return { kind: 'self_server', port }
+        }
         return { kind: 'dev_server', port }
       }
     } catch { /* ignore */ }
@@ -97,6 +106,27 @@ export function detectPortIssue(url, windowOrigin) {
     return { kind: 'wrong_port', port }
   }
   return { kind: 'ok', port: port || CANONICAL_PORT }
+}
+
+/**
+ * ¿La app se está sirviendo desde el propio desktop server (T12)?
+ *
+ * True cuando el mando se cargó desde http://<IP>:3434/app/ (build embed
+ * servido por Express del desktop). En ese caso el pairing es trivial:
+ * serverUrl = window.location.origin y solo hace falta el PIN/QR — el
+ * campo URL se oculta y los guards same-origin de pairing.js se relajan.
+ *
+ * @param {{ port?: string, pathname?: string }|null} [loc] — por defecto
+ *   window.location; inyectable para tests.
+ * @returns {boolean}
+ */
+export function isServedFromDesktop(
+  loc = typeof window !== 'undefined' ? window.location : null,
+) {
+  if (!loc) return false
+  const port = String(loc.port || '')
+  const pathname = String(loc.pathname || '')
+  return port === CANONICAL_PORT || pathname.startsWith('/app')
 }
 
 /**

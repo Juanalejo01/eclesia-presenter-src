@@ -39,6 +39,7 @@
  *     que sigue al POST /api/pair (back-compat con versiones <0.2.13).
  */
 import { getDeviceId } from './deviceId.js'
+import { isServedFromDesktop } from './urlHelpers.js'
 
 /**
  * Error tipado del pairing. El caller hace `switch (err.code)` y
@@ -298,7 +299,13 @@ export async function pairWithDesktop({ url, pin, deviceName, skipProbe = false 
   // (típicamente Vite dev en :5173 servido por LAN). Ningún fetch necesario.
   // Código `puerto_dev_server` (distinto de `puerto_incorrecto` para que la
   // UI pueda mostrar un mensaje específico).
-  if (typeof window !== 'undefined' && window.location?.host) {
+  //
+  // EXCEPCIÓN (T12): cuando la app se sirve desde el PROPIO desktop server
+  // (http://IP:3434/app/), el same-origin ES el server correcto — parear
+  // contra window.location.origin es exactamente lo que queremos. El guard
+  // se salta SOLO en ese caso (isServedFromDesktop: puerto canónico 3434 o
+  // pathname /app); el falso positivo de Vite :5173 sigue bloqueado.
+  if (typeof window !== 'undefined' && window.location?.host && !isServedFromDesktop(window.location)) {
     try {
       const targetHost = new URL(baseUrl).host
       if (targetHost === window.location.host) {
