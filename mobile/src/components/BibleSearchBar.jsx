@@ -5,7 +5,12 @@
  * allá del spinner en la derecha. El componente NO contiene lógica de
  * debounce — eso vive en useBibleSearch. Aquí solo somos un input
  * accesible y bonito.
+ *
+ * T13: el placeholder por defecto se resuelve EN RENDER via t() (un
+ * default param lo congelaria al idioma del primer render del caller).
+ * Si el caller pasa `placeholder` explicito, gana el suyo.
  */
+import { useT } from '../hooks/useT.js'
 
 export default function BibleSearchBar({
   value,
@@ -13,8 +18,9 @@ export default function BibleSearchBar({
   onClear,
   loading = false,
   disabled = false,
-  placeholder = 'Buscar versículo o texto…',
+  placeholder = null,
 }) {
+  const { t } = useT()
   return (
     <div className="relative">
       <span
@@ -26,7 +32,7 @@ export default function BibleSearchBar({
       <input
         type="search"
         role="searchbox"
-        aria-label="Buscar versículo"
+        aria-label={t('bible.searchAria')}
         inputMode="search"
         enterKeyHint="search"
         autoCapitalize="none"
@@ -36,7 +42,7 @@ export default function BibleSearchBar({
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('bible.searchPlaceholder')}
         className={
           'w-full h-12 pl-10 pr-12 rounded-xl bg-bg-2 border border-line-1 ' +
           'text-base text-ink-1 placeholder-ink-3 ' +
@@ -54,7 +60,7 @@ export default function BibleSearchBar({
         <button
           type="button"
           onClick={onClear}
-          aria-label="Limpiar búsqueda"
+          aria-label={t('common.clearSearch')}
           className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center text-ink-3 hover:text-ink-1 rounded-full hover:bg-bg-3 transition-colors"
         >
           <span aria-hidden="true" className="text-lg leading-none">×</span>

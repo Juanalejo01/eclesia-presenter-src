@@ -3,7 +3,13 @@
  *
  * Chips horizontales con referencias frecuentes. Visible solo en idle
  * para no robar protagonismo cuando ya hay resultados. Tap → onPick(query).
+ *
+ * T13: los textos de los chips NO se traducen — son QUERIES literales que
+ * el server resuelve contra el indice de nombres de libros en espanol de
+ * la RVR1960 ('John 3:16' devolveria cero resultados). Solo se traduce el
+ * aria-label del contenedor.
  */
+import { useT } from '../hooks/useT.js'
 
 const CHIPS = [
   'Juan 3:16',
@@ -17,10 +23,11 @@ const CHIPS = [
 ]
 
 export default function BibleQuickChips({ onPick, disabled = false }) {
+  const { t } = useT()
   return (
     <div
       role="list"
-      aria-label="Versículos frecuentes"
+      aria-label={t('bible.chipsAria')}
       className="flex gap-2 overflow-x-auto snap-x snap-mandatory py-1 -mx-1 px-1"
     >
       {CHIPS.map((chip) => (

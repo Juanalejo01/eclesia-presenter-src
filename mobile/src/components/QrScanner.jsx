@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import jsQR from 'jsqr'
+import { useT } from '../hooks/useT.js'
 
 /**
  * QrScanner
@@ -35,6 +36,7 @@ import jsQR from 'jsqr'
  *     mientras el play estaba pendiente.
  */
 export default function QrScanner({ onScan, onError, active = true }) {
+  const { t } = useT()
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
@@ -168,12 +170,12 @@ export default function QrScanner({ onScan, onError, active = true }) {
       <div className="absolute inset-8 border-2 border-copper-200/60 rounded-xl pointer-events-none" />
       {status === 'requesting' && (
         <div className="absolute inset-0 grid place-items-center text-ink-2 text-sm bg-bg-3/80">
-          Pidiendo permiso de cámara...
+          {t('qr.requesting')}
         </div>
       )}
       {status === 'error' && (
         <div className="absolute inset-0 grid place-items-center text-live text-sm text-center p-4 bg-bg-3/90">
-          No se pudo acceder a la cámara. Usa el modo manual.
+          {t('qr.error')}
         </div>
       )}
     </div>

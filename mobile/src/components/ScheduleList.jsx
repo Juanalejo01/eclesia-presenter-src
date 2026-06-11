@@ -25,9 +25,11 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { useSchedule } from '../hooks/useSchedule.js'
 import { projectItem, reorderItems } from '../services/scheduleActions.js'
 import { tapLight } from '../services/haptics.js'
+import { useT } from '../hooks/useT.js'
 import ScheduleItemRow from './ScheduleItemRow.jsx'
 
 export default function ScheduleList() {
+  const { t } = useT()
   const { items, isStale, setLocalOrder } = useSchedule()
 
   // onDragEnd: el callback de @hello-pangea/dnd. `result` trae source y
@@ -64,25 +66,25 @@ export default function ScheduleList() {
 
   if (isStale) {
     return (
-      <section aria-label="Lista del día" className="text-xs text-ink-3 text-center py-6">
-        Cargando lista del día...
+      <section aria-label={t('schedule.listAria')} className="text-xs text-ink-3 text-center py-6">
+        {t('schedule.loading')}
       </section>
     )
   }
   if (items.length === 0) {
     return (
-      <section aria-label="Lista del día" className="text-xs text-ink-3 text-center py-6">
-        Sin items en la lista del día.
+      <section aria-label={t('schedule.listAria')} className="text-xs text-ink-3 text-center py-6">
+        {t('schedule.emptyLine1')}
         <br />
-        Añade canciones desde el PC.
+        {t('schedule.emptyLine2')}
       </section>
     )
   }
 
   return (
-    <section aria-label="Lista del día">
+    <section aria-label={t('schedule.listAria')}>
       <h2 className="text-xs font-mono uppercase tracking-widest text-ink-3 mb-2 px-1">
-        Lista del día ({items.length})
+        {t('schedule.headerCount', { n: items.length })}
       </h2>
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="schedule">

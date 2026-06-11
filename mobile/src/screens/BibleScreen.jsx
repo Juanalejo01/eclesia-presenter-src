@@ -27,8 +27,11 @@ import { transport, ClientCommand, ServerEvent } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
 import { useBibleSearch } from '../hooks/useBibleSearch.js'
 import { tapLight, tapMedium } from '../services/haptics.js'
+import { useT } from '../hooks/useT.js'
+import { t as tGlobal } from '../services/i18n.js'
 
 export default function BibleScreen() {
+  const { t } = useT()
   const nav = useNavigate()
   const { isConnected, isConnecting } = useConnection()
   const {
@@ -101,21 +104,21 @@ export default function BibleScreen() {
       },
     })
     setSheetOpen(false)
-    setToast(`Proyectado: ${item.reference}`)
+    setToast(t('bible.toastProjected', { ref: item.reference }))
   }
 
   // Subtitle dinámico del header según status
   const subtitle = !isConnected
-    ? (isConnecting ? 'Reconectando con el PC…' : 'Sin conexión con el PC')
+    ? (isConnecting ? t('bible.reconnecting') : t('bible.offline'))
     : status === 'loading'
-      ? 'Buscando…'
+      ? t('bible.searching')
       : status === 'results'
-        ? `${results.length} resultado${results.length === 1 ? '' : 's'}`
+        ? t(results.length === 1 ? 'bible.resultsCount' : 'bible.resultsCountPlural', { n: results.length })
         : status === 'empty'
-          ? 'Sin resultados'
+          ? t('bible.noResults')
           : status === 'error'
             ? errorSubtitle(error)
-            : 'Buscar y proyectar versículos'
+            : t('bible.subtitleIdle')
 
   return (
     <div
@@ -125,7 +128,7 @@ export default function BibleScreen() {
       {/* Header */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink-1">Biblia</h1>
+          <h1 className="font-display text-3xl text-ink-1">{t('bible.title')}</h1>
           <p className="text-xs text-ink-3 mt-0.5" aria-live="polite">
             {subtitle}
           </p>
@@ -140,8 +143,8 @@ export default function BibleScreen() {
           role="alert"
         >
           {isConnecting
-            ? 'Reconectando con el PC…'
-            : 'Sin conexión con el PC. Comprueba la WiFi.'}
+            ? t('bible.reconnecting')
+            : t('bible.offlineWifi')}
         </div>
       )}
 
@@ -164,8 +167,8 @@ export default function BibleScreen() {
         {status === 'idle' && (
           <BibleEmptyState
             variant="idle"
-            message="Escribe una referencia o palabras clave"
-            hint="Ej: Juan 3:16, salmos 23, amor de Dios"
+            message={t('bible.idleMessage')}
+            hint={t('bible.idleHint')}
           />
         )}
         {status === 'loading' && <SkeletonRows />}
@@ -175,8 +178,8 @@ export default function BibleScreen() {
         {status === 'empty' && (
           <BibleEmptyState
             variant="empty"
-            message="No encontramos versículos para tu búsqueda"
-            hint="Prueba con otra referencia o palabra clave"
+            message={t('bible.emptyMessage')}
+            hint={t('bible.emptyHint')}
           />
         )}
         {status === 'error' && (
@@ -190,7 +193,7 @@ export default function BibleScreen() {
                   onClick={retry}
                   className="mt-2 h-10 px-4 rounded-lg bg-bg-3 text-ink-1 text-sm font-medium hover:bg-bg-2 transition-colors"
                 >
-                  Reintentar
+                  {t('common.retry')}
                 </button>
               )
             }
@@ -225,39 +228,30 @@ export default function BibleScreen() {
   )
 }
 
+// Codigos con subtitle dedicado en el dict (bible.err.<code>). Cualquier
+// otro codigo cae al generico bible.err.unknown.
+const ERR_SUBTITLE_CODES = new Set([
+  'auth_error', 'rate_limited', 'offline', 'q_too_short',
+  'book_not_found', 'reference_not_found',
+])
+
 function errorSubtitle(err) {
-  switch (err?.code) {
-    case 'auth_error': return 'Sesión expirada'
-    case 'rate_limited': return 'Demasiadas búsquedas'
-    case 'offline': return 'Sin respuesta del PC'
-    case 'q_too_short': return 'Escribe al menos 3 letras'
-    case 'book_not_found': return 'Libro no reconocido'
-    case 'reference_not_found': return 'Referencia fuera de rango'
-    default: return 'Error en la búsqueda'
-  }
+  const code = ERR_SUBTITLE_CODES.has(err?.code) ? err.code : 'unknown'
+  return tGlobal(`bible.err.${code}`)
 }
 
+const ERR_MSG_CODES = new Set([
+  'auth_error', 'rate_limited', 'offline', 'q_too_short',
+  'book_not_found', 'reference_not_found', 'no_credentials',
+])
+
 function errorMessage(err) {
-  switch (err?.code) {
-    case 'auth_error':
-      return 'Sesión expirada. Vuelve a parear este mando.'
-    case 'rate_limited': {
-      const sec = err.retryAfterMs ? Math.ceil(err.retryAfterMs / 1000) : 60
-      return `Demasiadas búsquedas. Espera ${sec}s e inténtalo de nuevo.`
-    }
-    case 'offline':
-      return 'Sin respuesta del PC. Comprueba la WiFi.'
-    case 'q_too_short':
-      return 'Escribe al menos 3 letras o una referencia (Juan 3:16).'
-    case 'book_not_found':
-      return 'No reconocemos ese libro. Prueba con el nombre completo.'
-    case 'reference_not_found':
-      return 'Esa referencia no existe en esta versión.'
-    case 'no_credentials':
-      return 'No hay credenciales guardadas. Vuelve a parear.'
-    default:
-      return 'No pudimos completar la búsqueda.'
+  const code = ERR_MSG_CODES.has(err?.code) ? err.code : 'unknown'
+  if (code === 'rate_limited') {
+    const sec = err.retryAfterMs ? Math.ceil(err.retryAfterMs / 1000) : 60
+    return tGlobal('bible.errMsg.rate_limited', { sec })
   }
+  return tGlobal(`bible.errMsg.${code}`)
 }
 
 function SkeletonRows() {

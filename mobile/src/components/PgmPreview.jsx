@@ -49,6 +49,7 @@ import {
   deriveReferenceStyle,
   mergeTheme,
 } from '../services/slideTheme.js'
+import { useT } from '../hooks/useT.js'
 
 // Style inline para el live region — equivalente al `sr-only` de
 // Tailwind/HeadlessUI. Lo dejamos inline para no depender de utilities
@@ -66,6 +67,7 @@ const _SR_ONLY = Object.freeze({
 })
 
 export default function PgmPreview({ slide, theme }) {
+  const { t } = useT()
   const containerRef = useRef(null)
   const [containerW, setContainerW] = useState(0)
 
@@ -129,9 +131,9 @@ export default function PgmPreview({ slide, theme }) {
         ref={containerRef}
         className="aspect-video bg-bg-3 border border-line-1 rounded-xl grid place-items-center text-ink-3 text-sm p-6 text-center"
         role="img"
-        aria-label="Sin contenido proyectado"
+        aria-label={t('pgm.noContent')}
       >
-        Sin contenido proyectado
+        {t('pgm.noContent')}
       </div>
     )
   }
@@ -142,9 +144,9 @@ export default function PgmPreview({ slide, theme }) {
         ref={containerRef}
         className="aspect-video bg-black border border-line-1 rounded-xl grid place-items-center text-ink-3 text-xs font-mono uppercase tracking-widest"
         role="img"
-        aria-label="Proyección en blackout"
+        aria-label={t('pgm.blackoutAria')}
       >
-        Blackout
+        {t('pgm.blackout')}
       </div>
     )
   }
@@ -155,22 +157,23 @@ export default function PgmPreview({ slide, theme }) {
         ref={containerRef}
         className="aspect-video bg-ink-1 border border-line-1 rounded-xl grid place-items-center text-bg-1 text-xs font-mono uppercase tracking-widest opacity-70"
         role="img"
-        aria-label="Slide en blanco proyectado"
+        aria-label={t('pgm.blankAria')}
       >
-        Slide en blanco
+        {t('pgm.blank')}
       </div>
     )
   }
 
   // Contenido normal — aplicar tema completo.
-  const aria = `Proyectando: ${slide?.text || ''}${
-    slide?.reference ? ` (${slide.reference})` : ''
-  }`.trim()
+  const aria = (slide?.reference
+    ? t('pgm.projectingAriaRef', { text: slide?.text || '', ref: slide.reference })
+    : t('pgm.projectingAria', { text: slide?.text || '' })
+  ).trim()
 
   // Texto del live region — corto, sin contenido literal del slide.
   // El "·" + tick fuerza a que dos updates consecutivos generen
   // strings distintos aunque el slide tenga el mismo texto/reference.
-  const liveText = `Diapositiva nueva en proyección · ${slideTick}`
+  const liveText = t('pgm.liveRegion', { n: slideTick })
 
   return (
     <>

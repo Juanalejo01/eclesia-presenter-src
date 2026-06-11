@@ -14,6 +14,7 @@
  * El sheet NO se renderiza si open=false (no portal — vive en el árbol).
  */
 import { useEffect, useRef, useState } from 'react'
+import { useT } from '../hooks/useT.js'
 
 export default function BiblePreviewSheet({
   open,
@@ -22,6 +23,7 @@ export default function BiblePreviewSheet({
   onClose,
   onProject,
 }) {
+  const { t } = useT()
   const sheetRef = useRef(null)
   const projectBtnRef = useRef(null)
   const [dragOffset, setDragOffset] = useState(0)
@@ -134,7 +136,7 @@ export default function BiblePreviewSheet({
             onClick={onClose}
             className="flex-1 h-12 rounded-xl bg-bg-3 text-ink-2 font-medium hover:bg-bg-2 transition-colors"
           >
-            Cancelar
+            {t('common.cancel')}
           </button>
           <button
             ref={projectBtnRef}
@@ -151,12 +153,12 @@ export default function BiblePreviewSheet({
             }
             style={{ flex: 2 }}
           >
-            Proyectar
+            {t('bible.project')}
           </button>
         </div>
         {!isConnected && (
           <p id="offline-hint" className="px-4 pb-3 text-center text-xs text-ink-3">
-            Sin conexión con el PC
+            {t('bible.sheetOffline')}
           </p>
         )}
       </div>

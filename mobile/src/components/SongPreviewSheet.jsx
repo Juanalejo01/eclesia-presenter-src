@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import SongSectionButton from './SongSectionButton.jsx'
+import { useT } from '../hooks/useT.js'
 
 export default function SongPreviewSheet({
   open,
@@ -21,6 +22,7 @@ export default function SongPreviewSheet({
   onProjectSection,
   onClearLive,
 }) {
+  const { t } = useT()
   const sheetRef = useRef(null)
   const closeBtnRef = useRef(null)
   const [dragOffset, setDragOffset] = useState(0)
@@ -94,7 +96,7 @@ export default function SongPreviewSheet({
         <div className="px-5 pt-3 pb-2 flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <h2 id={titleId} className="font-display text-xl text-ink-1 truncate">
-              {song?.title || (loading ? 'Cargando…' : 'Canción')}
+              {song?.title || (loading ? t('songs.sheetLoading') : t('songs.sheetFallbackTitle'))}
             </h2>
             {song?.author && (
               <p className="text-xs text-ink-3 mt-0.5">{song.author}</p>
@@ -113,7 +115,7 @@ export default function SongPreviewSheet({
             ref={closeBtnRef}
             type="button"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t('common.close')}
             className="w-10 h-10 grid place-items-center rounded-full bg-bg-2 text-ink-2 hover:bg-bg-3"
           >
             <span aria-hidden="true">×</span>
@@ -131,7 +133,7 @@ export default function SongPreviewSheet({
           )}
           {!loading && sections.length === 0 && song && (
             <p role="status" className="text-center text-sm text-ink-3 py-4">
-              Esta canción no tiene secciones.
+              {t('songs.noSections')}
             </p>
           )}
           {sections.map((sec) => (
@@ -148,7 +150,7 @@ export default function SongPreviewSheet({
 
         {!isConnected && (
           <p className="px-4 pb-3 text-center text-xs text-ink-3">
-            Sin conexión con el PC
+            {t('songs.sheetOffline')}
           </p>
         )}
       </div>

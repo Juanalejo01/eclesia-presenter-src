@@ -4,12 +4,14 @@
  * Item del catalogo de canciones. Two-line: title + (author · matchKind/snippet).
  * Badge "Letra" cuando matchKind === 'lyric'.
  */
+import { useT } from '../hooks/useT.js'
 
 export default function SongsRow({ song, onTap }) {
+  const { t } = useT()
   if (!song) return null
   const meta = song.author || song.tags || ''
   const showLyricBadge = song.matchKind === 'lyric'
-  const ariaLabel = `Canción ${song.title}${song.author ? ', ' + song.author : ''}`
+  const ariaLabel = t('songs.rowAria', { title: song.title }) + (song.author ? ', ' + song.author : '')
   return (
     <button
       type="button"
@@ -28,16 +30,16 @@ export default function SongsRow({ song, onTap }) {
         </span>
         {song.isFavorite && (
           <span
-            aria-label="Favorita"
+            aria-label={t('songs.favorite')}
             className="text-copper-200 text-xs"
-            title="Favorita"
+            title={t('songs.favorite')}
           >
             ★
           </span>
         )}
         {showLyricBadge && (
           <span className="text-[10px] uppercase font-mono tracking-widest text-copper-200 px-1.5 py-0.5 rounded bg-bg-3 border border-copper-200/30">
-            Letra
+            {t('songs.lyricBadge')}
           </span>
         )}
       </span>

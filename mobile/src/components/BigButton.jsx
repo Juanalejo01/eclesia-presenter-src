@@ -4,6 +4,10 @@
  * Botón táctil grande (min-height 56px) pensado para taps con el dedo.
  * Tres variantes: primary (cobre), ghost (outline), danger (rojo live).
  *
+ * forwardRef (T13): PanicButton necesita la referencia del <button> real
+ * para restaurar el foco al cerrar PanicModal (a11y). Los usos sin ref
+ * no cambian.
+ *
  * Props:
  *   onClick     — handler
  *   disabled    — bool
@@ -12,7 +16,9 @@
  *   type        — 'button' | 'submit' (default 'button')
  *   children    — contenido del botón
  */
-export default function BigButton({
+import { forwardRef } from 'react'
+
+const BigButton = forwardRef(function BigButton({
   onClick,
   disabled,
   loading,
@@ -20,7 +26,7 @@ export default function BigButton({
   type = 'button',
   children,
   ...rest
-}) {
+}, ref) {
   const cls = {
     primary: 'bg-copper-200 hover:bg-copper-100 active:bg-copper-300 text-bg-1',
     ghost:   'bg-transparent hover:bg-bg-2 text-ink-2 border border-line-2',
@@ -29,6 +35,7 @@ export default function BigButton({
 
   return (
     <button
+      ref={ref}
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
@@ -41,4 +48,6 @@ export default function BigButton({
       {loading ? '...' : children}
     </button>
   )
-}
+})
+
+export default BigButton

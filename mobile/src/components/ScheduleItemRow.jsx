@@ -15,6 +15,7 @@
  *   - El handle tiene aria-label "Reordenar".
  */
 import { memo } from 'react'
+import { useT } from '../hooks/useT.js'
 
 // Iconos emoji por tipo. Mantenidos como string literales (no SVG)
 // para no añadir peso al bundle — son glyphs del sistema y se ven
@@ -27,16 +28,21 @@ const ICON_BY_TYPE = {
   announcement: '\u{1F4E2}', // 📢
 }
 
-const LABEL_BY_TYPE = {
-  song:         'Canción',
-  bible:        'Biblia',
-  image:        'Imagen',
-  video:        'Video',
-  announcement: 'Anuncio',
+// T13: el const guarda KEYS de i18n (no strings) — resolverlas en render
+// evita congelar el idioma al import del modulo.
+const LABEL_KEY_BY_TYPE = {
+  song:         'schedule.type.song',
+  bible:        'schedule.type.bible',
+  image:        'schedule.type.image',
+  video:        'schedule.type.video',
+  announcement: 'schedule.type.announcement',
 }
 
 function _ScheduleItemRow({ item, isDragging, dragHandleProps, onTap }) {
-  const typeLabel = LABEL_BY_TYPE[item.type] || 'Item'
+  // useT suscribe la fila al locale: el memo() compara solo props, pero
+  // useSyncExternalStore fuerza el re-render al cambiar el idioma.
+  const { t } = useT()
+  const typeLabel = t(LABEL_KEY_BY_TYPE[item.type] || 'schedule.type.item')
   const icon = ICON_BY_TYPE[item.type] || '·'
 
   // Handlers locales que inyectan `item` para que el padre pase un
@@ -56,7 +62,7 @@ function _ScheduleItemRow({ item, isDragging, dragHandleProps, onTap }) {
       onClick={handleClick}
       role="button"
       tabIndex={0}
-      aria-label={`Proyectar ${typeLabel}: ${item.title}`}
+      aria-label={t('schedule.projectAria', { type: typeLabel, title: item.title })}
       onKeyDown={handleKeyDown}
       className={
         'flex items-center gap-3 px-3 py-3 rounded-lg ' +
@@ -72,7 +78,7 @@ function _ScheduleItemRow({ item, isDragging, dragHandleProps, onTap }) {
           por accidente al pulsar para proyectar. */}
       <div
         {...dragHandleProps}
-        aria-label="Reordenar"
+        aria-label={t('schedule.reorderAria')}
         className="shrink-0 grid place-items-center w-7 h-9 rounded text-ink-3 hover:text-ink-2 cursor-grab active:cursor-grabbing select-none"
         onClick={(e) => {
           // El handle NO debe disparar onTap del padre — sólo arrastra.

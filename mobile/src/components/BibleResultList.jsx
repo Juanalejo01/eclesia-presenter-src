@@ -8,14 +8,16 @@
  * todo — sigue siendo aceptable porque limit=20 max.
  */
 import BibleResultRow from './BibleResultRow.jsx'
+import { useT } from '../hooks/useT.js'
 
 export default function BibleResultList({ results, mode, onTap }) {
+  const { t } = useT()
   if (!Array.isArray(results) || results.length === 0) return null
   const highlightFirst = mode === 'ref' && results.length === 1
   return (
     <ul
       role="list"
-      aria-label={`${results.length} resultados`}
+      aria-label={t('bible.resultsAria', { n: results.length })}
       className="flex flex-col gap-2 overflow-y-auto"
     >
       {results.map((item, i) => (

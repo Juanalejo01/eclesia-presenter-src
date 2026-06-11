@@ -12,6 +12,8 @@ import {
   isServedFromDesktop,
 } from '../services/urlHelpers.js'
 import { transport } from '../services/transport.js'
+import { useT } from '../hooks/useT.js'
+import { t } from '../services/i18n.js'
 
 const LAST_URL_KEY = 'eclesia.pair.lastUrl'
 const FIRST_PAIR_SEEN_KEY = 'eclesia.firstPairSeen'
@@ -80,6 +82,9 @@ function safeLocalSet(key, value) {
  * Errores: el mapeo completo en `_humanError()` al final del fichero.
  */
 export default function PairScreen() {
+  // useT suscribe la pantalla al locale (re-render al cambiar idioma);
+  // los helpers de modulo (_humanError) usan el `t` global importado.
+  useT()
   const nav = useNavigate()
   const [mode, setMode] = useState('qr')   // 'qr' | 'manual'
   const [url, setUrl] = useState(() => {
@@ -238,14 +243,16 @@ export default function PairScreen() {
         setProbeStatus('ok')
         setServerVersion('legacy')
       } else if (r.ok) {
+        // Guardamos el dato crudo (o null); el string traducido se
+        // resuelve en render para respetar el idioma activo.
         setProbeStatus('ok')
-        setServerVersion(r.version || 'desconocida')
+        setServerVersion(r.version || null)
       }
     } catch (e) {
       if (ctrl.signal.aborted) return
       console.warn('[probe] inline blur fail:', e?.code || e?.message)
       setProbeStatus('fail')
-      const human = e instanceof PairingError ? _humanError(e) : { message: e?.message || 'Error de red' }
+      const human = e instanceof PairingError ? _humanError(e) : { message: e?.message || t('pair.netError') }
       setProbeError(human.message)
     } finally {
       if (probeCtrlRef.current === ctrl) probeCtrlRef.current = null
@@ -276,7 +283,7 @@ export default function PairScreen() {
         setError(_humanError(e))
       } else {
         console.warn('[pairing] error inesperado:', e?.message || e)
-        setError({ message: 'Error inesperado. Intenta de nuevo.' })
+        setError({ message: t('pair.unexpected') })
       }
       // Re-armar el scanner y forzar remount para permitir un nuevo intento
       setScannerActive(true)
@@ -308,7 +315,7 @@ export default function PairScreen() {
       handlePair({ url: parsed.url, pin: String(parsed.pin) })
     } catch {
       setError({
-        message: 'QR no válido. Usa el modo manual o vuelve a intentar.',
+        message: t('pair.qrInvalid'),
       })
       setScannerActive(true)
       setScanAttempt((n) => n + 1)
@@ -361,19 +368,19 @@ export default function PairScreen() {
   //   5. Probe ok (verde)
   //   6. Hint normal (gris)
   const urlFieldError = error?.field === 'url' ? error.message : null
-  let urlHint = 'Aparece en el panel Transmisión del PC'
+  let urlHint = t('pair.urlHint')
   let urlHintTone = 'normal'  // 'normal' | 'warning' | 'success' | 'probing'
   if (!urlFieldError) {
     if (showDevServerWarning) {
-      urlHint = 'Ese puerto es del mando (navegador). El PC normalmente está en :3434.'
+      urlHint = t('pair.urlHintDevServer')
       urlHintTone = 'warning'
     } else if (probeStatus === 'probing') {
-      urlHint = 'Comprobando…'
+      urlHint = t('pair.probing')
       urlHintTone = 'probing'
     } else if (probeStatus === 'ok') {
       urlHint = serverVersion === 'legacy'
-        ? '✓ Servidor encontrado (versión antigua)'
-        : `✓ EclesiaPresenter v${serverVersion} encontrado`
+        ? t('pair.probeLegacy')
+        : t('pair.probeFound', { version: serverVersion || t('pair.versionUnknown') })
       urlHintTone = 'success'
     } else if (probeStatus === 'fail' && probeError) {
       urlHint = probeError
@@ -387,9 +394,9 @@ export default function PairScreen() {
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 20px)' }}
     >
       <header className="text-center mb-6">
-        <h1 className="font-display text-3xl text-ink-1 mb-1">Emparejar</h1>
+        <h1 className="font-display text-3xl text-ink-1 mb-1">{t('pair.title')}</h1>
         <p className="text-sm text-ink-3">
-          Conecta con el PC donde corre EclesiaPresenter
+          {t('pair.subtitle')}
         </p>
       </header>
 
@@ -400,16 +407,14 @@ export default function PairScreen() {
         <div
           className="mb-5 p-3 rounded-xl bg-bg-2 border border-line-2 text-xs text-ink-2 leading-relaxed"
           role="note"
-          aria-label="Aviso de versión web"
+          aria-label={t('pair.web.aria')}
         >
           <span className="font-semibold text-copper-100 block mb-1">
-            Estás en la versión web
+            {t('pair.web.title')}
           </span>
-          Para conectar con el PC de tu red local, abre el mando desde el QR
-          del panel Transmisión del PC (http). Desde https el navegador
-          bloquea conexiones a la red local.
+          {t('pair.web.body')}
           <span className="block mt-1 text-ink-3">
-            Conexión cloud próximamente (T15).
+            {t('pair.web.soon')}
           </span>
         </div>
       )}
@@ -420,25 +425,25 @@ export default function PairScreen() {
         <div
           className="mb-5 p-3 rounded-xl bg-bg-2 border border-line-2"
           role="region"
-          aria-label="Instrucciones de emparejamiento"
+          aria-label={t('pair.banner.aria')}
         >
           <div className="flex items-start justify-between gap-2 mb-2">
             <span className="text-sm font-semibold text-copper-100">
-              Cómo emparejar
+              {t('pair.banner.title')}
             </span>
             <button
               type="button"
               onClick={dismissBanner}
               className="text-xs text-ink-3 hover:text-ink-2 transition px-2 py-0.5"
-              aria-label="Cerrar instrucciones"
+              aria-label={t('pair.banner.dismissAria')}
             >
-              Entendido ✕
+              {t('pair.banner.dismiss')}
             </button>
           </div>
           <ol className="text-xs text-ink-2 space-y-1 pl-1 list-decimal list-inside">
-            <li>Abre EclesiaPresenter en el PC</li>
-            <li>Ve a Ajustes → Transmisión</li>
-            <li>Copia la dirección y el PIN</li>
+            <li>{t('pair.banner.step1')}</li>
+            <li>{t('pair.banner.step2')}</li>
+            <li>{t('pair.banner.step3')}</li>
           </ol>
         </div>
       )}
@@ -457,7 +462,7 @@ export default function PairScreen() {
                 : 'text-ink-2 hover:text-ink-1'
             }`}
           >
-            {m === 'qr' ? 'Escanear QR' : 'Manual'}
+            {m === 'qr' ? t('pair.mode.qr') : t('pair.mode.manual')}
           </button>
         ))}
       </div>
@@ -471,16 +476,16 @@ export default function PairScreen() {
             onScan={onQrScan}
             onError={(e) =>
               setError({
-                message: 'No se pudo abrir la cámara: ' + (e?.message || e),
+                message: t('pair.cameraError', { msg: e?.message || e }),
               })
             }
           />
           <p className="text-xs text-center text-ink-3">
-            En el PC: Ajustes → Transmisión → escanea el QR
+            {t('pair.qrHint')}
           </p>
           {loading && (
             <p className="text-xs text-center text-copper-100">
-              Emparejando…
+              {t('pair.pairing')}
             </p>
           )}
         </div>
@@ -503,12 +508,12 @@ export default function PairScreen() {
               className="px-3 py-2 rounded-lg bg-bg-2 border border-line-1 text-xs text-ink-2"
               role="note"
             >
-              <span className="text-ink-3">Conectado a este PC: </span>
+              <span className="text-ink-3">{t('pair.sameOrigin.label')}</span>
               <span className="text-copper-100 font-medium">
                 {typeof window !== 'undefined' ? window.location?.origin : ''}
               </span>
               <span className="block mt-0.5 text-ink-3">
-                Solo necesitas el PIN del panel Transmisión.
+                {t('pair.sameOrigin.note')}
               </span>
             </div>
           )}
@@ -521,16 +526,16 @@ export default function PairScreen() {
               className="w-full text-left px-3 py-2 rounded-lg bg-bg-2 border border-line-1
                          text-xs text-ink-2 hover:bg-bg-3 transition"
             >
-              <span className="text-ink-3">Detectado: </span>
+              <span className="text-ink-3">{t('pair.detected')}</span>
               <span className="text-copper-100 font-medium">{suggested}</span>
-              <span className="float-right text-copper-200 font-semibold">Usar →</span>
+              <span className="float-right text-copper-200 font-semibold">{t('pair.use')}</span>
             </button>
           )}
 
           {!servedFromDesktop && (
             <FormField
-              label="Dirección del PC"
-              placeholder="http://<IP>:3434"
+              label={t('pair.urlLabel')}
+              placeholder={t('pair.urlPlaceholder')}
               value={url}
               onChange={onUrlChange}
               onBlur={onUrlBlur}
@@ -545,8 +550,8 @@ export default function PairScreen() {
             />
           )}
           <FormField
-            label="PIN de 6 dígitos"
-            placeholder="123456"
+            label={t('pair.pinLabel')}
+            placeholder={t('pair.pinPlaceholder')}
             value={pin}
             onChange={(e) => {
               setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
@@ -555,7 +560,7 @@ export default function PairScreen() {
             disabled={loading}
             inputMode="numeric"
             maxLength={6}
-            hint="Cambia cada vez que reinicias el PC"
+            hint={t('pair.pinHint')}
             error={error?.field === 'pin' ? error.message : null}
           />
           <BigButton
@@ -563,7 +568,7 @@ export default function PairScreen() {
             loading={loading}
             disabled={manualDisabled}
           >
-            Emparejar
+            {t('pair.submit')}
           </BigButton>
         </form>
       )}
@@ -597,7 +602,7 @@ export default function PairScreen() {
  *   - mixed_content_o_shields     → banner global (Brave Shields / CSP)
  *   - respuesta_invalida          → banner global (server con shape distinto)
  *   - servidor_legacy             → no debería llegar a UI (silent fallback), pero por defensa
- *   - unknown                     → banner global con err.message
+ *   - unknown                     → banner global con genérico traducido (T13)
  *
  * Decisión consciente: solo `firewall_o_red` menciona "misma WiFi". Antes
  * `no_alcanzable` lo decía, lo que era ambiguo (cubría timeout y POST-fail
@@ -608,67 +613,62 @@ function _humanError(err) {
     case 'pin_incorrecto':
       return {
         field: 'pin',
-        message: 'PIN incorrecto. Revisa que coincida con el PC.',
+        message: t('errors.pair.pin_incorrecto'),
       }
     case 'demasiados_intentos': {
       const sec = Math.ceil((err.extra?.retryAfterMs || 60_000) / 1000)
       return {
-        message: `Demasiados intentos fallidos. Vuelve a intentar en ${sec}s.`,
+        message: t('errors.pair.demasiados_intentos', { sec }),
       }
     }
     case 'puerto_incorrecto':
       return {
         field: 'url',
-        message:
-          'Esa dirección responde pero no es EclesiaPresenter. Comprueba el puerto (normalmente :3434).',
+        message: t('errors.pair.puerto_incorrecto'),
       }
     case 'puerto_dev_server':
       return {
         field: 'url',
-        message:
-          'Esa es la URL del navegador (el mando), no la del PC.',
+        message: t('errors.pair.puerto_dev_server'),
       }
     case 'no_es_eclesia':
       return {
         field: 'url',
-        message:
-          'Esa dirección responde, pero no es EclesiaPresenter. ¿Has puesto el puerto correcto?',
+        message: t('errors.pair.no_es_eclesia'),
       }
     case 'firewall_o_red':
       return {
         field: 'url',
-        message:
-          'El PC no responde a tiempo. Verifica que el firewall permita EclesiaPresenter y que estáis en la misma WiFi.',
+        message: t('errors.pair.firewall_o_red'),
       }
     case 'servidor_caido':
       return {
         field: 'url',
-        message:
-          'Nada responde en esa dirección. Asegúrate de que EclesiaPresenter está abierto en el PC.',
+        message: t('errors.pair.servidor_caido'),
       }
     case 'mixed_content_o_shields':
       return {
-        message:
-          'El navegador está bloqueando la conexión (Brave Shields o contenido mixto). Baja el escudo o abre la app desde http://.',
+        message: t('errors.pair.mixed_content_o_shields'),
       }
     case 'no_alcanzable':
       return {
         field: 'url',
-        message:
-          'El servidor dejó de responder durante el emparejamiento. Inténtalo de nuevo.',
+        message: t('errors.pair.no_alcanzable'),
       }
     case 'respuesta_invalida':
       return {
-        message:
-          'El servidor respondió con un formato inesperado. ¿Versión incompatible?',
+        message: t('errors.pair.respuesta_invalida'),
       }
     case 'servidor_legacy':
       // Silent fallback: este código se atrapa internamente y no debería
       // llegar a UI. Si llega, mostramos algo neutro.
       return {
-        message: 'Versión antigua del servidor detectada.',
+        message: t('errors.pair.servidor_legacy'),
       }
     default:
-      return { message: err.message || 'Error desconocido' }
+      // T13: genérico traducido en lugar de err.message crudo —
+      // PairingError.message es detalle de dev/log en ES y no debe
+      // filtrarse a la UI en otros idiomas.
+      return { message: t('errors.pair.unknown') }
   }
 }

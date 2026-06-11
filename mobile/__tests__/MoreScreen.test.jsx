@@ -111,10 +111,15 @@ test('5. version PC aparece cuando pgm-update-theme trae version', () => {
   expect(screen.getByText(/v0\.2\.17/)).toBeInTheDocument()
 })
 
-test('6. item "Idioma" tiene badge Proximamente y esta marcado como disabled', () => {
+test('6. seccion Ajustes monta el LanguageSwitcher (T13) en lugar del placeholder', () => {
   render(<MoreScreen />)
-  expect(screen.getByText(/idioma/i)).toBeInTheDocument()
-  expect(screen.getByText(/proximamente/i)).toBeInTheDocument()
+  expect(screen.getByText(/^idioma$/i)).toBeInTheDocument()
+  expect(screen.queryByText(/proximamente/i)).toBeNull()
+  const radios = screen.getAllByRole('radio')
+  expect(radios).toHaveLength(3)
+  expect(radios.map((r) => r.textContent)).toEqual(['Español', 'English', 'Português'])
+  // Default ES activo (los tests nunca llaman initLocale).
+  expect(screen.getByRole('radio', { name: 'Español' })).toHaveAttribute('aria-checked', 'true')
 })
 
 test('7. boton Desemparejar con confirm OK → disconnect + nav /pair', () => {

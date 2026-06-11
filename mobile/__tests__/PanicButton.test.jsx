@@ -1,12 +1,13 @@
 /**
- * PanicButton.test.jsx (T11)
+ * PanicButton.test.jsx (T11; PanicModal en T13)
  *
  * Cubre el boton de panico (cerrar proyeccion del PC):
  *  - render con variante danger + icono
- *  - confirm cancelado NO envia
- *  - confirm aceptado envia PROJECTION_CLOSE
- *  - disabled si !isConnected
- *  - feedback "Cerrado" tras envio + reset tras timeout
+ *  - tap abre PanicModal; cancelar NO envia y devuelve el foco al trigger
+ *  - confirmar envia PROJECTION_CLOSE una vez + feedback "Cerrado"
+ *  - disabled si !isConnected (modal ni se abre)
+ *  - Escape cierra sin enviar
+ *  - doble-click rapido en confirmar → 1 solo send
  */
 import '@testing-library/jest-dom'
 import { render, screen, fireEvent, act } from '@testing-library/react'
@@ -64,67 +65,75 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
-test('1. render: boton danger con texto de emergencia', () => {
+function getTrigger() {
+  return screen.getByRole('button', { name: /cerrar de emergencia/i })
+}
+
+test('1. render: boton danger con texto de emergencia, sin modal', () => {
   render(<PanicButton />)
-  const button = screen.getByRole('button', { name: /cerrar de emergencia/i })
+  const button = getTrigger()
   expect(button).toBeInTheDocument()
   expect(button).not.toBeDisabled()
   expect(button.textContent).toMatch(/cerrar proyecci/i)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
 })
 
-test('2. click + confirm cancelado → NO envia', () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false)
+test('2. tap abre el modal; Cancelar cierra, NO envia y restaura el foco al trigger', () => {
   render(<PanicButton />)
-  fireEvent.click(screen.getByRole('button', { name: /cerrar de emergencia/i }))
-  expect(confirmSpy).toHaveBeenCalled()
+  fireEvent.click(getTrigger())
+  expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+  expect(mockTapMedium).toHaveBeenCalledTimes(1)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.queryByRole('alertdialog')).toBeNull()
   expect(mockSend).not.toHaveBeenCalled()
-  confirmSpy.mockRestore()
+  expect(document.activeElement).toBe(getTrigger())
 })
 
-test('3. click + confirm OK → envia PROJECTION_CLOSE', () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true)
+test('3. tap + confirmar → envia PROJECTION_CLOSE una vez y cierra el modal', () => {
   render(<PanicButton />)
-  fireEvent.click(screen.getByRole('button', { name: /cerrar de emergencia/i }))
-  expect(confirmSpy).toHaveBeenCalled()
+  fireEvent.click(getTrigger())
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar proyección' }))
   expect(mockSend).toHaveBeenCalledTimes(1)
   expect(mockSend).toHaveBeenCalledWith({ type: 'projection-close' })
-  expect(mockTapMedium).toHaveBeenCalledTimes(1)
-  confirmSpy.mockRestore()
+  expect(screen.queryByRole('alertdialog')).toBeNull()
 })
 
-test('4. disabled si !isConnected', () => {
+test('4. disabled si !isConnected: el modal no se abre y hay hint offline', () => {
   mockConnectionState = { isConnected: false, isConnecting: false, latencyMs: null, signal: 'offline', queueSize: 0 }
   render(<PanicButton />)
-  const button = screen.getByRole('button', { name: /cerrar de emergencia/i })
+  const button = getTrigger()
   expect(button).toBeDisabled()
-  // Hint visible
   expect(screen.getByText(/sin conexion con el pc/i)).toBeInTheDocument()
   fireEvent.click(button)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
   expect(mockSend).not.toHaveBeenCalled()
 })
 
-test('5. tras envio muestra "Cerrado" y vuelve a estado normal tras timeout', () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true)
+test('5. tras confirmar muestra "Cerrado" y vuelve al estado normal tras 3s', () => {
   render(<PanicButton />)
-  fireEvent.click(screen.getByRole('button', { name: /cerrar de emergencia/i }))
-  // Phase 'closed' visible
-  expect(screen.getByRole('button', { name: /cerrar de emergencia/i }).textContent).toMatch(/cerrado/i)
-  // Avanzar 3s → vuelve al texto normal
+  fireEvent.click(getTrigger())
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar proyección' }))
+  expect(getTrigger().textContent).toMatch(/cerrado/i)
+  expect(getTrigger()).toBeDisabled()
   act(() => { jest.advanceTimersByTime(3001) })
-  expect(screen.getByRole('button', { name: /cerrar de emergencia/i }).textContent).toMatch(/cerrar proyecci/i)
-  confirmSpy.mockRestore()
+  expect(getTrigger().textContent).toMatch(/cerrar proyecci/i)
+  expect(getTrigger()).not.toBeDisabled()
 })
 
-test('6. doble-click rapido no envia 2 veces (modal confirm bloquea)', () => {
-  // El window.confirm es sincrono. Si el user cancela el primero y luego
-  // hace click otra vez tras un timeout, el segundo se procesa normal.
-  // Aqui simulamos un user que confirma el primero → setea phase=closed →
-  // el boton queda disabled hasta el timeout.
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true)
+test('6. doble-click rapido en Confirmar no envia 2 veces (guard del modal)', () => {
   render(<PanicButton />)
-  const button = screen.getByRole('button', { name: /cerrar de emergencia/i })
-  fireEvent.click(button)
-  fireEvent.click(button)  // disabled, no efecto
+  fireEvent.click(getTrigger())
+  const confirm = screen.getByRole('button', { name: 'Cerrar proyección' })
+  fireEvent.click(confirm)
+  fireEvent.click(confirm)
   expect(mockSend).toHaveBeenCalledTimes(1)
-  confirmSpy.mockRestore()
+})
+
+test('7. Escape cierra el modal sin enviar', () => {
+  render(<PanicButton />)
+  fireEvent.click(getTrigger())
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(mockSend).not.toHaveBeenCalled()
 })

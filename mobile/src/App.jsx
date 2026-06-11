@@ -6,21 +6,24 @@ import SongsScreen from './screens/SongsScreen.jsx'
 import MoreScreen from './screens/MoreScreen.jsx'
 import PairScreen from './screens/PairScreen.jsx'
 import { useBootstrap } from './hooks/useBootstrap.js'
+import { useT } from './hooks/useT.js'
 
 /**
  * Bootstrap del App:
- *   1. useBootstrap → transport.restore() async
- *   2. Mientras no esté listo → splash "Cargando..."
+ *   1. useBootstrap → transport.restore() + initLocale() async (T13)
+ *   2. Mientras no esté listo → splash (t('app.loading'); pre-hidratación
+ *      muestra el default ES, idéntico al comportamiento previo)
  *   3. Una vez listo: si hay creds → /service, si no → /pair
  *   4. BottomNav solo aparece cuando hay creds (en pairing, fuera del flow)
  */
 export default function App() {
+  const { t } = useT()
   const { ready, hasCredentials } = useBootstrap()
 
   if (!ready) {
     return (
       <div className="min-h-screen grid place-items-center bg-bg-1 text-ink-3 font-ui">
-        Cargando...
+        {t('app.loading')}
       </div>
     )
   }

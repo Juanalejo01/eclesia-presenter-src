@@ -28,6 +28,7 @@ import BigButton from './BigButton.jsx'
 import { transport, ClientCommand } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
 import { tapMedium } from '../services/haptics.js'
+import { useT } from '../hooks/useT.js'
 
 const MAX_TITLE = 80
 const MAX_BODY = 500
@@ -51,6 +52,7 @@ function counterTone(n, max, warnFrom) {
 }
 
 export default function AnnouncementForm() {
+  const { t } = useT()
   const { isConnected } = useConnection()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -88,14 +90,14 @@ export default function AnnouncementForm() {
 
   const titleCount = title.length
   const bodyCount = body.length
-  const disabledHint = !isConnected ? 'Sin conexion con el PC' : null
+  const disabledHint = !isConnected ? t('announce.offline') : null
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {/* Campo titulo */}
       <label className="block">
         <div className="flex items-baseline justify-between mb-1.5">
-          <span className="text-sm text-ink-2 font-medium">Titulo</span>
+          <span className="text-sm text-ink-2 font-medium">{t('announce.titleLabel')}</span>
           <span
             className={`text-xs font-mono ${counterTone(titleCount, MAX_TITLE, TITLE_WARN_FROM)}`}
             aria-live="polite"
@@ -109,19 +111,19 @@ export default function AnnouncementForm() {
           onChange={(e) => setTitle(e.target.value)}
           maxLength={MAX_TITLE}
           disabled={!isConnected}
-          placeholder="AVISO"
+          placeholder={t('announce.titlePlaceholder')}
           className="w-full h-12 px-4 rounded-lg bg-bg-2 border border-line-1
                      text-ink-1 placeholder:text-ink-3
                      focus:outline-none focus:border-copper-200 focus:bg-bg-3
                      transition-colors disabled:opacity-60"
-          aria-label="Titulo del anuncio"
+          aria-label={t('announce.titleAria')}
         />
       </label>
 
       {/* Campo cuerpo */}
       <label className="block">
         <div className="flex items-baseline justify-between mb-1.5">
-          <span className="text-sm text-ink-2 font-medium">Cuerpo</span>
+          <span className="text-sm text-ink-2 font-medium">{t('announce.bodyLabel')}</span>
           <span
             className={`text-xs font-mono ${counterTone(bodyCount, MAX_BODY, BODY_WARN_FROM)}`}
             aria-live="polite"
@@ -135,12 +137,12 @@ export default function AnnouncementForm() {
           maxLength={MAX_BODY}
           rows={4}
           disabled={!isConnected}
-          placeholder="Escribe el mensaje que aparecera en pantalla"
+          placeholder={t('announce.bodyPlaceholder')}
           className="w-full px-4 py-3 rounded-lg bg-bg-2 border border-line-1
                      text-ink-1 placeholder:text-ink-3
                      focus:outline-none focus:border-copper-200 focus:bg-bg-3
                      transition-colors disabled:opacity-60 resize-none"
-          aria-label="Cuerpo del anuncio"
+          aria-label={t('announce.bodyAria')}
         />
       </label>
 
@@ -152,9 +154,9 @@ export default function AnnouncementForm() {
         type="submit"
         variant="primary"
         disabled={!canSend}
-        aria-label="Proyectar anuncio en el PC"
+        aria-label={t('announce.submitAria')}
       >
-        Proyectar anuncio
+        {t('announce.submit')}
       </BigButton>
 
       {/* Toast inline de confirmacion. role=status + aria-live para que
@@ -165,7 +167,7 @@ export default function AnnouncementForm() {
           role="status"
           aria-live="polite"
         >
-          Anuncio enviado
+          {t('announce.sent')}
         </p>
       )}
     </form>

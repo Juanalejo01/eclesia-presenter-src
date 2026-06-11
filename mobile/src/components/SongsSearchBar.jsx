@@ -2,7 +2,11 @@
  * SongsSearchBar
  *
  * Input para busqueda de canciones. Sin debounce aqui — vive en useSongs.
+ *
+ * T13: placeholder por defecto resuelto en render via t() (no en default
+ * param, que congelaria el idioma). Un `placeholder` explicito gana.
  */
+import { useT } from '../hooks/useT.js'
 
 export default function SongsSearchBar({
   value,
@@ -10,8 +14,9 @@ export default function SongsSearchBar({
   onClear,
   loading = false,
   disabled = false,
-  placeholder = 'Buscar canción, autor o letra…',
+  placeholder = null,
 }) {
+  const { t } = useT()
   return (
     <div className="relative">
       <span
@@ -23,7 +28,7 @@ export default function SongsSearchBar({
       <input
         type="search"
         role="searchbox"
-        aria-label="Buscar canción"
+        aria-label={t('songs.searchAria')}
         inputMode="search"
         enterKeyHint="search"
         autoCapitalize="none"
@@ -33,7 +38,7 @@ export default function SongsSearchBar({
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('songs.searchPlaceholder')}
         className={
           'w-full h-12 pl-10 pr-12 rounded-xl bg-bg-2 border border-line-1 ' +
           'text-base text-ink-1 placeholder-ink-3 ' +
@@ -51,7 +56,7 @@ export default function SongsSearchBar({
         <button
           type="button"
           onClick={onClear}
-          aria-label="Limpiar búsqueda"
+          aria-label={t('common.clearSearch')}
           className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center text-ink-3 hover:text-ink-1 rounded-full hover:bg-bg-3 transition-colors"
         >
           <span aria-hidden="true" className="text-lg leading-none">×</span>

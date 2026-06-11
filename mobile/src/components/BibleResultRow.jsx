@@ -5,11 +5,16 @@
  * que la lista quepa en el viewport del móvil sin scroll horizontal.
  * Min height 64px para cumplir el target tap a11y (44x44).
  */
+import { useT } from '../hooks/useT.js'
 
 export default function BibleResultRow({ item, onTap, highlight = false }) {
+  const { t } = useT()
   if (!item) return null
   const preview = (item.text || '').slice(0, 80)
-  const aria = `Versículo ${item.reference}: ${preview}${item.text?.length > 80 ? '...' : ''}`
+  const aria = t('bible.verseAria', {
+    ref: item.reference,
+    preview: `${preview}${item.text?.length > 80 ? '...' : ''}`,
+  })
   return (
     <button
       type="button"

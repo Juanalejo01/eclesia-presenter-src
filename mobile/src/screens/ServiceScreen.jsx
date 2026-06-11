@@ -35,8 +35,10 @@ import { transport, ClientCommand, ServerEvent } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
 import { usePgmState } from '../hooks/usePgmState.js'
 import { tapLight, tapMedium } from '../services/haptics.js'
+import { useT } from '../hooks/useT.js'
 
 export default function ServiceScreen() {
+  const { t } = useT()
   const nav = useNavigate()
   const { isConnected, isConnecting } = useConnection()
   // T6: slide + theme + serverVersion centralizados en usePgmState.
@@ -88,10 +90,12 @@ export default function ServiceScreen() {
   // a una pero no a la otra).
 
   const headerSubtitle = isConnected
-    ? `Mando conectado${serverVersion ? ` · EclesiaPresenter v${serverVersion}` : ''}`
+    ? (serverVersion
+        ? t('service.connectedVersion', { version: serverVersion })
+        : t('service.connected'))
     : isConnecting
-      ? 'Reconectando con el PC...'
-      : 'Sin conexión con el PC'
+      ? t('service.reconnecting')
+      : t('service.offline')
 
   return (
     <div
@@ -101,7 +105,7 @@ export default function ServiceScreen() {
       {/* Header: título + StatusPill */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink-1">Servicio</h1>
+          <h1 className="font-display text-3xl text-ink-1">{t('service.title')}</h1>
           <p className="text-xs text-ink-3 mt-0.5">{headerSubtitle}</p>
         </div>
         <StatusPill />
@@ -117,8 +121,8 @@ export default function ServiceScreen() {
           role="alert"
         >
           {isConnecting
-            ? 'Reconectando con el PC...'
-            : 'Sin conexión con el PC. Comprueba la WiFi.'}
+            ? t('service.reconnecting')
+            : t('service.offlineWifi')}
         </div>
       )}
 
@@ -128,45 +132,45 @@ export default function ServiceScreen() {
           onClick={() => handleNav(ClientCommand.PREV)}
           disabled={cmdDisabled}
           variant="primary"
-          aria-label="Slide anterior"
+          aria-label={t('service.prevAria')}
         >
-          ◀ Prev
+          {t('service.prev')}
         </BigButton>
         <BigButton
           onClick={() => handleNav(ClientCommand.NEXT)}
           disabled={cmdDisabled}
           variant="primary"
-          aria-label="Slide siguiente"
+          aria-label={t('service.nextAria')}
         >
-          Next ▶
+          {t('service.next')}
         </BigButton>
       </div>
 
       {/* Botones secundarios Blank / Black / Clear */}
       <div className="flex gap-2">
         <CommandButton
-          label="Blank"
-          hint="Slide en blanco"
+          label={t('service.blank')}
+          hint={t('service.blankHint')}
           variant="blank"
           disabled={cmdDisabled}
           onClick={() => handleSecondary(ClientCommand.BLANK)}
-          aria-label="Proyectar slide en blanco"
+          aria-label={t('service.blankAria')}
         />
         <CommandButton
-          label="Black"
-          hint="Pantalla negra"
+          label={t('service.black')}
+          hint={t('service.blackHint')}
           variant="black"
           disabled={cmdDisabled}
           onClick={() => handleSecondary(ClientCommand.BLACK)}
-          aria-label="Proyectar pantalla negra"
+          aria-label={t('service.blackAria')}
         />
         <CommandButton
-          label="Clear"
-          hint="Quitar live"
+          label={t('service.clear')}
+          hint={t('service.clearHint')}
           variant="clear"
           disabled={cmdDisabled}
           onClick={() => handleSecondary(ClientCommand.CLEAR)}
-          aria-label="Quitar proyección en vivo"
+          aria-label={t('service.clearAria')}
         />
       </div>
 

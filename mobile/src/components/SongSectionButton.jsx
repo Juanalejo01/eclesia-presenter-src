@@ -4,6 +4,7 @@
  * Tarjeta de seccion dentro del SongPreviewSheet: label kicker + preview text.
  * Si esta es la seccion live, badge "EN VIVO" + boton "Quitar live".
  */
+import { useT } from '../hooks/useT.js'
 
 export default function SongSectionButton({
   section,
@@ -12,6 +13,7 @@ export default function SongSectionButton({
   onClearLive,
   disabled = false,
 }) {
+  const { t } = useT()
   if (!section) return null
   const preview = (section.text || '').replace(/\s+/g, ' ').slice(0, 60)
   return (
@@ -28,7 +30,7 @@ export default function SongSectionButton({
         onClick={() => !disabled && onProject?.(section)}
         disabled={disabled}
         aria-disabled={disabled}
-        aria-label={`Proyectar sección ${section.label}`}
+        aria-label={t('songs.sectionAria', { label: section.label })}
         className={
           'w-full text-left flex flex-col gap-1 min-h-[56px] ' +
           (disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-[0.99]')
@@ -40,12 +42,12 @@ export default function SongSectionButton({
           </span>
           {isLive && (
             <span className="text-[10px] uppercase font-mono tracking-widest text-live px-1.5 py-0.5 rounded bg-live/10 border border-live/40">
-              EN VIVO
+              {t('songs.liveBadge')}
             </span>
           )}
         </span>
         <span className="text-sm text-ink-2 truncate">
-          {preview || <em className="text-ink-3">(sin texto)</em>}
+          {preview || <em className="text-ink-3">{t('songs.noText')}</em>}
         </span>
       </button>
       {isLive && (
@@ -54,7 +56,7 @@ export default function SongSectionButton({
           onClick={() => onClearLive?.()}
           className="mt-1 h-9 rounded-lg bg-bg-3 text-ink-2 text-xs font-medium hover:bg-bg-1 transition-colors"
         >
-          Quitar live
+          {t('songs.clearLive')}
         </button>
       )}
     </div>

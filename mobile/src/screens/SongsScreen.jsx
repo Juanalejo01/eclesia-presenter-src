@@ -22,8 +22,11 @@ import { useConnection } from '../hooks/useConnection.js'
 import { useSongs } from '../hooks/useSongs.js'
 import { useSong } from '../hooks/useSong.js'
 import { tapLight, tapMedium } from '../services/haptics.js'
+import { useT } from '../hooks/useT.js'
+import { t as tGlobal } from '../services/i18n.js'
 
 export default function SongsScreen() {
+  const { t } = useT()
   const nav = useNavigate()
   const { isConnected, isConnecting } = useConnection()
   const {
@@ -106,7 +109,7 @@ export default function SongsScreen() {
         reference,
       },
     })
-    setToast(`Proyectado: ${detail.title} · ${section.label}`)
+    setToast(t('songs.toastProjected', { title: detail.title, section: section.label }))
     // NO cerramos el sheet: workflow en directo el operador suele saltar
     // entre secciones de la misma cancion.
   }
@@ -115,23 +118,24 @@ export default function SongsScreen() {
     if (!isConnected) return
     tapMedium()
     transport.send({ type: ClientCommand.CLEAR })
-    setToast('Live limpiado')
+    setToast(t('songs.toastCleared'))
   }
 
   // Subtitle dinamico segun status.
+  const resultCount = total || items.length
   const subtitle = !isConnected
-    ? (isConnecting ? 'Reconectando con el PC…' : 'Sin conexión con el PC')
+    ? (isConnecting ? t('songs.reconnecting') : t('songs.offline'))
     : status === 'loading'
-      ? 'Buscando…'
+      ? t('songs.searching')
       : status === 'results'
-        ? `${total || items.length} ${(total || items.length) === 1 ? 'canción' : 'canciones'}`
+        ? t(resultCount === 1 ? 'songs.totalCount' : 'songs.totalCountPlural', { n: resultCount })
         : status === 'empty'
-          ? 'Sin resultados'
+          ? t('songs.noResults')
           : status === 'empty-catalog'
-            ? 'Repertorio vacío'
+            ? t('songs.emptyCatalog')
             : status === 'error'
               ? errorSubtitle(error)
-              : 'Repertorio · Buscar y proyectar'
+              : t('songs.subtitleIdle')
 
   return (
     <div
@@ -140,7 +144,7 @@ export default function SongsScreen() {
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink-1">Canciones</h1>
+          <h1 className="font-display text-3xl text-ink-1">{t('songs.title')}</h1>
           <p className="text-xs text-ink-3 mt-0.5" aria-live="polite">
             {subtitle}
           </p>
@@ -154,8 +158,8 @@ export default function SongsScreen() {
           role="alert"
         >
           {isConnecting
-            ? 'Reconectando con el PC…'
-            : 'Sin conexión con el PC. Mostrando caché si la hay.'}
+            ? t('songs.reconnecting')
+            : t('songs.offlineCache')}
         </div>
       )}
 
@@ -175,15 +179,15 @@ export default function SongsScreen() {
         {status === 'empty' && (
           <SongsEmptyState
             variant="empty"
-            message="No encontramos coincidencias"
-            hint="Prueba con otro título, autor o palabra de la letra"
+            message={t('songs.emptyMessage')}
+            hint={t('songs.emptyHint')}
           />
         )}
         {status === 'empty-catalog' && (
           <SongsEmptyState
             variant="empty-catalog"
-            message="No hay canciones en el repertorio"
-            hint="Añade canciones desde el PC para verlas aquí"
+            message={t('songs.emptyCatalogMessage')}
+            hint={t('songs.emptyCatalogHint')}
           />
         )}
         {status === 'error' && (
@@ -197,7 +201,7 @@ export default function SongsScreen() {
                   onClick={retry}
                   className="mt-2 h-10 px-4 rounded-lg bg-bg-3 text-ink-1 text-sm font-medium hover:bg-bg-2 transition-colors"
                 >
-                  Reintentar
+                  {t('common.retry')}
                 </button>
               )
             }
@@ -229,31 +233,24 @@ export default function SongsScreen() {
   )
 }
 
+// Codigos con string dedicado en el dict (songs.err.* / songs.errMsg.*);
+// cualquier otro cae al generico *.unknown.
+const ERR_SUBTITLE_CODES = new Set(['auth_error', 'rate_limited', 'offline', 'not_found'])
+
 function errorSubtitle(err) {
-  switch (err?.code) {
-    case 'auth_error':   return 'Sesión expirada'
-    case 'rate_limited': return 'Demasiadas búsquedas'
-    case 'offline':      return 'Sin respuesta del PC'
-    case 'not_found':    return 'No encontrada'
-    default:             return 'Error al buscar'
-  }
+  const code = ERR_SUBTITLE_CODES.has(err?.code) ? err.code : 'unknown'
+  return tGlobal(`songs.err.${code}`)
 }
 
+const ERR_MSG_CODES = new Set(['auth_error', 'rate_limited', 'offline', 'no_credentials'])
+
 function errorMessage(err) {
-  switch (err?.code) {
-    case 'auth_error':
-      return 'Sesión expirada. Vuelve a parear este mando.'
-    case 'rate_limited': {
-      const sec = err.retryAfterMs ? Math.ceil(err.retryAfterMs / 1000) : 60
-      return `Demasiadas búsquedas. Espera ${sec}s e inténtalo de nuevo.`
-    }
-    case 'offline':
-      return 'Sin respuesta del PC. Comprueba la WiFi.'
-    case 'no_credentials':
-      return 'No hay credenciales guardadas. Vuelve a parear.'
-    default:
-      return 'No pudimos cargar el repertorio.'
+  const code = ERR_MSG_CODES.has(err?.code) ? err.code : 'unknown'
+  if (code === 'rate_limited') {
+    const sec = err.retryAfterMs ? Math.ceil(err.retryAfterMs / 1000) : 60
+    return tGlobal('songs.errMsg.rate_limited', { sec })
   }
+  return tGlobal(`songs.errMsg.${code}`)
 }
 
 function SkeletonRows() {

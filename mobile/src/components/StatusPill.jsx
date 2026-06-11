@@ -18,8 +18,10 @@
  *   - El chip de cola sólo aparece con queueSize > 0.
  */
 import { useConnection } from '../hooks/useConnection.js'
+import { useT } from '../hooks/useT.js'
 
 export default function StatusPill() {
+  const { t } = useT()
   const { isConnected, isConnecting, latencyMs, signal, queueSize } = useConnection()
 
   let bg, dot, label
@@ -38,16 +40,20 @@ export default function StatusPill() {
   } else if (isConnecting) {
     bg = 'bg-copper-300/15 text-copper-100 border-copper-300/40'
     dot = 'bg-copper-200 animate-pulse'
-    label = 'Reconectando'
+    label = t('status.reconnecting')
   } else {
     bg = 'bg-live/15 text-live border-live/40'
     dot = 'bg-live'
-    label = 'Sin conexión'
+    label = t('status.offline')
   }
 
+  // El enum del signal se traduce via lookup (status.signal.*) — antes
+  // el aria mezclaba 'Conexión excellent' (enum crudo en ingles).
   const liveLabel = isConnected
-    ? `Conexión ${signal}${latencyMs != null ? `, ${latencyMs} ms` : ''}`
-    : (isConnecting ? 'Reconectando con el PC' : 'Sin conexión con el PC')
+    ? (latencyMs != null
+        ? t('status.ariaConnectedLatency', { signal: t(`status.signal.${signal}`), ms: latencyMs })
+        : t('status.ariaConnected', { signal: t(`status.signal.${signal}`) }))
+    : (isConnecting ? t('status.ariaReconnecting') : t('status.ariaOffline'))
 
   return (
     <div className="flex items-center gap-2 flex-wrap" role="status" aria-live="polite" aria-label={liveLabel}>
@@ -58,9 +64,9 @@ export default function StatusPill() {
       {queueSize > 0 && (
         <div
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-copper-300/30 bg-bg-3 text-xs text-copper-100 font-mono"
-          aria-label={`${queueSize} comandos en cola`}
+          aria-label={t(queueSize === 1 ? 'status.queuedAria' : 'status.queuedAriaPlural', { n: queueSize })}
         >
-          {queueSize} en cola
+          {t(queueSize === 1 ? 'status.queued' : 'status.queuedPlural', { n: queueSize })}
         </div>
       )}
     </div>
