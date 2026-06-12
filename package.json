@@ -87,6 +87,13 @@
       {
         "from": "mobile/dist-app",
         "to": "mobile-app"
+      },
+      {
+        "from": "public",
+        "to": "bibles",
+        "filter": [
+          "*.json"
+        ]
       }
     ],
     "asarUnpack": [

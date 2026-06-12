@@ -40,16 +40,21 @@ describe('isServedFromDesktop', () => {
     expect(isServedFromDesktop({ port: '3434', pathname: '/' })).toBe(true)
   })
 
-  test('true con pathname /app aunque el puerto no sea visible', () => {
-    expect(isServedFromDesktop({ port: '', pathname: '/app/service' })).toBe(true)
+  test('true con pathname /app aunque el puerto no sea visible (embed http)', () => {
+    expect(isServedFromDesktop({ port: '', pathname: '/app/service', protocol: 'http:' })).toBe(true)
+  })
+
+  test('false en cloud https con pathname /app (el embed del desktop siempre es http)', () => {
+    expect(isServedFromDesktop({ port: '', pathname: '/app', protocol: 'https:' })).toBe(false)
+    expect(isServedFromDesktop({ port: '', pathname: '/app/service', protocol: 'https:' })).toBe(false)
   })
 
   test('false en Vite dev :5173', () => {
-    expect(isServedFromDesktop({ port: '5173', pathname: '/' })).toBe(false)
+    expect(isServedFromDesktop({ port: '5173', pathname: '/', protocol: 'http:' })).toBe(false)
   })
 
   test('false en Vercel https (sin puerto, pathname raíz)', () => {
-    expect(isServedFromDesktop({ port: '', pathname: '/' })).toBe(false)
+    expect(isServedFromDesktop({ port: '', pathname: '/', protocol: 'https:' })).toBe(false)
   })
 
   test('false con location null/ausente (SSR/tests)', () => {

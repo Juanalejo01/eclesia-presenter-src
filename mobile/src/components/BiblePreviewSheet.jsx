@@ -87,10 +87,11 @@ export default function BiblePreviewSheet({
 
   return (
     <div
-      // backdrop
+      // backdrop — SIN touchAction:'none': lo tenía y mataba el
+      // overflow-y-auto del contenido en versículos largos (el touch-scroll
+      // quedaba bloqueado para todo el subárbol).
       onClick={onClose}
       className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center"
-      style={{ touchAction: 'none' }}
     >
       <div
         ref={sheetRef}
@@ -99,17 +100,23 @@ export default function BiblePreviewSheet({
         aria-labelledby={titleId}
         aria-describedby={textId}
         onClick={(e) => e.stopPropagation()}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         className="w-full bg-bg-1 border-t-2 border-copper-200/30 rounded-t-2xl shadow-2xl flex flex-col max-h-[80vh] motion-safe:transition-transform"
         style={{
           transform: `translateY(${dragOffset}px)`,
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {/* Drag handle */}
-        <div className="pt-2 pb-1 grid place-items-center" aria-hidden="true">
+        {/* Drag handle — único dueño del gesto swipe-down. touchAction:'none'
+            vive SOLO aquí para que el browser no compita con el drag; el
+            resto del sheet scrollea con touch normal. */}
+        <div
+          className="pt-2 pb-1 grid place-items-center"
+          aria-hidden="true"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{ touchAction: 'none' }}
+        >
           <div className="w-10 h-1 rounded-full bg-ink-3/40" />
         </div>
 

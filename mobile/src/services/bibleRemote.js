@@ -70,7 +70,8 @@ export async function search(query, opts = {}) {
   // ambos, gana el primero — el resultado es igual: AbortError.
   const localCtrl = new AbortController()
   const timeoutId = setTimeout(() => localCtrl.abort(), DEFAULT_TIMEOUT_MS)
-  const compositeSignal = composeSignals(opts.signal, localCtrl.signal)
+  const { signal: compositeSignal, cleanup: cleanupSignals } =
+    composeSignals(opts.signal, localCtrl.signal)
 
   try {
     const res = await fetch(`${base}/api/bible/search`, {
@@ -124,6 +125,7 @@ export async function search(query, opts = {}) {
     return { ok: false, error: 'offline' }
   } finally {
     clearTimeout(timeoutId)
+    cleanupSignals()
   }
 }
 
@@ -131,14 +133,25 @@ export async function search(query, opts = {}) {
  * Compone dos AbortSignal en uno. Si cualquiera aborta, el resultante
  * aborta. Polyfill mínimo porque AbortSignal.any no está disponible en
  * Android WebView viejo (API <31).
+ *
+ * Devuelve { signal, cleanup }: cleanup DEBE llamarse al terminar el fetch
+ * (finally) — sin él, el listener 'abort' del signal externo (que puede
+ * vivir más que la request, p.ej. el AbortController del hook) queda
+ * colgado reteniendo el closure de cada request completada.
  */
 function composeSignals(external, internal) {
-  if (!external) return internal
+  if (!external) return { signal: internal, cleanup: () => {} }
   const ctrl = new AbortController()
   const onAbort = () => ctrl.abort()
   if (external.aborted) ctrl.abort()
   else external.addEventListener('abort', onAbort, { once: true })
   if (internal.aborted) ctrl.abort()
   else internal.addEventListener('abort', onAbort, { once: true })
-  return ctrl.signal
+  return {
+    signal: ctrl.signal,
+    cleanup: () => {
+      external.removeEventListener('abort', onAbort)
+      internal.removeEventListener('abort', onAbort)
+    },
+  }
 }

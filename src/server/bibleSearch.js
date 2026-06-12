@@ -27,7 +27,8 @@ const { BOOK_ALIASES, normalizeText } = require('./bibleSearch.bookmap')
 // Mismo set que renderer/services/bibleService.js → LOCAL_VERSIONS, pero
 // sin metadata de UI (license, short...). Aquí solo nos importa el
 // nombre del JSON. El campo `file` se resuelve relativo a rootDir, que
-// por defecto apunta a <repo>/public.
+// se resuelve al boot con resolveBibleDir() (resources/bibles en prod,
+// <repo>/public en dev).
 
 const VERSIONS = {
   rvr1909: 'rvr60.json',
@@ -48,8 +49,45 @@ const VERSION_IDS = Object.freeze(Object.keys(VERSIONS))
 // Cache: versionId → books[]. Cada book: { index, name, chapters[][] }.
 const _cache = new Map()
 
+/**
+ * Resuelve el directorio donde viven los JSON de biblias probando candidatos
+ * en orden (mismo patrón que resolveMobileAppDir en server.js / T12):
+ *
+ *   1. PROD empaquetado: <resources>/bibles (extraResources de
+ *      electron-builder; fuera del asar). En dev Electron, resourcesPath
+ *      apunta a node_modules/electron/dist/resources donde bibles/ no
+ *      existe, así que el check del marker lo descarta solo.
+ *   2. DEV (repo checkout / Jest): <repo>/public.
+ *   3. null → loadVersion devuelve null y el endpoint responde 503
+ *      bible_unavailable sin crashear.
+ *
+ * El marker de validez es el JSON de la versión default (rvr1909..tla
+ * viajan juntos, así que basta con comprobar uno). Un __dirname relativo
+ * a secas apuntaría a app.asar/public, que no existe en builds
+ * empaquetados (public/ no va en `files`).
+ *
+ * @param {{ resourcesPath?: string|null, repoDir?: string|null }} [opts] —
+ *   inyectables para tests; defaults = entorno real.
+ * @returns {string|null}
+ */
+function resolveBibleDir({
+  resourcesPath = typeof process.resourcesPath === 'string' ? process.resourcesPath : null,
+  repoDir = path.join(__dirname, '..', '..', 'public'),
+} = {}) {
+  const marker = VERSIONS[DEFAULT_VERSION]
+  const candidates = []
+  if (resourcesPath) candidates.push(path.join(resourcesPath, 'bibles'))
+  if (repoDir) candidates.push(repoDir)
+  for (const dir of candidates) {
+    try {
+      if (fs.existsSync(path.join(dir, marker))) return dir
+    } catch { /* fs error → siguiente candidato */ }
+  }
+  return null
+}
+
 // rootDir resuelto al boot. Permite override en tests (mock dir).
-let _rootDir = path.join(__dirname, '..', '..', 'public')
+let _rootDir = resolveBibleDir()
 
 /**
  * Override del directorio raíz donde viven los JSON. Útil en tests.
@@ -71,6 +109,9 @@ function setRootDir(dir) {
  * @returns {Array<{index, name, chapters: string[][]}> | null}
  */
 function loadVersion(versionId) {
+  // Sin rootDir resuelto (ningún candidato tenía biblias al boot) → 503
+  // en el endpoint, nunca un throw por path.join(null, ...).
+  if (!_rootDir) return null
   const id = VERSIONS[versionId] ? versionId : DEFAULT_VERSION
   if (_cache.has(id)) return _cache.get(id)
   const file = VERSIONS[id]
@@ -353,6 +394,9 @@ function __resetForTests() {
 
 const RATE_WINDOW_MS = 60_000
 const RATE_MAX = 30
+// Umbral del sweep: si el Map supera este tamaño (deviceIds rotados que
+// nunca vuelven), purgamos las entries con TODA su ventana expirada.
+const RATE_SWEEP_SIZE = 1000
 const _rateMap = new Map()
 
 /**
@@ -362,15 +406,31 @@ const _rateMap = new Map()
 function checkRateLimit(deviceId) {
   const now = Date.now()
   const id = String(deviceId || 'unknown')
-  let arr = _rateMap.get(id)
-  if (!arr) { arr = []; _rateMap.set(id, arr) }
+
+  // Sweep barato anti-leak: con deviceIds rotados las entries viejas nunca
+  // se tocan (la limpieza pasiva solo corre para el id que consulta). Si el
+  // Map creció demasiado, borramos las entries cuya ventana expiró entera
+  // (timestamps ordenados → basta mirar el último). Delete durante for..of
+  // sobre un Map es seguro en JS.
+  if (_rateMap.size > RATE_SWEEP_SIZE) {
+    for (const [key, ts] of _rateMap) {
+      if (ts.length === 0 || ts[ts.length - 1] <= now - RATE_WINDOW_MS) {
+        _rateMap.delete(key)
+      }
+    }
+  }
+
+  const arr = _rateMap.get(id) || []
   // Filtra timestamps fuera de la ventana.
   while (arr.length > 0 && arr[0] <= now - RATE_WINDOW_MS) arr.shift()
+  // Ventana vacía → fuera del Map (no dejamos entries huérfanas).
+  if (arr.length === 0) _rateMap.delete(id)
   if (arr.length >= RATE_MAX) {
     const retryAfterMs = arr[0] + RATE_WINDOW_MS - now
     return { allowed: false, retryAfterMs: Math.max(1, retryAfterMs) }
   }
   arr.push(now)
+  _rateMap.set(id, arr)
   return { allowed: true }
 }
 
@@ -381,9 +441,17 @@ function __resetRateLimitForTests() {
   _rateMap.clear()
 }
 
+function __getRateMapSizeForTests() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('__getRateMapSizeForTests no disponible en producción')
+  }
+  return _rateMap.size
+}
+
 module.exports = {
   VERSION_IDS,
   DEFAULT_VERSION,
+  resolveBibleDir,
   setRootDir,
   loadVersion,
   parseReference,
@@ -397,4 +465,5 @@ module.exports = {
   RATE_MAX,
   __resetForTests,
   __resetRateLimitForTests,
+  __getRateMapSizeForTests,
 }

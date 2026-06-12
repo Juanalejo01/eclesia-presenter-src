@@ -117,6 +117,14 @@ describe('/app con build presente', () => {
     expect(remote.status).toBe(200)
     expect(remote.text).toContain('EclesiaPresenter')
   })
+
+  test('GET / (welcome) con build → CTA principal apunta a /app/', async () => {
+    const res = await httpGet(handle.port, '/')
+    expect(res.status).toBe(200)
+    expect(res.text).toContain('href="/app/"')
+    // El placeholder interno nunca debe filtrarse al HTML servido.
+    expect(res.text).not.toContain('${MAIN_CTA}')
+  })
 })
 
 // ============================================================
@@ -146,6 +154,15 @@ describe('/app sin build', () => {
     expect((await httpGet(handle.port, '/app/service')).status).toBe(404)
     // El server NUNCA crashea por ausencia del build: /remote sigue ok.
     expect((await httpGet(handle.port, '/remote')).status).toBe(200)
+  })
+
+  test('GET / (welcome) sin build → NO enlaza /app/ (404); /remote es el CTA principal', async () => {
+    const res = await httpGet(handle.port, '/')
+    expect(res.status).toBe(200)
+    expect(res.text).not.toContain('href="/app/"')
+    expect(res.text).not.toContain('/app/')
+    expect(res.text).toContain('href="/remote"')
+    expect(res.text).not.toContain('${MAIN_CTA}')
   })
 })
 

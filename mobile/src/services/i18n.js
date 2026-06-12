@@ -240,7 +240,9 @@ export const DICT = {
     'more.unpair':            'Desemparejar este mando',
     'more.unpairAria':        'Desemparejar este mando del PC',
     'more.unpairCaption':     'Borrara el token y volveras al QR de emparejamiento.',
-    'more.unpairConfirm':     '¿Desemparejar este mando?\n\nBorrara el token y volveras al QR de emparejamiento. Tendras que volver a escanear el PIN del PC.',
+    'more.unpairConfirmTitle': '¿Desemparejar este mando?',
+    'more.unpairConfirm':     'Borrara el token y volveras al QR de emparejamiento. Tendras que volver a escanear el PIN del PC.',
+    'more.unpairConfirmCta':  'Desemparejar',
 
     // ----- AnnouncementForm -----
     'announce.titleLabel':       'Titulo',
@@ -488,7 +490,9 @@ export const DICT = {
     'more.unpair':            'Unpair this remote',
     'more.unpairAria':        'Unpair this remote from the PC',
     'more.unpairCaption':     'This will delete the token and take you back to the pairing QR.',
-    'more.unpairConfirm':     'Unpair this remote?\n\nThis will delete the token and take you back to the pairing QR. You will need to scan the PC PIN again.',
+    'more.unpairConfirmTitle': 'Unpair this remote?',
+    'more.unpairConfirm':     'This will delete the token and take you back to the pairing QR. You will need to scan the PC PIN again.',
+    'more.unpairConfirmCta':  'Unpair',
 
     'announce.titleLabel':       'Title',
     'announce.titleAria':        'Announcement title',
@@ -731,7 +735,9 @@ export const DICT = {
     'more.unpair':            'Desparear este controle',
     'more.unpairAria':        'Desparear este controle do PC',
     'more.unpairCaption':     'Apagará o token e você voltará ao QR de pareamento.',
-    'more.unpairConfirm':     'Desparear este controle?\n\nApagará o token e você voltará ao QR de pareamento. Você terá que escanear o PIN do PC de novo.',
+    'more.unpairConfirmTitle': 'Desparear este controle?',
+    'more.unpairConfirm':     'Apagará o token e você voltará ao QR de pareamento. Você terá que escanear o PIN do PC de novo.',
+    'more.unpairConfirmCta':  'Desparear',
 
     'announce.titleLabel':       'Título',
     'announce.titleAria':        'Título do anúncio',

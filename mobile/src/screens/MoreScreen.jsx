@@ -13,16 +13,17 @@
  *     ServiceScreen, eliminado en T11 para evitar divergencia.
  *   - T13: el placeholder 'Proximamente' de Ajustes se reemplazo por el
  *     LanguageSwitcher real (ES/EN/PT).
- *   - El confirm de Desemparejar sigue siendo window.confirm (texto via
- *     t() resuelto en el handler). Migrarlo a un ConfirmModal del brand
- *     (generalizacion de PanicModal) es follow-up documentado de T13 —
- *     fuera de scope aqui.
+ *   - Hardening v0.2.0: el confirm de Desemparejar dejo de ser
+ *     window.confirm nativo — ahora usa ConfirmModal (variant danger),
+ *     el mismo alertdialog del brand que el boton de panico.
  */
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MoreSection from '../components/MoreSection.jsx'
 import StatusPill from '../components/StatusPill.jsx'
 import AnnouncementForm from '../components/AnnouncementForm.jsx'
 import PanicButton from '../components/PanicButton.jsx'
+import ConfirmModal from '../components/ConfirmModal.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import { transport } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
@@ -41,14 +42,13 @@ export default function MoreScreen() {
   // serverVersion del usePgmState (lo envia el desktop en pgm-update-theme
   // del handshake). Si todavia no llego, mostramos "desconocido".
   const { serverVersion } = usePgmState()
+  const [unpairConfirmOpen, setUnpairConfirmOpen] = useState(false)
 
-  function handleUnpair() {
-    // window.confirm nativo: bloquea el thread (anti doble-tap) y anuncia
-    // el modal al lector de pantalla. El texto se resuelve AQUI via t()
-    // (no en un const de modulo) para que respete el idioma activo.
-    const ok = window.confirm(t('more.unpairConfirm'))
-    if (!ok) return
+  function handleUnpairConfirm() {
+    // El anti doble-tap vive en ConfirmModal (inFlight ref): este handler
+    // dispara exactamente una vez por apertura del modal.
     console.warn('[more] desemparejado por el usuario')
+    setUnpairConfirmOpen(false)
     transport.disconnect()
     nav('/pair', { replace: true })
   }
@@ -108,7 +108,7 @@ export default function MoreScreen() {
       <MoreSection title={t('more.sectionAccount')}>
         <button
           type="button"
-          onClick={handleUnpair}
+          onClick={() => setUnpairConfirmOpen(true)}
           className="w-full text-left p-3 rounded-lg text-base text-live
                      hover:bg-live/10 transition-colors
                      underline underline-offset-2 decoration-live/40"
@@ -120,6 +120,18 @@ export default function MoreScreen() {
           {t('more.unpairCaption')}
         </p>
       </MoreSection>
+
+      {/* Confirm de desemparejar — ConfirmModal del brand (no window.confirm). */}
+      <ConfirmModal
+        open={unpairConfirmOpen}
+        variant="danger"
+        title={t('more.unpairConfirmTitle')}
+        message={t('more.unpairConfirm')}
+        confirmLabel={t('more.unpairConfirmCta')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleUnpairConfirm}
+        onCancel={() => setUnpairConfirmOpen(false)}
+      />
     </div>
   )
 }

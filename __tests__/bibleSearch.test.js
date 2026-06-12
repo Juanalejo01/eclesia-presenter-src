@@ -190,4 +190,23 @@ describe('rate-limit', () => {
     expect(bs.checkRateLimit('A').allowed).toBe(false)
     expect(bs.checkRateLimit('B').allowed).toBe(true)
   })
+
+  test('no-leak: entries con ventana expirada se eliminan del map (sweep)', () => {
+    bs.__resetRateLimitForTests()
+    const t0 = 1_000_000
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(t0)
+    try {
+      // 1001 deviceIds rotados → supera el umbral del sweep (1000).
+      for (let i = 0; i < 1001; i++) bs.checkRateLimit(`rotado-${i}`)
+      expect(bs.__getRateMapSizeForTests()).toBe(1001)
+
+      // Ventana expirada por completo → la siguiente request purga todo.
+      nowSpy.mockReturnValue(t0 + bs.RATE_WINDOW_MS + 1)
+      expect(bs.checkRateLimit('fresh').allowed).toBe(true)
+      expect(bs.__getRateMapSizeForTests()).toBe(1)
+    } finally {
+      nowSpy.mockRestore()
+      bs.__resetRateLimitForTests()
+    }
+  })
 })

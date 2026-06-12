@@ -69,9 +69,10 @@ export default function SongPreviewSheet({
 
   return (
     <div
+      // backdrop — SIN touchAction:'none' (mataba el overflow-y-auto de la
+      // lista de secciones; mismo fix que BiblePreviewSheet).
       onClick={onClose}
       className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center"
-      style={{ touchAction: 'none' }}
     >
       <div
         ref={sheetRef}
@@ -79,16 +80,22 @@ export default function SongPreviewSheet({
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         className="w-full bg-bg-1 border-t-2 border-copper-200/30 rounded-t-2xl shadow-2xl flex flex-col max-h-[80vh] motion-safe:transition-transform"
         style={{
           transform: `translateY(${dragOffset}px)`,
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        <div className="pt-2 pb-1 grid place-items-center" aria-hidden="true">
+        {/* Drag handle — único dueño del gesto swipe-down (touchAction:'none'
+            solo aquí; el contenido scrollea con touch normal). */}
+        <div
+          className="pt-2 pb-1 grid place-items-center"
+          aria-hidden="true"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{ touchAction: 'none' }}
+        >
           <div className="w-10 h-1 rounded-full bg-ink-3/40" />
         </div>
 

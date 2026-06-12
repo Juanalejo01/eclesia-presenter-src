@@ -213,4 +213,21 @@ describe('checkRateLimit', () => {
     expect(songsCatalog.checkRateLimit('a').allowed).toBe(false)
     expect(songsCatalog.checkRateLimit('b').allowed).toBe(true)
   })
+
+  test('no-leak: entries con ventana expirada se eliminan del map (sweep)', () => {
+    const t0 = 1_000_000
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(t0)
+    try {
+      // 1001 deviceIds rotados → supera el umbral del sweep (1000).
+      for (let i = 0; i < 1001; i++) songsCatalog.checkRateLimit(`rotado-${i}`)
+      expect(songsCatalog.__getRateMapSizeForTests()).toBe(1001)
+
+      // Ventana expirada por completo → la siguiente request purga todo.
+      nowSpy.mockReturnValue(t0 + songsCatalog.RATE_WINDOW_MS + 1)
+      expect(songsCatalog.checkRateLimit('fresh').allowed).toBe(true)
+      expect(songsCatalog.__getRateMapSizeForTests()).toBe(1)
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
 })

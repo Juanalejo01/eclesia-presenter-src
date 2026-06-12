@@ -122,24 +122,34 @@ test('6. seccion Ajustes monta el LanguageSwitcher (T13) en lugar del placeholde
   expect(screen.getByRole('radio', { name: 'Español' })).toHaveAttribute('aria-checked', 'true')
 })
 
-test('7. boton Desemparejar con confirm OK → disconnect + nav /pair', () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true)
+test('7. boton Desemparejar → abre ConfirmModal → confirmar → disconnect + nav /pair', () => {
+  const confirmSpy = jest.spyOn(window, 'confirm')
   render(<MoreScreen />)
-  const button = screen.getByRole('button', { name: /desemparejar este mando del pc/i })
-  fireEvent.click(button)
-  expect(confirmSpy).toHaveBeenCalled()
+  // El modal no esta montado antes del tap.
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: /desemparejar este mando del pc/i }))
+
+  // ConfirmModal del brand (NO window.confirm nativo).
+  const dialog = screen.getByRole('alertdialog')
+  expect(dialog).toHaveTextContent(/¿Desemparejar este mando\?/)
+  expect(confirmSpy).not.toHaveBeenCalled()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Desemparejar' }))
   expect(mockDisconnect).toHaveBeenCalledTimes(1)
   expect(mockNavigate).toHaveBeenCalledWith('/pair', { replace: true })
   confirmSpy.mockRestore()
 })
 
-test('8. boton Desemparejar con confirm cancel → no acciona', () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false)
+test('8. boton Desemparejar → abre ConfirmModal → cancelar → no acciona y cierra', () => {
   render(<MoreScreen />)
   fireEvent.click(screen.getByRole('button', { name: /desemparejar este mando del pc/i }))
+  expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
   expect(mockDisconnect).not.toHaveBeenCalled()
   expect(mockNavigate).not.toHaveBeenCalled()
-  confirmSpy.mockRestore()
+  expect(screen.queryByRole('alertdialog')).toBeNull()
 })
 
 test('9. AnnouncementForm visible dentro de la seccion Anuncio rapido', () => {

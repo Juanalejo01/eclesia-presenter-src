@@ -222,6 +222,8 @@ function clampInt(value, min, max, fallback) {
 
 const RATE_WINDOW_MS = 60_000
 const RATE_MAX = 30
+// Umbral del sweep anti-leak (mismo patrón que bibleSearch.js).
+const RATE_SWEEP_SIZE = 1000
 const _rateMap = new Map()
 
 /**
@@ -231,14 +233,28 @@ const _rateMap = new Map()
 function checkRateLimit(deviceId) {
   const now = Date.now()
   const id = String(deviceId || 'unknown')
-  let arr = _rateMap.get(id)
-  if (!arr) { arr = []; _rateMap.set(id, arr) }
+
+  // Sweep barato anti-leak: las entries de deviceIds rotados nunca se tocan
+  // por la limpieza pasiva. Si el Map creció demasiado, borramos las que
+  // tienen TODA la ventana expirada (timestamps ordenados → último basta).
+  if (_rateMap.size > RATE_SWEEP_SIZE) {
+    for (const [key, ts] of _rateMap) {
+      if (ts.length === 0 || ts[ts.length - 1] <= now - RATE_WINDOW_MS) {
+        _rateMap.delete(key)
+      }
+    }
+  }
+
+  const arr = _rateMap.get(id) || []
   while (arr.length > 0 && arr[0] <= now - RATE_WINDOW_MS) arr.shift()
+  // Ventana vacía → fuera del Map (no dejamos entries huérfanas).
+  if (arr.length === 0) _rateMap.delete(id)
   if (arr.length >= RATE_MAX) {
     const retryAfterMs = arr[0] + RATE_WINDOW_MS - now
     return { allowed: false, retryAfterMs: Math.max(1, retryAfterMs) }
   }
   arr.push(now)
+  _rateMap.set(id, arr)
   return { allowed: true }
 }
 
@@ -251,6 +267,13 @@ function __resetForTests() {
   _snapshot = []
   _serverVersion = Date.now()
   _rateMap.clear()
+}
+
+function __getRateMapSizeForTests() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('__getRateMapSizeForTests no disponible en producción')
+  }
+  return _rateMap.size
 }
 
 module.exports = {
@@ -271,4 +294,5 @@ module.exports = {
   RATE_MAX,
   // test
   __resetForTests,
+  __getRateMapSizeForTests,
 }

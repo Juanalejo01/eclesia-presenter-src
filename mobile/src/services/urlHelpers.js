@@ -116,8 +116,12 @@ export function detectPortIssue(url, windowOrigin) {
  * serverUrl = window.location.origin y solo hace falta el PIN/QR — el
  * campo URL se oculta y los guards same-origin de pairing.js se relajan.
  *
- * @param {{ port?: string, pathname?: string }|null} [loc] — por defecto
- *   window.location; inyectable para tests.
+ * El heurístico del pathname exige protocol http: — el embed del desktop
+ * SIEMPRE es http. Sin ese guard, un deploy cloud https://dominio/app
+ * daba falso positivo y suprimía el banner de "esto no es tu PC".
+ *
+ * @param {{ port?: string, pathname?: string, protocol?: string }|null}
+ *   [loc] — por defecto window.location; inyectable para tests.
  * @returns {boolean}
  */
 export function isServedFromDesktop(
@@ -126,7 +130,8 @@ export function isServedFromDesktop(
   if (!loc) return false
   const port = String(loc.port || '')
   const pathname = String(loc.pathname || '')
-  return port === CANONICAL_PORT || pathname.startsWith('/app')
+  const protocol = String(loc.protocol || '')
+  return port === CANONICAL_PORT || (protocol === 'http:' && pathname.startsWith('/app'))
 }
 
 /**

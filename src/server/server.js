@@ -59,8 +59,8 @@ function getLocalIP() {
  *   3. null → la ruta /app responde 404 accionable, el server NUNCA crashea.
  *
  * Path absoluto via process.resourcesPath + existsSync — evita la clase de
- * bug de bibleSearch.js:52 (__dirname relativo → app.asar/public inexistente
- * en builds empaquetados).
+ * bug del __dirname relativo (→ app.asar/<dir> inexistente en builds
+ * empaquetados). bibleSearch.resolveBibleDir() usa el mismo patrón.
  *
  * @param {{ resourcesPath?: string|null, repoDir?: string }} [opts] —
  *   inyectables para tests; defaults = entorno real.
@@ -260,10 +260,18 @@ function startServer(opts = {}) {
     })
   }
 
-  // Página raíz: bienvenida + link al remote
+  // Página raíz: bienvenida + link al mando. Si NO hay build del mobile
+  // (mobileAppDir null), /app/ daría 404 — el CTA principal pasa a /remote
+  // en vez de enlazar a una página rota.
   app.get('/', (_req, res) => {
     const ip = getLocalIP()
-    res.send(WELCOME_PAGE.replace(/\$\{IP\}/g, ip).replace(/\$\{PORT\}/g, String(PORT)))
+    const cta = mobileAppDir ? WELCOME_CTA_APP : WELCOME_CTA_REMOTE
+    res.send(
+      WELCOME_PAGE
+        .replace('${MAIN_CTA}', cta)
+        .replace(/\$\{IP\}/g, ip)
+        .replace(/\$\{PORT\}/g, String(PORT)),
+    )
   })
 
   // OBS browser source
@@ -1014,16 +1022,26 @@ const WELCOME_PAGE = `<!DOCTYPE html>
   <div class="card">
     <h1>Eclesia<em>Presenter</em></h1>
     <p>Estás conectado al servidor local de EclesiaPresenter.</p>
-    <p>Para controlar la app desde este dispositivo, abre:</p>
+\${MAIN_CTA}
+  </div>
+</body>
+</html>`
+
+// CTA principal cuando el build PWA del mobile está disponible en /app.
+const WELCOME_CTA_APP = `    <p>Para controlar la app desde este dispositivo, abre:</p>
     <code>http://\${IP}:\${PORT}/app/</code>
     <br>
     <a class="link" href="/app/">Abrir mando móvil →</a>
     <p style="margin-top:18px; font-size:13px;">
       ¿Problemas con el mando nuevo?
       <a href="/remote" style="color:#db9f75;">Abrir mando clásico (/remote)</a>
-    </p>
-  </div>
-</body>
-</html>`
+    </p>`
+
+// CTA fallback cuando NO hay build del mobile (mobileAppDir null): enlazar
+// /app/ sería un 404 — el mando clásico /remote pasa a ser el principal.
+const WELCOME_CTA_REMOTE = `    <p>Para controlar la app desde este dispositivo, abre:</p>
+    <code>http://\${IP}:\${PORT}/remote</code>
+    <br>
+    <a class="link" href="/remote">Abrir mando móvil →</a>`
 
 module.exports = { startServer, resolveMobileAppDir }

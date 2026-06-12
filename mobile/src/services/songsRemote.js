@@ -32,16 +32,26 @@ function sanitizeQuery(q) {
 
 /**
  * Compone dos AbortSignal. Polyfill mínimo (AbortSignal.any falta en WebView viejo).
+ *
+ * Devuelve { signal, cleanup }: cleanup DEBE llamarse al terminar el fetch
+ * (finally) — sin él, el listener 'abort' del signal externo queda colgado
+ * reteniendo el closure de cada request completada.
  */
 function composeSignals(external, internal) {
-  if (!external) return internal
+  if (!external) return { signal: internal, cleanup: () => {} }
   const ctrl = new AbortController()
   const onAbort = () => ctrl.abort()
   if (external.aborted) ctrl.abort()
   else external.addEventListener('abort', onAbort, { once: true })
   if (internal.aborted) ctrl.abort()
   else internal.addEventListener('abort', onAbort, { once: true })
-  return ctrl.signal
+  return {
+    signal: ctrl.signal,
+    cleanup: () => {
+      external.removeEventListener('abort', onAbort)
+      internal.removeEventListener('abort', onAbort)
+    },
+  }
 }
 
 /**
@@ -62,7 +72,7 @@ export async function list(opts = {}) {
 
   const localCtrl = new AbortController()
   const timeoutId = setTimeout(() => localCtrl.abort(), DEFAULT_TIMEOUT_MS)
-  const signal = composeSignals(opts.signal, localCtrl.signal)
+  const { signal, cleanup: cleanupSignals } = composeSignals(opts.signal, localCtrl.signal)
 
   try {
     const url = `${base}/api/songs/list${params.toString() ? '?' + params.toString() : ''}`
@@ -85,6 +95,7 @@ export async function list(opts = {}) {
     return { ok: false, error: 'offline' }
   } finally {
     clearTimeout(timeoutId)
+    cleanupSignals()
   }
 }
 
@@ -104,7 +115,7 @@ export async function get(id, opts = {}) {
 
   const localCtrl = new AbortController()
   const timeoutId = setTimeout(() => localCtrl.abort(), DEFAULT_TIMEOUT_MS)
-  const signal = composeSignals(opts.signal, localCtrl.signal)
+  const { signal, cleanup: cleanupSignals } = composeSignals(opts.signal, localCtrl.signal)
 
   try {
     const res = await fetch(`${base}/api/songs/${Number(id)}`, {
@@ -123,6 +134,7 @@ export async function get(id, opts = {}) {
     return { ok: false, error: 'offline' }
   } finally {
     clearTimeout(timeoutId)
+    cleanupSignals()
   }
 }
 
