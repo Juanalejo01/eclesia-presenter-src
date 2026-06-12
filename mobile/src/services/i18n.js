@@ -63,6 +63,7 @@ export const DICT = {
     'nav.bible':   'Biblia',
     'nav.songs':   'Canciones',
     'nav.more':    'Más',
+    'nav.main':    'Navegación principal',
 
     // ----- PairScreen -----
     'pair.title':              'Emparejar',
@@ -320,6 +321,7 @@ export const DICT = {
     'nav.bible':   'Bible',
     'nav.songs':   'Songs',
     'nav.more':    'More',
+    'nav.main':    'Main navigation',
 
     'pair.title':              'Pair',
     'pair.subtitle':           'Connect to the PC running EclesiaPresenter',
@@ -565,6 +567,7 @@ export const DICT = {
     'nav.bible':   'Bíblia',
     'nav.songs':   'Cânticos',
     'nav.more':    'Mais',
+    'nav.main':    'Navegação principal',
 
     'pair.title':              'Parear',
     'pair.subtitle':           'Conecte com o PC onde roda o EclesiaPresenter',

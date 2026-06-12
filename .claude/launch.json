@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:renderer"],
       "port": 5173
+    },
+    {
+      "name": "EclesiaMobile",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "mobile", "run", "dev", "--", "--port", "5174"],
+      "port": 5174
     }
   ]
 }
