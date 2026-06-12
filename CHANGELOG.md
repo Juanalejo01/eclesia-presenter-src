@@ -11,6 +11,51 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [Mobile 0.2.0] — 2026-06-12
+
+Release del **mando móvil** (app Android/PWA `@eclesia-presenter/mobile`,
+versionada aparte del desktop). El mando pasa de control básico de culto
+(T1–T8) a operador completo: Biblia, canciones, anuncios y pánico, con
+i18n y modo PWA servido desde el propio PC. Hitos T9–T13 + hardening.
+
+### Added
+- 📖 **BibleScreen (T9)** — buscar versículo por referencia ("Juan 3:16")
+  o texto libre contra el desktop (`/api/bible/search`, Bearer token,
+  rate-limit por dispositivo) y proyectarlo desde el preview bottom-sheet.
+- 🎵 **SongsScreen (T10)** — buscar canción por título/autor/letra, sheet
+  con secciones tapeables y sync realtime del repertorio (serverVersion +
+  cache local); badge EN VIVO de la sección proyectada.
+- 📣 **MoreScreen (T11)** — anuncio rápido (título + cuerpo proyectados
+  como slide) y **botón de pánico** que cierra todas las ventanas de
+  proyección del PC con confirm destructivo.
+- 📱 **PWA installable + `/app` desde el desktop (T12)** — manifest +
+  service worker; el server Express del PC sirve el build del mando en
+  `http://IP:3434/app/` (pairing same-origin trivial vía QR/PIN).
+- 🌐 **i18n ES/EN/PT (T13)** — diccionario único con test de paridad de
+  keys, LanguageSwitcher en Ajustes y modal de pánico del brand.
+
+### Fixed (hardening pre-release)
+- 🧹 Rate-limit de Biblia/canciones: sweep anti-leak de deviceIds rotados
+  (las entries con ventana expirada se purgan del Map).
+- 👆 Los bottom-sheets bloqueaban el scroll táctil de versículos/secciones
+  largas (`touchAction:'none'` en el backdrop) — ahora solo el drag handle
+  captura el gesto swipe-down.
+- ☁️ `isServedFromDesktop` daba falso positivo en deploys cloud
+  `https://dominio/app` — el heurístico de pathname ahora exige `http:`.
+- 🔗 La página raíz del server enlazaba `/app/` (404) aunque el build del
+  mobile no existiera — fallback a `/remote` como CTA principal.
+- 🧠 `composeSignals` dejaba el listener `abort` del signal externo
+  colgado tras cada fetch completado — cleanup en el `finally`.
+- 💬 Último `window.confirm` nativo (desemparejar) migrado a
+  `ConfirmModal` reutilizable del brand (PanicModal ahora es wrapper).
+
+### Infrastructure
+- 🔧 Capacitor: `androidScheme: http` + `cleartext` + `allowNavigation`
+  LAN — arregla el mixed content del APK contra el server http del PC (T8).
+- 🔧 Workflow `release-mobile.yml` (T14) para el APK firmado.
+
+---
+
 ## [0.2.17] — 2026-06-07
 
 Fix UX del confirm de cierre — eliminado el doble dialog (custom + nativo

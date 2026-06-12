@@ -1,7 +1,7 @@
 {
   "name": "@eclesia-presenter/mobile",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "EclesiaPresenter mobile remote — Android/iOS/PWA",
   "type": "module",
   "scripts": {
