@@ -309,6 +309,20 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      # --- PUBLICACIÓN CROSS-REPO (esquema de 2 repos) ---
+      # El código y este workflow viven en el repo PRIVADO
+      # (Juanalejo01/eclesia-presenter-src); los releases user-facing viven en
+      # el repo PÚBLICO (Juanalejo01/eclesia-presenter). GITHUB_TOKEN solo
+      # puede escribir en ESTE repo, así que el publish usa el secret
+      # RELEASES_TOKEN (PAT fine-grained con Contents read-write sobre el
+      # repo público). Ver docs/RELEASES_MIGRATION.md.
+      - name: Guard — RELEASES_TOKEN presente
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.RELEASES_TOKEN }}" ]; then
+            echo "::error::Falta el secret RELEASES_TOKEN (PAT con contents:write sobre Juanalejo01/eclesia-presenter). Sin el, el release no puede publicarse al repo publico." && exit 1
+          fi
+
       # IMPORTANTE: prerelease:true + make_latest:false — el auto-updater del
       # desktop (electron-updater, publish releaseType 'release' en package.json)
       # resuelve /releases/latest de GitHub y busca latest.yml ahí. Si un release
@@ -318,6 +332,14 @@ jobs:
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
+          # Cross-repo: el tag mobile-v* se pushea al repo privado y NO existe
+          # en el público. action-gh-release crea el release (y GitHub crea el
+          # tag) en el repo destino automáticamente. target_commitish: main
+          # ancla ese tag a la rama default del repo público — el SHA del repo
+          # privado no existe allí y nunca debe heredarse del contexto.
+          repository: Juanalejo01/eclesia-presenter
+          token: ${{ secrets.RELEASES_TOKEN }}
+          target_commitish: main
           tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
             mobile/android/app/build/outputs/apk/**/EclesiaPresenter-mobile-*.apk
@@ -326,8 +348,6 @@ jobs:
           draft: false
           prerelease: true
           make_latest: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Gradle log on failure
         if: failure()

@@ -183,10 +183,34 @@ jobs:
             echo "::endgroup::"
           done
 
+      # --- PUBLICACIÓN CROSS-REPO (esquema de 2 repos) ---
+      # El código y este workflow viven en el repo PRIVADO
+      # (Juanalejo01/eclesia-presenter-src), pero los releases user-facing viven
+      # en el repo PÚBLICO (Juanalejo01/eclesia-presenter): el auto-updater
+      # (package.json -> build.publish) y la web de descargas leen de ahí.
+      # GITHUB_TOKEN solo puede escribir en ESTE repo, así que el publish usa
+      # el secret RELEASES_TOKEN (PAT fine-grained con Contents read-write
+      # sobre el repo público). Ver docs/RELEASES_MIGRATION.md.
+      - name: Guard — RELEASES_TOKEN presente
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.RELEASES_TOKEN }}" ]; then
+            echo "::error::Falta el secret RELEASES_TOKEN (PAT con contents:write sobre Juanalejo01/eclesia-presenter). Sin el, el release no puede publicarse al repo publico." && exit 1
+          fi
+
       - name: Upload artifacts to Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
+          # Cross-repo: el tag v* se pushea al repo privado y NO existe en el
+          # público. action-gh-release crea el release (y GitHub crea el tag)
+          # en el repo destino automáticamente. target_commitish: main ancla
+          # ese tag a la rama default del repo público — el SHA del repo
+          # privado no existe allí y nunca debe heredarse del contexto.
+          repository: Juanalejo01/eclesia-presenter
+          token: ${{ secrets.RELEASES_TOKEN }}
+          target_commitish: main
           tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
             dist-electron/*.exe
@@ -198,5 +222,3 @@ jobs:
           generate_release_notes: false
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

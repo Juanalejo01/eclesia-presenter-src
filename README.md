@@ -6,9 +6,11 @@
 
 **Software libre de presentación para iglesias — alternativa OSS a ProPresenter / EasyWorship.**
 
+> **Código fuente privado.** Este repo (`eclesia-presenter-src`) contiene el código, los workflows de CI y los secrets. Los releases y descargas viven en [github.com/Juanalejo01/eclesia-presenter](https://github.com/Juanalejo01/eclesia-presenter). Ver [docs/RELEASES_MIGRATION.md](docs/RELEASES_MIGRATION.md).
+
 [![Latest Release](https://img.shields.io/github/v/release/Juanalejo01/eclesia-presenter?style=flat-square&color=db9f75)](https://github.com/Juanalejo01/eclesia-presenter/releases/latest)
-[![Build & Release](https://img.shields.io/github/actions/workflow/status/Juanalejo01/eclesia-presenter/release.yml?style=flat-square&label=build&color=6bcf8e)](https://github.com/Juanalejo01/eclesia-presenter/actions/workflows/release.yml)
-[![Tests](https://img.shields.io/github/actions/workflow/status/Juanalejo01/eclesia-presenter/test.yml?style=flat-square&label=tests&color=6bcf8e)](https://github.com/Juanalejo01/eclesia-presenter/actions/workflows/test.yml)
+[![Build & Release](https://img.shields.io/github/actions/workflow/status/Juanalejo01/eclesia-presenter-src/release.yml?style=flat-square&label=build&color=6bcf8e)](https://github.com/Juanalejo01/eclesia-presenter-src/actions/workflows/release.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/Juanalejo01/eclesia-presenter-src/test.yml?style=flat-square&label=tests&color=6bcf8e)](https://github.com/Juanalejo01/eclesia-presenter-src/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/Juanalejo01/eclesia-presenter?style=flat-square&color=c9b29c)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/Juanalejo01/eclesia-presenter/total?style=flat-square&color=db9f75)](https://github.com/Juanalejo01/eclesia-presenter/releases)
 [![Stars](https://img.shields.io/github/stars/Juanalejo01/eclesia-presenter?style=flat-square&color=f4b840)](https://github.com/Juanalejo01/eclesia-presenter/stargazers)
@@ -148,8 +150,8 @@ Disponible para Windows (NSIS + portable) y macOS (zip arm64).
 ### Para desarrolladores
 
 ```bash
-git clone https://github.com/Juanalejo01/eclesia-presenter.git
-cd eclesia-presenter
+git clone https://github.com/Juanalejo01/eclesia-presenter-src.git
+cd eclesia-presenter-src
 npm install
 npm run dev
 ```
