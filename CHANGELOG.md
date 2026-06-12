@@ -11,6 +11,40 @@ este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.2.18] — 2026-06-12
+
+Primera release publicada con el esquema de 2 repos (código privado en
+`eclesia-presenter-src`, binarios públicos en `eclesia-presenter`).
+
+### Added
+- 📱 **El desktop sirve el mando móvil** en `http://IP:3434/app/` (build
+  PWA empaquetado en `resources/mobile-app`); el QR del panel Transmisión
+  apunta ahí — cualquier móvil de la congregación escanea e instala sin APK.
+- 🔐 **Persistencia de tokens de pairing** en `userData/pairing_tokens.json`
+  (escritura atómica + debounce): los mandos emparejados sobreviven
+  reinicios del PC sin volver a teclear el PIN.
+- 🌍 Endpoints para el mando: `POST /api/bible/search` y
+  `GET /api/songs/list|/:id` (Bearer + rate-limit por dispositivo) +
+  comandos WS `announce`, `projection-close`, `bible/song-project-direct`.
+
+### Fixed
+- 🩹 **Updater**: mensajes de error amigables (sin stack trace en Ajustes),
+  detalles técnicos colapsados y botón "Abrir página de descargas" como
+  plan B. El 404 de `latest.yml` causado por releases mobile quedó
+  resuelto de raíz (releases mobile = prerelease, nunca Latest).
+- 📦 **Biblias en app instalada**: `bibleSearch` resuelve `public/*.json`
+  vía `extraResources` (antes apuntaba dentro del asar y el endpoint
+  devolvía 503 en producción).
+- 🖥️ La página raíz del server no enlaza `/app/` si el build del mando
+  no está empaquetado (fallback a `/remote`).
+
+### Changed
+- 🔁 **CI publica releases al repo público** `eclesia-presenter` vía
+  `RELEASES_TOKEN` (PAT); guard con error accionable si falta el secret.
+  Runbook en `docs/RELEASES_MIGRATION.md`.
+
+---
+
 ## [Mobile 0.2.0] — 2026-06-12
 
 Release del **mando móvil** (app Android/PWA `@eclesia-presenter/mobile`,
