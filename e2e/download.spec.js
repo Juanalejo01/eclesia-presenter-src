@@ -39,4 +39,15 @@ test.describe('Download page', () => {
     await expect(installer).toHaveAttribute('href', /download\/installer/)
     await expect(portable).toHaveAttribute('href', /download\/portable/)
   })
+
+  test('card de la app móvil Android con CTA al APK evergreen', async ({ page }) => {
+    await page.goto('/download')
+    await expect(page.getByRole('heading', { name: /App móvil para Android/i })).toBeVisible()
+    const apk = page.getByRole('link', { name: /Descargar APK/i })
+    await expect(apk).toBeVisible()
+    // El href apunta a la ruta API evergreen (redirect 302 al último mobile-v*)
+    await expect(apk).toHaveAttribute('href', /\/api\/download\/mobile-apk/)
+    // Nota de side-load visible
+    await expect(page.getByText(/fuentes desconocidas/i)).toBeVisible()
+  })
 })

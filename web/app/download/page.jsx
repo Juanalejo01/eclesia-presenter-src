@@ -96,6 +96,54 @@ export default function DownloadPage() {
         </div>
       </div>
 
+      {/* MOBILE APK — mando a distancia Android */}
+      <div className="rounded-2xl border border-copper-300/15 bg-bg-2 p-7 mb-8
+                      md:flex md:items-start md:gap-8">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-bg-3 to-bg-1
+                            border border-copper-300/30 flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                <path d="M7 2.5 L15 2.5 Q16.5 2.5 16.5 4 L16.5 18 Q16.5 19.5 15 19.5 L7 19.5 Q5.5 19.5 5.5 18 L5.5 4 Q5.5 2.5 7 2.5 Z M9.5 17 L12.5 17"
+                  stroke="#8a7866" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <h2 className="font-display text-2xl text-ink-1">App móvil para Android</h2>
+          </div>
+
+          <p className="text-sm text-ink-2 mb-3">
+            Mando a distancia para EclesiaPresenter: proyecta versículos de la Biblia,
+            canciones y anuncios desde el móvil, sin levantarte del banco.
+          </p>
+          <ul className="space-y-1.5 text-sm text-ink-2 mb-5 md:mb-0">
+            <li>✓ Biblia, canciones y lista del día en tu mano</li>
+            <li>✓ Anuncio rápido y botón de pánico</li>
+            <li>✓ Se conecta por WiFi local — escanea el QR del panel Transmisión</li>
+          </ul>
+        </div>
+
+        <div className="md:w-64 shrink-0 flex flex-col">
+          <a
+            href="/api/download/mobile-apk"
+            className="inline-flex items-center justify-center gap-2 h-12 rounded-lg
+                       border border-copper-300/30 bg-bg-3 text-ink-1 font-semibold text-base
+                       hover:bg-bg-4 transition-all">
+            Descargar APK
+          </a>
+          <p className="text-xs text-ink-3 text-center mt-2 font-mono">
+            .apk · Android 7+ · side-load
+          </p>
+          <p className="text-xs text-ink-3 mt-3 leading-relaxed">
+            Android 7+. Activa {'"Instalar apps de fuentes desconocidas"'} si el
+            sistema lo pide.
+          </p>
+          <p className="text-xs text-ink-3 mt-2 leading-relaxed">
+            También puedes usar el mando sin instalar nada: abre EclesiaPresenter
+            en el PC y escanea el QR del panel Transmisión.
+          </p>
+        </div>
+      </div>
+
       {/* SmartScreen + Smart App Control */}
       <div className="rounded-xl border border-copper-300/20 bg-bg-2 p-7 mb-8">
         <h3 className="font-display text-2xl text-ink-1 mb-4 flex items-center gap-2">
