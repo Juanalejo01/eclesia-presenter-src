@@ -32,6 +32,7 @@ import SongsEmptyState from '../components/SongsEmptyState.jsx'
 import SongPreviewSheet from '../components/SongPreviewSheet.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import BigButton from '../components/BigButton.jsx'
+import CloudGateCard from '../components/CloudGateCard.jsx'
 import { transport, ClientCommand, ServerEvent } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
 import { useSongs } from '../hooks/useSongs.js'
@@ -385,24 +386,8 @@ function SkeletonRows() {
 /* Modo "Mi nube" (C2)                                             */
 /* ============================================================== */
 
-// Card de gating (inicia sesión / upsell Pro) — mismo lenguaje visual
-// que la card de login de AccountScreen.
-function CloudGateCard({ title, body, cta, ctaAria, onCta }) {
-  return (
-    <section
-      aria-label={title}
-      className="border border-copper-300/25 rounded-xl p-5 bg-bg-2 space-y-4"
-    >
-      <div>
-        <h2 className="font-display text-xl text-copper-100">{title}</h2>
-        <p className="text-sm text-ink-2 mt-1">{body}</p>
-      </div>
-      <BigButton onClick={onCta} aria-label={ctaAria}>
-        {cta}
-      </BigButton>
-    </section>
-  )
-}
+// La card de gating (inicia sesión / upsell Pro) se extrajo a
+// components/CloudGateCard.jsx en C3a — PlannerListScreen la comparte.
 
 const CLOUD_ERR_CODES = new Set(['network', 'unauthorized', 'not_found', 'validation', 'unknown'])
 

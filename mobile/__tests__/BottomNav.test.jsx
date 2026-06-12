@@ -14,7 +14,7 @@
  *    que sigue al tab activo, aria-current del NavLink y haptic al tap.
  */
 import '@testing-library/jest-dom'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 import BottomNav from '../src/components/BottomNav.jsx'
@@ -76,6 +76,19 @@ describe('BottomNav (rediseño v0.2.1)', () => {
     const indicator = screen.getByTestId('nav-indicator')
     expect(indicator.style.transform).toBe('translateX(200%)')
     expect(screen.getByRole('link', { name: /Canciones/ })).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('5c. en /plans (planificador C3a) no hay píldora ni tab activo, pero los links siguen navegando', () => {
+    renderAt('/plans')
+    // Ningún startsWith de TABS matchea /plans → sin píldora ni aria-current.
+    expect(screen.queryByTestId('nav-indicator')).not.toBeInTheDocument()
+    for (const name of [/Servicio/, /Biblia/, /Canciones/, /Más/]) {
+      expect(screen.getByRole('link', { name })).not.toHaveAttribute('aria-current')
+    }
+    // Tap en un tab navega con normalidad y reactiva la píldora.
+    fireEvent.click(screen.getByRole('link', { name: /Servicio/ }))
+    expect(screen.getByTestId('nav-indicator')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Servicio/ })).toHaveAttribute('aria-current', 'page')
   })
 
   test('6. iconos son SVG (no emoji) y aria-hidden', () => {

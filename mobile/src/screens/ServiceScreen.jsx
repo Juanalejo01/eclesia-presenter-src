@@ -174,6 +174,32 @@ export default function ServiceScreen() {
         />
       </div>
 
+      {/* Cabecera de la sección de lista del día: botón "Planificar" →
+          /plans (C3a). Visible SIEMPRE — el gating por cuenta/plan lo
+          hace PlannerListScreen. ScheduleList pinta su propio header
+          con el contador, así que aquí solo va la acción, alineada a
+          la derecha. */}
+      <div className="flex justify-end -mb-2">
+        <button
+          type="button"
+          onClick={() => { tapLight(); nav('/plans') }}
+          aria-label={t('planner.entryAria')}
+          className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg
+                     text-xs font-medium text-copper-100 bg-copper-300/10
+                     ring-1 ring-copper-300/20 hover:bg-copper-300/20 transition-colors"
+        >
+          <svg
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+            strokeLinecap="round" strokeLinejoin="round"
+            aria-hidden="true" className="h-4 w-4"
+          >
+            <rect x="4" y="5" width="16" height="16" rx="2" />
+            <path d="M8 3v4M16 3v4M4 11h16M9.5 15.5l1.8 1.8 3.2-3.3" />
+          </svg>
+          {t('planner.entry')}
+        </button>
+      </div>
+
       {/* Lista del día — sortable con drag&drop táctil. Tap proyecta el
           item; el handle (⋮⋮) inicia el drag para reordenar. El componente
           se suscribe a schedule-update internamente vía useSchedule. */}

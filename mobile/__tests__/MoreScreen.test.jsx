@@ -214,3 +214,11 @@ test('14. fila de cuenta con sesion PRO: badge PRO cobre (C1)', () => {
   render(<MoreScreen />)
   expect(screen.getByTestId('plan-badge')).toHaveTextContent('PRO')
 })
+
+test('15. fila "Mis listas" (C3a) navega a /plans', () => {
+  render(<MoreScreen />)
+  const row = screen.getByRole('button', { name: 'Abrir el planificador de listas' })
+  expect(row).toHaveTextContent('Mis listas')
+  fireEvent.click(row)
+  expect(mockNavigate).toHaveBeenCalledWith('/plans')
+})

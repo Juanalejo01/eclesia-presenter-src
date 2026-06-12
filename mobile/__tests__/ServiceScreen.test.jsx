@@ -327,3 +327,17 @@ test('11. pgm-update {type:"blackout"} → preview muestra "Blackout"', () => {
   expect(screen.getByText(/Blackout/i)).toBeTruthy()
   expect(screen.queryByText(/Sin contenido proyectado/i)).toBeNull()
 })
+
+// 12. Entry point del planificador (C3a): botón "Planificar" → /plans.
+// Visible y habilitado SIEMPRE (también offline): el gating por
+// cuenta/plan lo hace PlannerListScreen, no esta pantalla.
+test('12. botón "Planificar" navega a /plans incluso sin conexión', () => {
+  mockConnectionState = {
+    isConnected: false, isConnecting: false, latencyMs: null, signal: 'offline', queueSize: 0,
+  }
+  render(<ServiceScreen />)
+  const btn = screen.getByRole('button', { name: 'Abrir el planificador de listas' })
+  expect(btn).toBeEnabled()
+  fireEvent.click(btn)
+  expect(mockNavigate).toHaveBeenCalledWith('/plans')
+})

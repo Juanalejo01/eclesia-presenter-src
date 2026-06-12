@@ -111,6 +111,18 @@ export default function MoreScreen() {
 
       {/* Cuenta — sesion Supabase (C1) + desemparejar mando (ubicacion canonica). */}
       <MoreSection title={t('more.sectionAccount')}>
+        {/* Mis listas (C3a) — planificador cloud. Vive en Cuenta porque
+            las listas estan ligadas a la cuenta/plan (gating en /plans). */}
+        <button
+          type="button"
+          onClick={() => nav('/plans')}
+          aria-label={t('planner.entryAria')}
+          className="w-full flex items-center justify-between gap-3 p-3 rounded-lg
+                     hover:bg-bg-3 transition-colors text-left"
+        >
+          <span className="text-base text-ink-1">{t('planner.moreRow')}</span>
+          <span aria-hidden="true" className="text-ink-3">→</span>
+        </button>
         <button
           type="button"
           onClick={() => nav('/account')}

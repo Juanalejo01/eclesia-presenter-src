@@ -4,6 +4,8 @@ import ServiceScreen from './screens/ServiceScreen.jsx'
 import BibleScreen from './screens/BibleScreen.jsx'
 import SongsScreen from './screens/SongsScreen.jsx'
 import SongEditorScreen from './screens/SongEditorScreen.jsx'
+import PlannerListScreen from './screens/PlannerListScreen.jsx'
+import PlannerEditorScreen from './screens/PlannerEditorScreen.jsx'
 import MoreScreen from './screens/MoreScreen.jsx'
 import AccountScreen from './screens/AccountScreen.jsx'
 import PairScreen from './screens/PairScreen.jsx'
@@ -61,6 +63,12 @@ export default function App() {
               BottomNav sigue activo gracias al startsWith('/songs'). */}
           <Route path="/songs/cloud/new" element={<SongEditorScreen />} />
           <Route path="/songs/cloud/:id" element={<SongEditorScreen />} />
+          {/* Planificador de listas cloud (C3a). /plans no matchea ningún
+              tab del BottomNav (sin píldora activa) — deliberado: se entra
+              desde ServiceScreen o MoreScreen, no es un tab. */}
+          <Route path="/plans"     element={<PlannerListScreen />} />
+          <Route path="/plans/new" element={<PlannerEditorScreen />} />
+          <Route path="/plans/:id" element={<PlannerEditorScreen />} />
           <Route path="/more"    element={<MoreScreen />} />
           <Route path="/account" element={<AccountScreen />} />
         </Routes>
