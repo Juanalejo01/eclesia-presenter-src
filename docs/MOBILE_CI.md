@@ -178,6 +178,21 @@ Y el Release del tag tendrá adjunto el APK firmado.
 
 Son disjoint: nunca dispares un tag que matchee ambos patrones.
 
+> **⚠ Los releases mobile se publican como _prerelease_ y con `make_latest: false`.**
+> El auto-updater del desktop (electron-updater con `releaseType: 'release'`)
+> resuelve `https://github.com/.../releases/latest` y busca `latest.yml` en ese
+> release. Si un release `mobile-v*` queda marcado como **Latest** del repo, el
+> updater de **todos** los desktops instalados falla con 404 (los releases mobile
+> solo contienen el APK, no `latest.yml`). Por eso el step `Upload APK to Release`
+> declara `prerelease: true` + `make_latest: false`. Si alguna vez un release
+> mobile aparece como Latest en GitHub, corrígelo con:
+>
+> ```bash
+> gh release edit mobile-vX.Y.Z --latest=false
+> # o re-marca el último release desktop:
+> gh release edit vX.Y.Z --latest
+> ```
+
 ---
 
 ## 8. Naming convention del APK final
