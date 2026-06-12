@@ -3,6 +3,7 @@ import BottomNav from './components/BottomNav.jsx'
 import ServiceScreen from './screens/ServiceScreen.jsx'
 import BibleScreen from './screens/BibleScreen.jsx'
 import SongsScreen from './screens/SongsScreen.jsx'
+import SongEditorScreen from './screens/SongEditorScreen.jsx'
 import MoreScreen from './screens/MoreScreen.jsx'
 import AccountScreen from './screens/AccountScreen.jsx'
 import PairScreen from './screens/PairScreen.jsx'
@@ -56,6 +57,10 @@ export default function App() {
           <Route path="/service" element={<ServiceScreen />} />
           <Route path="/bible"   element={<BibleScreen />} />
           <Route path="/songs"   element={<SongsScreen />} />
+          {/* Editor cloud (C2) — subrutas de /songs: el tab Canciones del
+              BottomNav sigue activo gracias al startsWith('/songs'). */}
+          <Route path="/songs/cloud/new" element={<SongEditorScreen />} />
+          <Route path="/songs/cloud/:id" element={<SongEditorScreen />} />
           <Route path="/more"    element={<MoreScreen />} />
           <Route path="/account" element={<AccountScreen />} />
         </Routes>

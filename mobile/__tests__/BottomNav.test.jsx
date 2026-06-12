@@ -71,6 +71,13 @@ describe('BottomNav (rediseño v0.2.1)', () => {
     expect(screen.queryByTestId('nav-indicator')).not.toBeInTheDocument()
   })
 
+  test('5b. el editor cloud (/songs/cloud/*) mantiene activo el tab Canciones (C2)', () => {
+    renderAt('/songs/cloud/new')
+    const indicator = screen.getByTestId('nav-indicator')
+    expect(indicator.style.transform).toBe('translateX(200%)')
+    expect(screen.getByRole('link', { name: /Canciones/ })).toHaveAttribute('aria-current', 'page')
+  })
+
   test('6. iconos son SVG (no emoji) y aria-hidden', () => {
     const { container } = renderAt('/service')
     const svgs = container.querySelectorAll('svg[aria-hidden="true"]')
