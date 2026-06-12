@@ -931,25 +931,39 @@ function SectionApiBible({ onUpdate }) {
 }
 
 // ---------- ACERCA DE ----------
+
+const RELEASES_URL = 'https://github.com/Juanalejo01/eclesia-presenter/releases'
+const GENERIC_UPDATER_ERROR = 'No se pudo comprobar la actualización.'
+
+// Defensa en profundidad: aunque main ya manda mensajes amigables de 1 línea,
+// nunca renderizamos más de una línea ni más de ~160 chars en el span de estado.
+function oneLine(msg, maxLen = 160) {
+  const line = String(msg || '').split('\n')[0].trim()
+  return line.length > maxLen ? line.slice(0, maxLen - 1) + '…' : line
+}
+
 function SectionAcerca() {
   const [info, setInfo] = useState(null)
   const [upd, setUpd] = useState(null)
   const [checking, setChecking] = useState(false)
   const [lastCheckMsg, setLastCheckMsg] = useState('')
+  const [errorDetail, setErrorDetail] = useState('')  // mensaje crudo (colapsado en <details>)
 
   useEffect(() => {
     if (window.electron?.app) window.electron.app.info().then(setInfo)
     if (window.electron?.updater) {
       window.electron.updater.state().then(setUpd)
-      const off1 = window.electron.updater.onChecking(() => { setChecking(true); setLastCheckMsg('Buscando actualizaciones…') })
+      const off1 = window.electron.updater.onChecking(() => { setChecking(true); setLastCheckMsg('Buscando actualizaciones…'); setErrorDetail('') })
       const off2 = window.electron.updater.onAvailable((d) => {
         setChecking(false)
         setLastCheckMsg(`Hay una versión nueva: v${d.version}`)
+        setErrorDetail('')
         setUpd(prev => ({ ...prev, available: d }))
       })
       const off3 = window.electron.updater.onNotAvailable((d) => {
         setChecking(false)
         setLastCheckMsg(`Ya estás en la última versión (v${d?.version || ''}).`)
+        setErrorDetail('')
       })
       const off4 = window.electron.updater.onDownloadProgress((p) => {
         setUpd(prev => ({ ...prev, downloading: true, downloadProgress: p }))
@@ -959,7 +973,10 @@ function SectionAcerca() {
       })
       const off6 = window.electron.updater.onError((e) => {
         setChecking(false)
-        setLastCheckMsg(`Error: ${e?.error || 'desconocido'}`)
+        // e.error ya viene amigable desde main (classifyUpdaterError);
+        // el crudo viaja en e.detail y solo se enseña colapsado.
+        setLastCheckMsg(oneLine(e?.error) || GENERIC_UPDATER_ERROR)
+        setErrorDetail(e?.detail || '')
       })
       return () => { off1(); off2(); off3(); off4(); off5(); off6() }
     }
@@ -968,13 +985,25 @@ function SectionAcerca() {
   const handleCheck = async () => {
     setChecking(true)
     setLastCheckMsg('Buscando…')
+    setErrorDetail('')
     const res = await window.electron.updater.check()
     if (!res.ok) {
       setChecking(false)
+      // res.error = código estable; res.message = frase amigable de main.
       const friendly = {
         dev_mode: 'En modo desarrollo no se chequea (solo en .exe instalado).',
-      }[res.error] || `No se pudo comprobar: ${res.error}`
+      }[res.error] || oneLine(res.message) || GENERIC_UPDATER_ERROR
       setLastCheckMsg(friendly)
+      setErrorDetail(res.detail || '')
+    }
+  }
+
+  const openReleases = (e) => {
+    // Mismo patrón que UpdateButton: si el preload expone shell.openExternal
+    // úsalo; si no, deja que el <a target="_blank"> lo gestione.
+    if (window.electron?.shell?.openExternal) {
+      e.preventDefault()
+      try { window.electron.shell.openExternal(RELEASES_URL) } catch {}
     }
   }
 
@@ -1034,16 +1063,41 @@ function SectionAcerca() {
         </p>
 
         {!hasUpdate && !isDownloaded && (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-primary"
-              onClick={handleCheck}
-              disabled={checking}
-              style={{ fontSize: 12 }}>
-              {checking ? 'Comprobando…' : 'Buscar actualizaciones'}
-            </button>
-            {lastCheckMsg && (
-              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{lastCheckMsg}</span>
+          <div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleCheck}
+                disabled={checking}
+                style={{ fontSize: 12 }}>
+                {checking ? 'Comprobando…' : 'Buscar actualizaciones'}
+              </button>
+              {lastCheckMsg && (
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{oneLine(lastCheckMsg)}</span>
+              )}
+              {errorDetail && (
+                <a
+                  href={RELEASES_URL}
+                  target="_blank" rel="noreferrer"
+                  onClick={openReleases}
+                  style={{ fontSize: 12, color: 'var(--copper-200)', whiteSpace: 'nowrap' }}>
+                  Abrir página de descargas →
+                </a>
+              )}
+            </div>
+            {errorDetail && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ fontSize: 11, color: 'var(--text-3)', cursor: 'pointer', userSelect: 'none' }}>
+                  Detalles técnicos
+                </summary>
+                <pre style={{
+                  margin: '6px 0 0', padding: 8,
+                  fontSize: 10, fontFamily: 'var(--font-mono)', lineHeight: 1.5,
+                  color: 'var(--text-3)', background: 'var(--bg-3)', borderRadius: 6,
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                  maxHeight: 140, overflow: 'auto',
+                }}>{errorDetail}</pre>
+              </details>
             )}
           </div>
         )}

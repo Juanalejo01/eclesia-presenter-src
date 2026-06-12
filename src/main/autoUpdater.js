@@ -16,6 +16,7 @@
 
 const { autoUpdater } = require('electron-updater')
 const { app } = require('electron')
+const { classifyUpdaterError } = require('./updaterErrors')
 
 let _mainWindow = null
 let _state = {
@@ -24,7 +25,9 @@ let _state = {
   downloading: false,
   downloadProgress: null,  // { percent, bytesPerSecond, transferred, total } | null
   downloaded: false,
-  error: null,
+  error: null,             // mensaje AMIGABLE (1 frase) — apto para renderizar
+  errorCode: null,         // 'no_feed' | 'offline' | 'rate_limited' | 'unknown' | null
+  errorDetail: null,       // mensaje crudo de electron-updater (solo para debug/<details>)
   isPortable: !!process.env.PORTABLE_EXECUTABLE_FILE,
   currentVersion: app.getVersion(),
 }
@@ -57,6 +60,8 @@ function init() {
   autoUpdater.on('checking-for-update', () => {
     _state.checking = true
     _state.error = null
+    _state.errorCode = null
+    _state.errorDetail = null
     emit('updater:checking', {})
   })
 
@@ -99,9 +104,15 @@ function init() {
   autoUpdater.on('error', (err) => {
     _state.checking = false
     _state.downloading = false
-    _state.error = err?.message || String(err)
-    console.error('[updater] error:', _state.error)
-    emit('updater:error', { error: _state.error })
+    // El mensaje crudo de electron-updater es un HttpError multilínea con
+    // headers + stack — NO apto para UI. Clasificamos a mensaje amigable y
+    // guardamos el crudo aparte para diagnóstico.
+    const { code, friendly, detail } = classifyUpdaterError(err)
+    _state.error = friendly
+    _state.errorCode = code
+    _state.errorDetail = detail
+    console.error('[updater] error:', code, '—', detail)
+    emit('updater:error', { error: friendly, code, detail })
   })
 
   // Política de chequeo:
@@ -130,7 +141,15 @@ async function _runCheckWithRetry(attempt = 0) {
       return
     }
     if (r.error === 'dev_mode') return  // no reintentar en dev
-    throw new Error(r.error)
+    // Solo reintentamos errores de red (WiFi caída al arrancar). Si el feed
+    // está roto (404 latest.yml) o GitHub nos limita, reintentar cada 5 min
+    // no ayuda — lo dejamos en el re-check normal de 4 h.
+    if (r.error !== 'offline') {
+      console.warn('[updater] startup check failed (no-retry):', r.error)
+      _schedulePeriodicCheck()
+      return
+    }
+    throw new Error(r.message || r.error)
   } catch (e) {
     // Backoff: 60 s, 5 min, 5 min, 5 min...
     const delay = attempt === 0 ? 60_000 : 5 * 60_000
@@ -156,8 +175,13 @@ async function checkForUpdates() {
     const result = await autoUpdater.checkForUpdates()
     return { ok: true, updateInfo: result?.updateInfo || null }
   } catch (e) {
-    _state.error = e?.message || String(e)
-    return { ok: false, error: _state.error }
+    const { code, friendly, detail } = classifyUpdaterError(e)
+    _state.error = friendly
+    _state.errorCode = code
+    _state.errorDetail = detail
+    // error = código estable (para lógica), message = frase amigable (para UI),
+    // detail = crudo (solo para el <details> de diagnóstico).
+    return { ok: false, error: code, message: friendly, detail }
   }
 }
 
@@ -172,8 +196,11 @@ async function downloadUpdate() {
     await autoUpdater.downloadUpdate()
     return { ok: true }
   } catch (e) {
-    _state.error = e?.message || String(e)
-    return { ok: false, error: _state.error }
+    const { code, friendly, detail } = classifyUpdaterError(e)
+    _state.error = friendly
+    _state.errorCode = code
+    _state.errorDetail = detail
+    return { ok: false, error: code, message: friendly, detail }
   }
 }
 
