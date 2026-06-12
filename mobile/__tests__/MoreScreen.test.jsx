@@ -60,6 +60,14 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }))
 
+// ─── Mock useAccount (C1) — la fila de cuenta de la seccion Cuenta ──
+let mockAccountState = {
+  status: 'signedOut', email: null, user: null, plan: null, isPro: false, error: null,
+}
+jest.mock('../src/hooks/useAccount.js', () => ({
+  useAccount: () => mockAccountState,
+}))
+
 import MoreScreen from '../src/screens/MoreScreen.jsx'
 
 beforeEach(() => {
@@ -69,6 +77,9 @@ beforeEach(() => {
   mockNavigate.mockClear()
   mockConnectionState = {
     isConnected: true, isConnecting: false, latencyMs: 50, signal: 'excellent', queueSize: 0,
+  }
+  mockAccountState = {
+    status: 'signedOut', email: null, user: null, plan: null, isPro: false, error: null,
   }
 })
 
@@ -174,4 +185,32 @@ test('11. unmount limpia subscribes del usePgmState', () => {
   const finalSize = (mockSubscribers['pgm-update']?.size || 0)
     + (mockSubscribers['pgm-update-theme']?.size || 0)
   expect(finalSize).toBe(0)
+})
+
+test('12. fila de cuenta sin sesion: "Iniciar sesion" → navega a /account (C1)', () => {
+  render(<MoreScreen />)
+  const row = screen.getByRole('button', { name: 'Cuenta y plan' })
+  expect(row).toHaveTextContent('Iniciar sesión')
+  fireEvent.click(row)
+  expect(mockNavigate).toHaveBeenCalledWith('/account')
+})
+
+test('13. fila de cuenta con sesion FREE: email + badge Free (C1)', () => {
+  mockAccountState = {
+    status: 'signedIn', email: 'pastor@iglesia.com', user: { id: 'u1' },
+    plan: 'free', isPro: false, error: null,
+  }
+  render(<MoreScreen />)
+  const row = screen.getByRole('button', { name: 'Cuenta y plan' })
+  expect(row).toHaveTextContent('pastor@iglesia.com')
+  expect(screen.getByTestId('plan-badge')).toHaveTextContent('Free')
+})
+
+test('14. fila de cuenta con sesion PRO: badge PRO cobre (C1)', () => {
+  mockAccountState = {
+    status: 'signedIn', email: 'pro@iglesia.com', user: { id: 'u1' },
+    plan: 'pro_yearly', isPro: true, error: null,
+  }
+  render(<MoreScreen />)
+  expect(screen.getByTestId('plan-badge')).toHaveTextContent('PRO')
 })

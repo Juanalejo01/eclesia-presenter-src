@@ -4,6 +4,7 @@ import ServiceScreen from './screens/ServiceScreen.jsx'
 import BibleScreen from './screens/BibleScreen.jsx'
 import SongsScreen from './screens/SongsScreen.jsx'
 import MoreScreen from './screens/MoreScreen.jsx'
+import AccountScreen from './screens/AccountScreen.jsx'
 import PairScreen from './screens/PairScreen.jsx'
 import { useBootstrap } from './hooks/useBootstrap.js'
 import { useT } from './hooks/useT.js'
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/bible"   element={<BibleScreen />} />
           <Route path="/songs"   element={<SongsScreen />} />
           <Route path="/more"    element={<MoreScreen />} />
+          <Route path="/account" element={<AccountScreen />} />
         </Routes>
       </main>
       {showNav && <BottomNav />}

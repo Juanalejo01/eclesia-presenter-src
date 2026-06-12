@@ -130,8 +130,16 @@ jobs:
         env:
           CI: 'true'
 
+      # C1: credenciales Supabase (cuenta Free/Pro del mando). Se inyectan
+      # como build-time defines en vite.config.js. Son repo VARIABLES (no
+      # secrets): la anon key es publica por diseno (viaja en el bundle; RLS
+      # protege los datos). Si las vars no existen, el build sale igual y la
+      # UI de cuenta muestra "no disponible en esta build".
       - name: Build web bundle (vite)
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || '' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || '' }}
 
       - name: Ensure android platform exists
         shell: bash

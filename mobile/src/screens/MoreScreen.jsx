@@ -25,9 +25,11 @@ import AnnouncementForm from '../components/AnnouncementForm.jsx'
 import PanicButton from '../components/PanicButton.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
+import PlanBadge from '../components/PlanBadge.jsx'
 import { transport } from '../services/transport.js'
 import { useConnection } from '../hooks/useConnection.js'
 import { usePgmState } from '../hooks/usePgmState.js'
+import { useAccount } from '../hooks/useAccount.js'
 import { useT } from '../hooks/useT.js'
 
 // Inyectada por Vite via define en vite.config.js. En el entorno de tests
@@ -42,6 +44,9 @@ export default function MoreScreen() {
   // serverVersion del usePgmState (lo envia el desktop en pgm-update-theme
   // del handshake). Si todavia no llego, mostramos "desconocido".
   const { serverVersion } = usePgmState()
+  // Cuenta Supabase (C1): la fila muestra sesión + plan y navega a /account.
+  const { status: accountStatus, email: accountEmail, isPro } = useAccount()
+  const isSignedIn = accountStatus === 'signedIn'
   const [unpairConfirmOpen, setUnpairConfirmOpen] = useState(false)
 
   function handleUnpairConfirm() {
@@ -104,8 +109,27 @@ export default function MoreScreen() {
         <LanguageSwitcher />
       </MoreSection>
 
-      {/* Cuenta — desemparejar mando (ubicacion canonica). */}
+      {/* Cuenta — sesion Supabase (C1) + desemparejar mando (ubicacion canonica). */}
       <MoreSection title={t('more.sectionAccount')}>
+        <button
+          type="button"
+          onClick={() => nav('/account')}
+          aria-label={t('account.row.aria')}
+          className="w-full flex items-center justify-between gap-3 p-3 rounded-lg
+                     hover:bg-bg-3 transition-colors text-left"
+        >
+          {isSignedIn ? (
+            <>
+              <span className="text-base text-ink-1 truncate">{accountEmail}</span>
+              <PlanBadge isPro={isPro} />
+            </>
+          ) : (
+            <>
+              <span className="text-base text-ink-1">{t('account.row.signIn')}</span>
+              <span aria-hidden="true" className="text-ink-3">→</span>
+            </>
+          )}
+        </button>
         <button
           type="button"
           onClick={() => setUnpairConfirmOpen(true)}

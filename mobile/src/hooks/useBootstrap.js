@@ -20,12 +20,17 @@
 import { useEffect, useState } from 'react'
 import { transport } from '../services/transport.js'
 import { initLocale } from '../services/i18n.js'
+import { account } from '../services/account.js'
 
 export function useBootstrap() {
   const [state, setState] = useState({ ready: false, hasCredentials: false })
 
   useEffect(() => {
     let cancelled = false
+    // C1: la cuenta Supabase se restaura en BACKGROUND — init() es
+    // fire-and-forget (nunca lanza) y NO gatea `ready`: el fetch del
+    // plan puede tardar (red) y el mando debe arrancar igual de rapido.
+    account.init()
     ;(async () => {
       let hasCreds = false
       try {
