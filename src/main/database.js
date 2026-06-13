@@ -214,6 +214,15 @@ function getSong(id) {
   return parseRow(db.prepare('SELECT * FROM songs WHERE id = ?').get(id))
 }
 
+// Busca una canción local por su cloud_id (uuid de cloud_songs). Usado al
+// importar una lista del día de la nube (C3b): los items 'song' traen el
+// cloudSongId y el desktop resuelve la canción local correspondiente.
+// Devuelve null si esa canción aún no está sincronizada en este PC.
+function getSongByCloudId(cloudId) {
+  if (!cloudId) return null
+  return parseRow(db.prepare('SELECT * FROM songs WHERE cloud_id = ?').get(cloudId))
+}
+
 function createSong(data) {
   const now = Date.now()
   const result = db.prepare(`
@@ -445,7 +454,7 @@ function deleteMedia(id) {
 
 module.exports = {
   init,
-  listSongs, getSong, createSong, updateSong, deleteSong, toggleFavorite,
+  listSongs, getSong, getSongByCloudId, createSong, updateSong, deleteSong, toggleFavorite,
   getSyncPayload, applySyncResult,
   listMedia, addMedia, deleteMedia,
 }

@@ -76,6 +76,7 @@ const db = require('./database')
 const projection = require('./projection')
 const license = require('./license')
 const cloudSync = require('./cloudSync')
+const cloudSchedules = require('./cloudSchedules')
 // (backgroundLibrary eliminado en v0.2.14 — los vídeos de fondo viven
 // ahora en el apartado /recursos de la web, donde el usuario los descarga
 // manualmente y los usa como archivos normales vía MediaPicker.)
@@ -309,6 +310,10 @@ ipcMain.handle('cloud-sync:state',     ()        => cloudSync.getState())
 ipcMain.handle('cloud-sync:setEnabled',(_e, on)  => cloudSync.setEnabled(on))
 ipcMain.handle('cloud-sync:syncNow',   ()        => cloudSync.syncOnce())
 
+// IPC: importar listas del día desde la nube (C3b — Pro feature)
+ipcMain.handle('schedules:cloud-list', ()       => cloudSchedules.listPlans())
+ipcMain.handle('schedules:cloud-get',  (_e, id) => cloudSchedules.getPlan(id))
+
 // IPC: biblioteca de fondos preset (catálogo + descargas)
 
 // IPC: proyección externa (overlay/background sin red, capturable por OBS)
@@ -448,6 +453,7 @@ ipcMain.handle('media:addFiles', async (_e, sourcePaths = []) => {
 //      (no-op silencioso si no hay licencia Pro o auto-sync está apagado)
 ipcMain.handle('songs:list',     (_e, opts)    => db.listSongs(opts))
 ipcMain.handle('songs:get',      (_e, id)      => db.getSong(id))
+ipcMain.handle('songs:getByCloudId', (_e, cloudId) => db.getSongByCloudId(cloudId))
 ipcMain.handle('songs:create',   (_e, data)    => {
   const r = db.createSong(data)
   syncSongsToServer({ changeType: 'created', songIds: r?.id ? [r.id] : [] })
@@ -766,6 +772,7 @@ app.whenReady().then(() => {
   db.init()
   license.init()
   cloudSync.init({ db, license })
+  cloudSchedules.init({ license })
 
   // Helper: previene path traversal asegurando que el path resuelto
   // está DENTRO del directorio base esperado. Sin esto, un atacante

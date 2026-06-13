@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electron', {
   songs: {
     list:     (opts)       => ipcRenderer.invoke('songs:list', opts),
     get:      (id)         => ipcRenderer.invoke('songs:get', id),
+    getByCloudId: (cloudId) => ipcRenderer.invoke('songs:getByCloudId', cloudId),
     create:   (data)       => ipcRenderer.invoke('songs:create', data),
     update:   (id, data)   => ipcRenderer.invoke('songs:update', id, data),
     delete:   (id)         => ipcRenderer.invoke('songs:delete', id),
@@ -99,6 +100,12 @@ contextBridge.exposeInMainWorld('electron', {
     onStart: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:start', h); return () => ipcRenderer.removeListener('cloud-sync:start', h) },
     onOk:    (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:ok',    h); return () => ipcRenderer.removeListener('cloud-sync:ok', h) },
     onError: (cb) => { const h = (_e, d) => cb(d); ipcRenderer.on('cloud-sync:error', h); return () => ipcRenderer.removeListener('cloud-sync:error', h) },
+  },
+
+  // Importar listas del día planificadas en el móvil (C3b)
+  cloudSchedules: {
+    list: ()   => ipcRenderer.invoke('schedules:cloud-list'),
+    get:  (id) => ipcRenderer.invoke('schedules:cloud-get', id),
   },
 
   // Auto-updater (electron-updater + GitHub Releases)
