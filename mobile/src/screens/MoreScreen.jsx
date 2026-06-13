@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MoreSection from '../components/MoreSection.jsx'
 import StatusPill from '../components/StatusPill.jsx'
+import ModeChip from '../components/ModeChip.jsx'
 import AnnouncementForm from '../components/AnnouncementForm.jsx'
 import PanicButton from '../components/PanicButton.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
@@ -79,10 +80,15 @@ export default function MoreScreen() {
         <PanicButton />
       </MoreSection>
 
-      {/* Conexion — estado actual + version del PC y del mando. */}
+      {/* Conexion — estado actual + version del PC y del mando. El ModeChip
+          "En vivo · PC" deja explícito que esta sección (y las de mando:
+          Servicio, Biblia, Canciones-PC) dependen del PC en la WiFi. */}
       <MoreSection title={t('more.sectionConnection')}>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-ink-2">{t('more.connectionState')}</span>
+          <span className="inline-flex items-center gap-2 text-sm text-ink-2">
+            {t('more.connectionState')}
+            <ModeChip mode="live" connected={isConnected} />
+          </span>
           <StatusPill />
         </div>
         <div className="grid grid-cols-2 gap-3 pt-2">
@@ -120,7 +126,10 @@ export default function MoreScreen() {
           className="w-full flex items-center justify-between gap-3 p-3 rounded-lg
                      hover:bg-bg-3 transition-colors text-left"
         >
-          <span className="text-base text-ink-1">{t('planner.moreRow')}</span>
+          <span className="inline-flex items-center gap-2 min-w-0">
+            <span className="text-base text-ink-1">{t('planner.moreRow')}</span>
+            <ModeChip mode="cloud" />
+          </span>
           <span aria-hidden="true" className="text-ink-3">→</span>
         </button>
         <button

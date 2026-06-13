@@ -29,6 +29,8 @@ import { useNavigate } from 'react-router-dom'
 import BigButton from '../components/BigButton.jsx'
 import CommandButton from '../components/CommandButton.jsx'
 import StatusPill from '../components/StatusPill.jsx'
+import ModeChip from '../components/ModeChip.jsx'
+import LanDualHint from '../components/LanDualHint.jsx'
 import PgmPreview from '../components/PgmPreview.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
 import { transport, ClientCommand, ServerEvent } from '../services/transport.js'
@@ -102,10 +104,13 @@ export default function ServiceScreen() {
       className="px-4 pb-4 flex flex-col gap-4"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
     >
-      {/* Header: título + StatusPill */}
+      {/* Header: título + chip de modo + StatusPill */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink-1">{t('service.title')}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-3xl text-ink-1">{t('service.title')}</h1>
+            <ModeChip mode="live" connected={isConnected} />
+          </div>
           <p className="text-xs text-ink-3 mt-0.5">{headerSubtitle}</p>
         </div>
         <StatusPill />
@@ -124,6 +129,16 @@ export default function ServiceScreen() {
             ? t('service.reconnecting')
             : t('service.offlineWifi')}
         </div>
+      )}
+
+      {/* Aviso dual (C4): offline real (no reconectando) → orienta a que el
+          usuario puede preparar el culto desde las secciones cloud aunque no
+          tenga el PC. Botones que cruzan a /songs?mode=cloud y /plans. */}
+      {!isConnected && !isConnecting && (
+        <LanDualHint
+          variant="full"
+          onNavigate={(path) => { tapLight(); nav(path) }}
+        />
       )}
 
       {/* Botones principales Prev / Next */}

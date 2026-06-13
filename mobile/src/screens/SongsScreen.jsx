@@ -24,8 +24,10 @@
  * nube; aterrizarlo en el modo PC sería desorientador).
  */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import StatusPill from '../components/StatusPill.jsx'
+import ModeChip from '../components/ModeChip.jsx'
+import LanDualHint from '../components/LanDualHint.jsx'
 import SongsSearchBar from '../components/SongsSearchBar.jsx'
 import SongsResultList from '../components/SongsResultList.jsx'
 import SongsEmptyState from '../components/SongsEmptyState.jsx'
@@ -42,24 +44,15 @@ import { useCloudSongs } from '../hooks/useCloudSongs.js'
 import { AccountStatus } from '../services/account.js'
 import * as cloudSongs from '../services/cloudSongs.js'
 import { consumeFlash } from '../services/flashMessage.js'
+import { openPricing } from '../services/cloudUpsell.js'
 import { tapLight, tapMedium } from '../services/haptics.js'
 import { useT } from '../hooks/useT.js'
 import { t as tGlobal } from '../services/i18n.js'
 
-// Mismo destino y patrón de link externo que AccountScreen.
-const PRICING_URL = 'https://eclesia-presenter.vercel.app/pricing'
-
-function openExternal(url) {
-  try {
-    window.open(url, '_blank', 'noopener')
-  } catch {
-    // WebView sin window.open: no crasheamos
-  }
-}
-
 export default function SongsScreen() {
   const { t } = useT()
   const nav = useNavigate()
+  const { search: locationSearch } = useLocation()
   const { isConnected, isConnecting } = useConnection()
   const account = useAccount()
   const {
@@ -69,7 +62,16 @@ export default function SongsScreen() {
   const [sheetOpen, setSheetOpen] = useState(false)
   // Flash one-shot del editor (guardado OK) → toast + arrancar en nube.
   const [flash] = useState(() => consumeFlash())
-  const [mode, setMode] = useState(flash ? 'cloud' : 'pc')
+  // Modo inicial: cloud si venimos del editor (flash) O si la ruta trae
+  // ?mode=cloud (deep-link desde ServiceScreen/PairScreen/LanDualHint para
+  // "preparar el culto sin PC"). El segmented sigue mandando después.
+  const [mode, setMode] = useState(() => {
+    if (flash) return 'cloud'
+    try {
+      if (new URLSearchParams(locationSearch).get('mode') === 'cloud') return 'cloud'
+    } catch { /* ignore */ }
+    return 'pc'
+  })
   const [toast, setToast] = useState(flash || null)
   const [livePgm, setLivePgm] = useState(null)  // { songId, sectionId }
   const mountedRef = useRef(true)
@@ -190,7 +192,18 @@ export default function SongsScreen() {
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink-1">{t('songs.title')}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-3xl text-ink-1">{t('songs.title')}</h1>
+            {/* Chip de modo: "Nube" en Mi nube, "En vivo · PC" en modo PC.
+                Solo se muestra cuando el segmented existe (cuenta configurada)
+                — si no, la pantalla es 100% modo PC como antes de C2 y el chip
+                sería ruido. */}
+            {cloudAvailable && (
+              cloudMode
+                ? <ModeChip mode="cloud" />
+                : <ModeChip mode="live" connected={isConnected} />
+            )}
+          </div>
           <p className="text-xs text-ink-3 mt-0.5" aria-live="polite">
             {subtitle}
           </p>
@@ -239,6 +252,17 @@ export default function SongsScreen() {
                 ? t('songs.reconnecting')
                 : t('songs.offlineCache')}
             </div>
+          )}
+
+          {/* Cross-link dual (C4): en modo PC offline y con nube disponible,
+              una línea recuerda que las canciones cloud sí están a un toque.
+              Cambia el segmented a "Mi nube" en vez de navegar (ya estamos
+              en /songs). */}
+          {!isConnected && !isConnecting && cloudAvailable && (
+            <LanDualHint
+              variant="compact"
+              onNavigate={() => handlePickMode('cloud')}
+            />
           )}
 
           <SongsSearchBar
@@ -312,7 +336,7 @@ export default function SongsScreen() {
               body={t('cloudSongs.upsellBody')}
               cta={t('cloudSongs.upsellCta')}
               ctaAria={t('cloudSongs.upsellAria')}
-              onCta={() => openExternal(PRICING_URL)}
+              onCta={openPricing}
             />
           )}
           {account.status === AccountStatus.SIGNED_IN && account.isPro && (

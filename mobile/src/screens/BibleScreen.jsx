@@ -18,6 +18,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatusPill from '../components/StatusPill.jsx'
+import ModeChip from '../components/ModeChip.jsx'
+import LanDualHint from '../components/LanDualHint.jsx'
 import BibleSearchBar from '../components/BibleSearchBar.jsx'
 import BibleQuickChips from '../components/BibleQuickChips.jsx'
 import BibleResultList from '../components/BibleResultList.jsx'
@@ -128,7 +130,10 @@ export default function BibleScreen() {
       {/* Header */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink-1">{t('bible.title')}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-3xl text-ink-1">{t('bible.title')}</h1>
+            <ModeChip mode="live" connected={isConnected} />
+          </div>
           <p className="text-xs text-ink-3 mt-0.5" aria-live="polite">
             {subtitle}
           </p>
@@ -146,6 +151,15 @@ export default function BibleScreen() {
             ? t('bible.reconnecting')
             : t('bible.offlineWifi')}
         </div>
+      )}
+
+      {/* Cross-link dual (C4): Biblia es modo MANDO (busca en el PC). Offline
+          real → hint corto hacia la preparación cloud. */}
+      {!isConnected && !isConnecting && (
+        <LanDualHint
+          variant="compact"
+          onNavigate={(path) => { tapLight(); nav(path) }}
+        />
       )}
 
       {/* Input */}

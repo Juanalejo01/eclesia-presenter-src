@@ -63,8 +63,12 @@ jest.mock('../src/services/haptics.js', () => ({
 }))
 
 const mockNavigate = jest.fn()
+// useLocation: la screen lee ?mode=cloud para deep-link a "Mi nube" (C4).
+// mockSearch mutable → un test puede simular el deep-link.
+let mockSearch = ''
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ search: mockSearch }),
 }))
 
 // ─── Mock cuenta (C1) ──
@@ -108,6 +112,7 @@ beforeEach(() => {
   for (const k of Object.keys(mockSubscribers)) delete mockSubscribers[k]
   jest.clearAllMocks()
   consumeFlash() // limpiar flashes de tests previos
+  mockSearch = ''
   mockAccountState = { status: 'signedOut', email: null, user: null, plan: null, isPro: false, error: null }
   mockCloudState = {
     search: '', setSearch: jest.fn(), status: 'loading', items: [], error: null, refetch: jest.fn(),
@@ -280,4 +285,27 @@ test('14. flash del editor: arranca en modo nube + toast de guardado', () => {
   expect(screen.getByRole('radio', { name: 'Mi nube' })).toHaveAttribute('aria-checked', 'true')
   expect(screen.getAllByText('Canción guardada').length).toBeGreaterThan(0)
   expect(screen.getByText('Sublime Gracia')).toBeInTheDocument()
+})
+
+/* ============ C4: deep-link ?mode=cloud + chip + cross-link ============ */
+
+test('15. (C4) ?mode=cloud arranca directamente en "Mi nube"', () => {
+  setAccount('signedIn', { isPro: true })
+  mockSearch = '?mode=cloud'
+  mockCloudState.status = 'results'
+  mockCloudState.items = CLOUD_ITEMS
+  render(<SongsScreen />)
+  expect(screen.getByRole('radio', { name: 'Mi nube' })).toHaveAttribute('aria-checked', 'true')
+  expect(screen.getByText('Sublime Gracia')).toBeInTheDocument()
+})
+
+test('16. (C4) chip "Nube" visible en modo nube; "En vivo · PC" en modo PC', () => {
+  setAccount('signedIn', { isPro: true })
+  mockCloudState.status = 'results'
+  mockCloudState.items = CLOUD_ITEMS
+  render(<SongsScreen />)
+  // Por defecto modo PC → chip live.
+  expect(screen.getByRole('note', { name: /En vivo|conectada al PC/i })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('radio', { name: 'Mi nube' }))
+  expect(screen.getByRole('note', { name: /funciona sin el PC/i })).toHaveTextContent('Nube')
 })

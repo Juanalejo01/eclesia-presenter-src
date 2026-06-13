@@ -222,3 +222,11 @@ test('15. fila "Mis listas" (C3a) navega a /plans', () => {
   fireEvent.click(row)
   expect(mockNavigate).toHaveBeenCalledWith('/plans')
 })
+
+test('16. (C4) chips de modo: "En vivo · PC" en Conexion y "Nube" en Mis listas', () => {
+  render(<MoreScreen />)
+  // Chip live junto al estado de conexion (conectado por defecto en el mock).
+  expect(screen.getByRole('note', { name: /conectada al PC/i })).toHaveTextContent('En vivo · PC')
+  // Chip cloud junto a la fila "Mis listas".
+  expect(screen.getByRole('note', { name: /funciona sin el PC/i })).toHaveTextContent('Nube')
+})

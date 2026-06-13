@@ -180,3 +180,17 @@ test('5. Banner first-run se muestra cuando localStorage está vacío y se ocult
   expect(screen.queryByText(/Cómo emparejar/i)).toBeNull()
   expect(window.localStorage.getItem('eclesia.firstPairSeen')).toBe('1')
 })
+
+test('6. (C4) enlace "solo preparar el culto" navega a /songs?mode=cloud sin emparejar', () => {
+  setLocation({ hostname: '192.168.1.5' })
+  render(<PairScreen />)
+  // Visible en el modo por defecto (QR), sin tocar el flujo de emparejado.
+  // (Este suite no carga @testing-library/jest-dom, así que afirmamos con
+  // matchers de jest puros — getByRole ya valida nombre accesible/visibilidad.)
+  const link = screen.getByRole('button', { name: /preparar el culto en la nube sin emparejar/i })
+  expect(link.textContent).toContain('Solo quiero preparar el culto (sin PC)')
+  fireEvent.click(link)
+  expect(mockNavigate).toHaveBeenCalledWith('/songs?mode=cloud')
+  // No se intentó emparejar.
+  expect(pairWithDesktop).not.toHaveBeenCalled()
+})

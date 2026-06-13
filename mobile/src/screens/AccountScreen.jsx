@@ -33,17 +33,12 @@ import PlanBadge from '../components/PlanBadge.jsx'
 import { account, AccountStatus } from '../services/account.js'
 import { useAccount } from '../hooks/useAccount.js'
 import { useT } from '../hooks/useT.js'
+// PRICING_URL + openExternal viven en cloudUpsell.js (lugar canónico C4):
+// el CTA "Hazte Pro" lleva al MISMO sitio aquí, en Canciones-nube y en Mis
+// listas. MANAGE_URL es específico de esta pantalla (gestión de cuenta).
+import { PRICING_URL, openExternal } from '../services/cloudUpsell.js'
 
 const MANAGE_URL = 'https://eclesia-presenter.vercel.app/cuenta'
-const PRICING_URL = 'https://eclesia-presenter.vercel.app/pricing'
-
-function openExternal(url) {
-  try {
-    window.open(url, '_blank', 'noopener')
-  } catch {
-    // WebView sin window.open: no hay fallback razonable, no crasheamos
-  }
-}
 
 export default function AccountScreen() {
   const { t } = useT()

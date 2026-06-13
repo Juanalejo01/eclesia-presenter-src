@@ -582,6 +582,23 @@ export default function PairScreen() {
           {error.message}
         </div>
       )}
+
+      {/* Escape dual (C4): si el usuario está en casa SIN el PC pero quiere
+          preparar el culto, no tiene por qué emparejar. Este enlace
+          secundario lo lleva a las secciones cloud (que hacen su propio
+          gating de cuenta/plan). No interfiere con el flujo principal de
+          emparejado — es un salto opcional, deliberadamente discreto. */}
+      <div className="mt-6 pt-4 border-t border-line-1 text-center">
+        <button
+          type="button"
+          onClick={() => nav('/songs?mode=cloud')}
+          aria-label={t('dualMode.pairPrepCloudAria')}
+          className="text-sm text-copper-100 underline underline-offset-2
+                     decoration-copper-300/40 hover:text-copper-200 transition-colors"
+        >
+          {t('dualMode.pairPrepCloud')}
+        </button>
+      </div>
     </div>
   )
 }

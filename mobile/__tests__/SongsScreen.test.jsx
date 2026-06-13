@@ -92,8 +92,10 @@ jest.mock('../src/services/haptics.js', () => ({
 
 // ─── Mock router ──
 const mockNavigate = jest.fn()
+// useLocation añadido en C4: SongsScreen lee ?mode=cloud para deep-link.
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ search: '' }),
 }))
 
 import SongsScreen from '../src/screens/SongsScreen.jsx'
@@ -254,11 +256,37 @@ test('13. PGM_UPDATE con type:song matcheando seleccion muestra EN VIVO', () => 
     const set = mockSubscribers['pgm-update']
     set && set.forEach(h => h({ type: 'song', text: 'X', reference: 'Hit', meta: { songId: 7, sectionId: 's_0' } }))
   })
-  expect(screen.getByText(/EN VIVO/i)).toBeInTheDocument()
+  // Exact 'EN VIVO' (badge live de la sección). El ModeChip de C4 dice
+  // "En vivo · PC" y matchearía /EN VIVO/i — por eso afirmamos el texto
+  // exacto del badge en mayúsculas para no colisionar.
+  expect(screen.getByText('EN VIVO')).toBeInTheDocument()
 })
 
 test('14. status=loading muestra skeleton + subtitle', () => {
   mockSongsState.status = 'loading'
   render(<SongsScreen />)
   expect(screen.getByText(/Buscando…/i)).toBeInTheDocument()
+})
+
+test('15. (C4) modo PC offline real: cross-link cloud cambia a "Mi nube"', () => {
+  // useAccount real → default signedOut → cloud disponible (segmented presente).
+  mockConnectionState = {
+    isConnected: false, isConnecting: false, latencyMs: null, signal: 'offline', queueSize: 0,
+  }
+  render(<SongsScreen />)
+  // El segmented arranca en PC.
+  expect(screen.getByRole('radio', { name: 'PC' })).toHaveAttribute('aria-checked', 'true')
+  // El cross-link compacto está presente y al pulsarlo salta a Mi nube
+  // (sin navegar a otra ruta).
+  fireEvent.click(screen.getByRole('button', { name: /tus canciones en la nube/i }))
+  expect(mockNavigate).not.toHaveBeenCalled()
+  expect(screen.getByRole('radio', { name: 'Mi nube' })).toHaveAttribute('aria-checked', 'true')
+})
+
+test('16. (C4) modo PC reconectando: NO muestra el cross-link cloud', () => {
+  mockConnectionState = {
+    isConnected: false, isConnecting: true, latencyMs: null, signal: 'offline', queueSize: 0,
+  }
+  render(<SongsScreen />)
+  expect(screen.queryByRole('button', { name: /tus canciones en la nube/i })).toBeNull()
 })

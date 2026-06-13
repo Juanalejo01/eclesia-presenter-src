@@ -83,6 +83,7 @@ jest.mock('../src/services/haptics.js', () => ({
 const mockNavigate = jest.fn()
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ search: '' }),
 }))
 jest.mock('../src/components/QrScanner.jsx', () => ({
   __esModule: true,

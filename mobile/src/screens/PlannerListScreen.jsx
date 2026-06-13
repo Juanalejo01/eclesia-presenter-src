@@ -24,25 +24,16 @@ import { useNavigate } from 'react-router-dom'
 import BigButton from '../components/BigButton.jsx'
 import CloudGateCard from '../components/CloudGateCard.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import ModeChip from '../components/ModeChip.jsx'
 import { useAccount } from '../hooks/useAccount.js'
 import { useCloudSchedules } from '../hooks/useCloudSchedules.js'
 import { AccountStatus } from '../services/account.js'
 import * as cloudSchedules from '../services/cloudSchedules.js'
 import { consumeFlash } from '../services/flashMessage.js'
+import { openPricing } from '../services/cloudUpsell.js'
 import { tapLight, tapMedium } from '../services/haptics.js'
 import { useT } from '../hooks/useT.js'
 import { t as tGlobal, getLocale } from '../services/i18n.js'
-
-// Mismo destino y patrón de link externo que SongsScreen/AccountScreen.
-const PRICING_URL = 'https://eclesia-presenter.vercel.app/pricing'
-
-function openExternal(url) {
-  try {
-    window.open(url, '_blank', 'noopener')
-  } catch {
-    // WebView sin window.open: no crasheamos
-  }
-}
 
 const PLANNER_ERR_CODES = new Set(['network', 'unauthorized', 'not_found', 'validation', 'unknown'])
 
@@ -99,7 +90,10 @@ export default function PlannerListScreen() {
           ←
         </button>
         <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink-1">{t('planner.title')}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-3xl text-ink-1">{t('planner.title')}</h1>
+            <ModeChip mode="cloud" />
+          </div>
           <p className="text-xs text-ink-3 mt-0.5">{t('planner.subtitle')}</p>
         </div>
       </header>
@@ -135,7 +129,7 @@ export default function PlannerListScreen() {
             body={t('planner.upsellBody')}
             cta={t('planner.upsellCta')}
             ctaAria={t('planner.upsellAria')}
-            onCta={() => openExternal(PRICING_URL)}
+            onCta={openPricing}
           />
         )}
         {isPro && (
