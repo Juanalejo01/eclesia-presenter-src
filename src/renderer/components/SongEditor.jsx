@@ -1,96 +1,28 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { songToSlides } from '../services/songSplit.js'
-import { confirm } from '../services/dialogService.js'
 import {
-  IconX, IconPlus, IconArrowUp, IconArrowDown, IconCheck, IconChevDown,
-} from './Icons.jsx'
-
-const SECTION_TYPES = [
-  { value: 'verse',   label: 'Estrofa' },
-  { value: 'chorus',  label: 'Coro' },
-  { value: 'bridge',  label: 'Puente' },
-  { value: 'intro',   label: 'Intro' },
-  { value: 'outro',   label: 'Final' },
-  { value: 'tag',     label: 'Tag' },
-]
-
-// ============================================================
-// Helpers de split — usados para auto-dividir letras al pegar o al
-// exceder el límite de líneas por sección.
-// ============================================================
-
-/**
- * Toma un texto crudo (recién pegado) y lo divide en N "estrofas"
- * basándose en líneas vacías como separador (estándar al copiar letras).
- * Si una estrofa excede maxLines, la sub-divide para que cada bloque
- * resultante sea ≤ maxLines.
- *
- * Devuelve array de strings (cada elemento = letra de una sección nueva).
- */
-function splitPastedSong(rawText, maxLines = 4) {
-  if (!rawText) return []
-  // Normalizar saltos de línea
-  const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
-
-  // Agrupar por estrofas (separador = líneas vacías consecutivas)
-  const stanzas = []
-  let current = []
-  for (const line of lines) {
-    if (line.trim() === '') {
-      if (current.length > 0) { stanzas.push(current); current = [] }
-    } else {
-      current.push(line)
-    }
-  }
-  if (current.length > 0) stanzas.push(current)
-
-  // Si NO hay líneas vacías, todo cae en una estrofa. La cortamos por maxLines.
-  if (stanzas.length === 1 && stanzas[0].length > maxLines) {
-    const single = stanzas[0]
-    const out = []
-    for (let i = 0; i < single.length; i += maxLines) {
-      out.push(single.slice(i, i + maxLines).join('\n'))
-    }
-    return out
-  }
-
-  // Si una estrofa excede maxLines, la dividimos en sub-secciones
-  const result = []
-  for (const stanza of stanzas) {
-    if (stanza.length <= maxLines) {
-      result.push(stanza.join('\n'))
-    } else {
-      for (let i = 0; i < stanza.length; i += maxLines) {
-        result.push(stanza.slice(i, i + maxLines).join('\n'))
-      }
-    }
-  }
-  return result
-}
-
-/**
- * Crea un array de secciones a partir de un texto pegado.
- * Distribuye según tipo: si hay 1 sola, "Estrofa". Si hay varias,
- * alterna heurísticamente (estrofa, coro, estrofa, coro…).
- */
-function buildSectionsFromPaste(rawText, maxLines = 4) {
-  const chunks = splitPastedSong(rawText, maxLines)
-  return chunks.map((text, i) => ({
-    type: 'verse',
-    label: `Estrofa ${i + 1}`,
-    text,
-  }))
-}
+  parseCanvas, sectionsToCanvas, getHashContext, SECTION_SUGGESTIONS,
+} from '../services/songCanvas.js'
+import { confirm } from '../services/dialogService.js'
+import { IconX, IconCheck } from './Icons.jsx'
 
 export default function SongEditor({ song, onSave, onCancel }) {
-  const [title, setTitle]       = useState(song?.title || '')
-  const [author, setAuthor]     = useState(song?.author || '')
-  const [tags, setTags]         = useState(song?.tags || '')
-  const [sections, setSections] = useState(
-    song?.sections?.length ? song.sections : [{ type: 'verse', label: 'Estrofa 1', text: '' }]
+  const [title, setTitle]   = useState(song?.title || '')
+  const [author, setAuthor] = useState(song?.author || '')
+  const [tags, setTags]     = useState(song?.tags || '')
+  // Lienzo único: toda la letra en un solo texto. Doble Enter = nuevo
+  // slide, "#Coro" etiqueta secciones. Se parsea a sections[] al vuelo.
+  const [canvas, setCanvas] = useState(
+    song?.sections?.length ? sectionsToCanvas(song.sections) : ''
   )
   const [maxLines, setMaxLines] = useState(song?.maxLines ?? song?.max_lines ?? 4)
   const [tab, setTab] = useState('edit')
+
+  // El menú "#" vive en LyricsCanvas; estos refs dejan que el handler
+  // global de Escape cierre el menú en vez del modal.
+  const hashMenuOpenRef = useRef(false)
+  const closeHashMenuRef = useRef(null)
+  const insertHeaderRef = useRef(null)
 
   // Theme override por canción. null = usa el theme global de proyección.
   // DECLARADO AQUÍ ARRIBA (antes de los useEffect/helpers que lo usan) para
@@ -105,13 +37,13 @@ export default function SongEditor({ song, onSave, onCancel }) {
   // accidental fuera del modal).
   const initialRef = useRef(JSON.stringify({
     title: song?.title || '', author: song?.author || '', tags: song?.tags || '',
-    sections: song?.sections?.length ? song.sections : [{ type: 'verse', label: 'Estrofa 1', text: '' }],
+    canvas: song?.sections?.length ? sectionsToCanvas(song.sections) : '',
     maxLines: song?.maxLines ?? song?.max_lines ?? 4,
     themeOverride: song?.theme_override || null,
   }))
 
   const hasUnsavedChanges = () => {
-    const current = JSON.stringify({ title, author, tags, sections, maxLines, themeOverride })
+    const current = JSON.stringify({ title, author, tags, canvas, maxLines, themeOverride })
     return current !== initialRef.current
   }
 
@@ -131,13 +63,19 @@ export default function SongEditor({ song, onSave, onCancel }) {
     onCancel()
   }
 
-  // Escape también pasa por la confirmación
+  // Escape también pasa por la confirmación. Si el menú "#" está abierto,
+  // Escape lo cierra a él (no al modal).
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); requestClose() } }
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      if (hashMenuOpenRef.current) { closeHashMenuRef.current?.(); return }
+      requestClose()
+    }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, author, tags, sections, maxLines, themeOverride])
+  }, [title, author, tags, canvas, maxLines, themeOverride])
 
   // (themeOverride y styleOpen se declaran arriba, junto a los otros useState,
   //  para evitar el TDZ que rompía el render del editor.)
@@ -147,34 +85,23 @@ export default function SongEditor({ song, onSave, onCancel }) {
   const clearOverride = () => setThemeOverride(null)
   const hasOverride = themeOverride !== null && Object.keys(themeOverride || {}).length > 0
 
+  // sections[] derivadas del lienzo — mismo modelo que BD/proyección/móvil.
+  const parsedSections = useMemo(() => parseCanvas(canvas), [canvas])
+
   const presentationSlides = useMemo(
-    () => songToSlides({ title, sections }, { maxLines }),
-    [title, sections, maxLines]
+    () => songToSlides({ title, sections: parsedSections }, { maxLines }),
+    [title, parsedSections, maxLines]
   )
 
-  const addSection = () => {
-    const count = sections.filter(s => s.type === 'verse').length + 1
-    setSections([...sections, { type: 'verse', label: `Estrofa ${count}`, text: '' }])
+  // Mayús/minús sobre la letra; los encabezados "#..." no se tocan para
+  // que el parser los siga reconociendo tal cual los escribió el usuario.
+  const mapLyricLines = (fn) => {
+    setCanvas(canvas.split('\n')
+      .map(l => l.trimStart().startsWith('#') ? l : fn(l))
+      .join('\n'))
   }
-  const updateSection = (i, patch) => setSections(sections.map((s, idx) => idx === i ? { ...s, ...patch } : s))
-  const removeSection = (i) => setSections(sections.filter((_, idx) => idx !== i))
-
-  // Convierte la letra de TODAS las secciones a mayúsculas (operación bulk).
-  // Útil para canciones que se proyectan estilo broadcast/clásico.
-  const upperAll = () => {
-    setSections(sections.map(s => ({ ...s, text: (s.text || '').toUpperCase() })))
-  }
-  // Inverso: deja todo en formato normal (capitalización natural según primera letra).
-  const lowerAll = () => {
-    setSections(sections.map(s => ({ ...s, text: (s.text || '').toLowerCase() })))
-  }
-  const moveSection = (i, dir) => {
-    const j = i + dir
-    if (j < 0 || j >= sections.length) return
-    const copy = [...sections]
-    ;[copy[i], copy[j]] = [copy[j], copy[i]]
-    setSections(copy)
-  }
+  const upperAll = () => mapLyricLines(l => l.toUpperCase())
+  const lowerAll = () => mapLyricLines(l => l.toLowerCase())
 
   const handleSave = () => {
     if (!title.trim()) return
@@ -182,7 +109,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
       title: title.trim(),
       author: author.trim(),
       tags: tags.trim(),
-      sections,
+      sections: parsedSections,
       maxLines,
       theme_override: hasOverride ? themeOverride : null,
     })
@@ -264,7 +191,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
                   backdropFilter: 'blur(6px)',
                 }}>
                   <div className="section-h">
-                    <h3 style={{ fontSize: 14 }}>Letra por secciones</h3>
+                    <h3 style={{ fontSize: 14 }}>Letra</h3>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button className="btn btn-ghost" onClick={upperAll}
                         title="Convertir toda la letra a mayúsculas">
@@ -280,7 +207,11 @@ export default function SongEditor({ song, onSave, onCancel }) {
                         title="Asignar fondo y tipografía propios a esta canción">
                         🎨 Estilo {hasOverride && '·●'}
                       </button>
-                      <button className="btn btn-ghost" onClick={addSection}><IconPlus size={13} /> Sección</button>
+                      <button className="btn btn-ghost"
+                        onClick={() => insertHeaderRef.current?.()}
+                        title="Insertar etiqueta de sección (Coro, Estrofa, Puente…)">
+                        # Etiqueta
+                      </button>
                     </div>
                   </div>
                   {styleOpen && (
@@ -292,49 +223,19 @@ export default function SongEditor({ song, onSave, onCancel }) {
                     />
                   )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {sections.map((section, i) => (
-                    <SectionRow key={i} section={section} index={i}
-                      total={sections.length} maxLines={maxLines}
-                      onChange={(patch) => updateSection(i, patch)}
-                      onRemove={() => removeSection(i)}
-                      onMove={(dir) => moveSection(i, dir)}
-                      onPasteMultiSection={(chunks) => {
-                        // Reemplaza esta sección con la primera del paste y
-                        // añade el resto como secciones nuevas a continuación.
-                        if (chunks.length === 0) return
-                        const before = sections.slice(0, i)
-                        const after  = sections.slice(i + 1)
-                        const newSections = chunks.map((text, idx) => ({
-                          type: 'verse',
-                          label: idx === 0 && section.label
-                            ? section.label
-                            : `Estrofa ${before.length + idx + 1}`,
-                          text,
-                        }))
-                        // Re-numerar las posteriores que sean estrofas auto
-                        const renumbered = after.map((s, idx) => (
-                          s.type === 'verse' && /^Estrofa\s+\d+$/.test(s.label || '')
-                            ? { ...s, label: `Estrofa ${before.length + newSections.length + idx + 1}` }
-                            : s
-                        ))
-                        setSections([...before, ...newSections, ...renumbered])
-                      }}
-                      onOverflowToNewSection={(remainingLines) => {
-                        // El usuario excedió maxLines en esta sección.
-                        // Mueve las líneas excedentes a una nueva sección
-                        // que aparece DESPUÉS de esta.
-                        const before = sections.slice(0, i + 1)
-                        const after  = sections.slice(i + 1)
-                        const newCount = sections.filter(s => s.type === 'verse').length + 1
-                        const overflow = {
-                          type: 'verse',
-                          label: `Estrofa ${newCount}`,
-                          text: remainingLines.join('\n'),
-                        }
-                        setSections([...before, overflow, ...after])
-                      }} />
-                  ))}
+                <LyricsCanvas
+                  value={canvas}
+                  onChange={setCanvas}
+                  menuOpenRef={hashMenuOpenRef}
+                  closeMenuRef={closeHashMenuRef}
+                  insertHeaderRef={insertHeaderRef}
+                />
+                <div style={{
+                  padding: '6px 4px', fontSize: 10, color: 'var(--text-4)',
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  {parsedSections.length} secci{parsedSections.length === 1 ? 'ón' : 'ones'} ·
+                  {' '}doble Enter = nuevo slide · escribe <b>#</b> para etiquetar (Coro, Estrofa…)
                 </div>
               </div>
             </>
@@ -345,7 +246,7 @@ export default function SongEditor({ song, onSave, onCancel }) {
 
         <div className="modal-footer">
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>
-            {sections.length} secciones · {presentationSlides.length} slides al proyectar
+            {parsedSections.length} secciones · {presentationSlides.length} slides al proyectar
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={requestClose}>Cancelar</button>
@@ -359,90 +260,142 @@ export default function SongEditor({ song, onSave, onCancel }) {
   )
 }
 
-function SectionRow({
-  section, index, total, maxLines,
-  onChange, onRemove, onMove,
-  onPasteMultiSection,    // (chunks: string[]) → reemplaza esta sección + añade el resto
-  onOverflowToNewSection, // (remainingLines: string[]) → mueve líneas a sección nueva
-}) {
-  const lineCount = (section.text || '').split('\n').filter(l => l.trim()).length
-  const willSplit = lineCount > maxLines
-  const splitCount = Math.ceil(lineCount / maxLines) || 1
+// ============================================================
+// LyricsCanvas — el lienzo único de la letra.
+//
+// Un solo textarea con toda la canción. Doble Enter separa slides;
+// al escribir "#" a inicio de línea se abre un menú con las partes
+// (Coro, Estrofa, Puente…) navegable con ↑/↓ + Enter, o click.
+// La posición del menú se aproxima por número de línea (fuente y
+// line-height fijos), suficiente sin recurrir a un mirror div.
+// ============================================================
+const CANVAS_FONT_SIZE = 14
+const CANVAS_LINE_HEIGHT = 1.5
+const CANVAS_PADDING = 12
 
-  // Maneja paste: si el contenido pegado tiene varias estrofas (líneas en
-  // blanco como separador) o excede maxLines, lo divide automáticamente
-  // en múltiples secciones.
-  const handlePaste = (e) => {
-    const pasted = e.clipboardData?.getData('text') || ''
-    if (!pasted.trim()) return
-    const chunks = splitPastedSong(pasted, maxLines)
-    // Si solo hay 1 chunk y cabe en una sección, dejamos el paste normal
-    if (chunks.length <= 1) return
-    e.preventDefault()
-    onPasteMultiSection?.(chunks)
+function LyricsCanvas({ value, onChange, menuOpenRef, closeMenuRef, insertHeaderRef }) {
+  const taRef = useRef(null)
+  const [menu, setMenu] = useState(null)   // { start, query, top } | null
+  const [selIdx, setSelIdx] = useState(0)
+  const pendingCaretRef = useRef(null)
+
+  const matches = useMemo(() => {
+    if (!menu) return []
+    const q = menu.query.trim().toLowerCase()
+    return SECTION_SUGGESTIONS.filter(s => s.label.toLowerCase().startsWith(q))
+  }, [menu])
+  const open = !!menu && matches.length > 0
+
+  // Estado compartido con SongEditor (Escape global + botón "# Etiqueta").
+  useEffect(() => { menuOpenRef.current = open }, [open, menuOpenRef])
+  useEffect(() => {
+    closeMenuRef.current = () => setMenu(null)
+    return () => { closeMenuRef.current = null }
+  }, [closeMenuRef])
+
+  // Recoloca el caret tras una inserción programática (menú o botón).
+  useEffect(() => {
+    if (pendingCaretRef.current == null || !taRef.current) return
+    const pos = pendingCaretRef.current
+    pendingCaretRef.current = null
+    taRef.current.focus()
+    taRef.current.setSelectionRange(pos, pos)
+  }, [value])
+
+  const refreshMenu = (text, caret) => {
+    const ctx = getHashContext(text, caret)
+    if (!ctx) { setMenu(null); return }
+    const ta = taRef.current
+    const lineHeight = CANVAS_FONT_SIZE * CANVAS_LINE_HEIGHT
+    const linesBefore = text.slice(0, caret).split('\n').length
+    const top = CANVAS_PADDING + linesBefore * lineHeight - (ta?.scrollTop || 0)
+    setMenu({ ...ctx, top: Math.max(8, top) })
+    setSelIdx(0)
   }
 
-  // Maneja Enter: si el usuario añade una línea que hace que la sección
-  // exceda maxLines, mueve TODA la línea nueva (y siguientes) a una
-  // sección nueva automáticamente.
-  const handleKeyDown = (e) => {
-    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return
-    const textarea = e.target
-    const cursor = textarea.selectionStart
-    const text = textarea.value
-    // Líneas antes del cursor (incluyendo la actual)
-    const linesBefore = text.slice(0, cursor).split('\n')
-    const nonEmptyBefore = linesBefore.filter(l => l.trim()).length
-    // Si ya estamos en maxLines y vamos a añadir UNA MÁS, derivamos a sección nueva
-    if (nonEmptyBefore >= maxLines) {
-      e.preventDefault()
-      // Texto que se queda: hasta el cursor
-      const keep = text.slice(0, cursor).trimEnd()
-      // Texto que se va a la nueva sección: desde cursor en adelante
-      const overflow = text.slice(cursor).trimStart()
-      onChange({ text: keep })
-      // Crear sección nueva con la parte que excede (o vacía si empezaba en Enter)
-      onOverflowToNewSection?.(overflow ? overflow.split('\n') : [''])
+  const apply = (suggestion) => {
+    if (!menu) return
+    const ta = taRef.current
+    const caret = ta ? ta.selectionStart : menu.start + 1 + menu.query.length
+    const next = value.slice(0, menu.start) + '#' + suggestion.label + '\n' + value.slice(caret)
+    pendingCaretRef.current = menu.start + suggestion.label.length + 2
+    setMenu(null)
+    onChange(next)
+  }
+
+  // Botón "# Etiqueta" de la barra del editor: inserta "#" en un bloque
+  // nuevo (con la separación de línea en blanco que haga falta) y abre el menú.
+  useEffect(() => {
+    insertHeaderRef.current = () => {
+      const ta = taRef.current
+      if (!ta) return
+      const caret = ta.selectionStart
+      const before = value.slice(0, caret)
+      const ins = !before ? '#' : /\n\n$/.test(before) ? '#' : /\n$/.test(before) ? '\n#' : '\n\n#'
+      const next = before + ins + value.slice(ta.selectionEnd)
+      const newCaret = caret + ins.length
+      pendingCaretRef.current = newCaret
+      onChange(next)
+      refreshMenu(next, newCaret)
     }
+    return () => { insertHeaderRef.current = null }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, onChange, insertHeaderRef])
+
+  const handleKeyDown = (e) => {
+    if (!open) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSelIdx(i => (i + 1) % matches.length) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSelIdx(i => (i - 1 + matches.length) % matches.length) }
+    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); apply(matches[selIdx]) }
+    // Escape lo gestiona el handler global del modal (cierra solo el menú).
   }
 
   return (
-    <div className="section-block">
-      <div className="section-head">
-        <select className="select" style={{ height: 26, fontSize: 11 }}
-          value={section.type} onChange={e => onChange({ type: e.target.value })}>
-          {SECTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
-        <input className="field-input" value={section.label}
-          onChange={e => onChange({ label: e.target.value })}
-          placeholder="Etiqueta..."
-          style={{ height: 26, flex: 1, fontSize: 12 }} />
-        {willSplit && (
-          <span className="song-tag" style={{
-            background: 'rgba(244,184,64,0.15)', borderColor: 'rgba(244,184,64,0.35)', color: 'var(--preview)',
-          }} title={`Esta sección excede ${maxLines} líneas, se proyectará en ${splitCount} slides`}>
-            {splitCount} slides
-          </span>
-        )}
-        <button className="btn btn-ghost" onClick={() => onMove(-1)} disabled={index === 0}><IconArrowUp size={12} /></button>
-        <button className="btn btn-ghost" onClick={() => onMove(1)} disabled={index === total - 1}><IconArrowDown size={12} /></button>
-        <button className="btn btn-ghost btn-danger" onClick={onRemove}><IconX size={12} /></button>
-      </div>
-      <textarea className="field-input"
+    <div style={{ position: 'relative' }}>
+      <textarea ref={taRef} className="field-input"
         style={{
-          border: 0, borderRadius: 0,
-          minHeight: 140, width: '100%', resize: 'vertical',
-          fontSize: 14, lineHeight: 1.5,
-          padding: '12px 16px',
+          minHeight: 320, width: '100%', resize: 'vertical',
+          fontSize: CANVAS_FONT_SIZE, lineHeight: CANVAS_LINE_HEIGHT,
+          padding: `${CANVAS_PADDING}px 16px`,
         }}
-        value={section.text}
-        onChange={e => onChange({ text: e.target.value })}
-        onPaste={handlePaste}
-        onKeyDown={handleKeyDown}
-        placeholder="Escribe la letra aquí…&#10;Al exceder el máximo se crea una sección nueva automáticamente.&#10;Pegar una canción entera la divide por estrofas." />
-      <div style={{ padding: '6px 12px', fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
-        {lineCount} línea{lineCount !== 1 ? 's' : ''} · max {maxLines}
-      </div>
+        value={value}
+        onChange={e => { onChange(e.target.value); refreshMenu(e.target.value, e.target.selectionStart) }}
+        onSelect={e => refreshMenu(e.target.value, e.target.selectionStart)}
+        onScroll={() => { if (menu && taRef.current) refreshMenu(value, taRef.current.selectionStart) }}
+        onBlur={() => setMenu(null)}
+        spellCheck={false}
+        placeholder={'Escribe aquí toda la letra…\n\nDeja una línea en blanco (doble Enter) para empezar un slide nuevo.\nEscribe # para etiquetar una parte: #Coro, #Estrofa, #Puente…'}
+        onKeyDown={handleKeyDown} />
+      {open && (
+        <div style={{
+          position: 'absolute', top: menu.top, left: 18, zIndex: 30,
+          minWidth: 180, overflow: 'hidden',
+          background: 'var(--bg-2)',
+          border: '1px solid var(--copper-300)',
+          borderRadius: 'var(--r-md)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+        }}>
+          {matches.map((s, i) => (
+            <div key={s.label}
+              onMouseDown={e => { e.preventDefault(); apply(s) }}
+              onMouseEnter={() => setSelIdx(i)}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16,
+                padding: '7px 12px', cursor: 'pointer', fontSize: 13,
+                background: i === selIdx ? 'rgba(168,95,51,0.25)' : 'transparent',
+                color: i === selIdx ? 'var(--copper-100)' : 'var(--text-1)',
+              }}>
+              <span><span style={{ color: 'var(--copper-200)' }}>#</span> {s.label}</span>
+            </div>
+          ))}
+          <div style={{
+            padding: '5px 12px', fontSize: 10, color: 'var(--text-4)',
+            fontFamily: 'var(--font-mono)', borderTop: '1px solid var(--line-1)',
+          }}>
+            ↑↓ navegar · Enter elegir
+          </div>
+        </div>
+      )}
     </div>
   )
 }
